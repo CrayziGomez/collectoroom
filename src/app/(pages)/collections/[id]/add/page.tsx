@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wand2, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { notFound, useRouter, useParams } from "next/navigation";
 import { CARD_STATUSES } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { generateCardDescription } from "@/ai/flows/card-description-generator";
@@ -20,7 +20,9 @@ import { doc, getDoc, addDoc, collection, updateDoc, increment } from "firebase/
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { Collection } from "@/lib/types";
 
-export default function AddCardPage({ params }: { params: { id: string } }) {
+export default function AddCardPage() {
+    const params = useParams();
+    const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
     const { toast } = useToast();
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -44,13 +46,13 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
         }
 
         const fetchCollection = async () => {
+            if (!collectionId) return;
             setIsCollectionLoading(true);
-            const collectionRef = doc(db, 'collections', params.id);
+            const collectionRef = doc(db, 'collections', collectionId);
             const collectionSnap = await getDoc(collectionRef);
 
             if (collectionSnap.exists()) {
                 const data = collectionSnap.data() as Collection;
-                // Ensure the current user is the owner of the collection
                 if (data.userId !== user.uid) {
                     toast({ title: "Access Denied", description: "You don't own this collection.", variant: "destructive" });
                     router.push('/my-collectoroom');
@@ -65,7 +67,7 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
 
         fetchCollection();
 
-    }, [user, authLoading, params.id, router, toast]);
+    }, [user, authLoading, collectionId, router, toast]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -204,7 +206,7 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
                 </Card>
 
                 <div className="flex justify-end gap-2 mt-6">
-                    <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${params.id}`}>Cancel</Link></Button>
+                    <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${collectionId}`}>Cancel</Link></Button>
                     <Button onClick={handleAddCard} disabled={isSaving || !title || !status || !imageFile}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? 'Adding...' : 'Add Card'}
