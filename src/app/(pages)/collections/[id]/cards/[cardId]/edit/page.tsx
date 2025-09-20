@@ -20,7 +20,8 @@ import { doc, getDoc, updateDoc, deleteDoc, increment } from "firebase/firestore
 import type { Card as CardType, Collection } from "@/lib/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-const MAX_WORDS = 500;
+const MAX_DESC_WORDS = 500;
+const MAX_TITLE_WORDS = 10;
 
 export default function EditCardPage() {
     const params = useParams();
@@ -81,19 +82,31 @@ export default function EditCardPage() {
 
     }, [user, authLoading, collectionId, cardId, router, toast]);
 
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const text = e.target.value;
+        const words = text.split(/\s+/).filter(Boolean);
+        if (words.length <= MAX_TITLE_WORDS) {
+            setTitle(text);
+        } else {
+            const trimmedText = words.slice(0, MAX_TITLE_WORDS).join(' ');
+            setTitle(trimmedText);
+        }
+    };
+
     const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
         const words = text.split(/\s+/).filter(Boolean);
-        if (words.length <= MAX_WORDS) {
+        if (words.length <= MAX_DESC_WORDS) {
             setDescription(text);
         } else {
-            // Trim the text to the first MAX_WORDS words
-            const trimmedText = words.slice(0, MAX_WORDS).join(' ');
+            // Trim the text to the first MAX_DESC_WORDS words
+            const trimmedText = words.slice(0, MAX_DESC_WORDS).join(' ');
             setDescription(trimmedText);
         }
     };
 
-    const wordCount = description.split(/\s+/).filter(Boolean).length;
+    const titleWordCount = title.split(/\s+/).filter(Boolean).length;
+    const descriptionWordCount = description.split(/\s+/).filter(Boolean).length;
     
     const handleGenerateDescription = async () => {
         if (!collectionData) return;
@@ -106,8 +119,8 @@ export default function EditCardPage() {
             });
             if (result.suggestedDescription) {
                  const words = result.suggestedDescription.split(/\s+/).filter(Boolean);
-                if (words.length > MAX_WORDS) {
-                    const trimmedText = words.slice(0, MAX_WORDS).join(' ');
+                if (words.length > MAX_DESC_WORDS) {
+                    const trimmedText = words.slice(0, MAX_DESC_WORDS).join(' ');
                     setDescription(trimmedText);
                 } else {
                     setDescription(result.suggestedDescription);
@@ -234,13 +247,16 @@ export default function EditCardPage() {
                 <Card>
                     <CardContent className="p-6 grid gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="title">Card Title</Label>
-                            <Input id="title" placeholder="e.g., Action Comics #1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isSaving} />
+                             <div className="flex justify-between items-center">
+                                <Label htmlFor="title">Card Title</Label>
+                                <span className="text-sm text-muted-foreground">{titleWordCount}/{MAX_TITLE_WORDS} words</span>
+                            </div>
+                            <Input id="title" placeholder="e.g., Action Comics #1" value={title} onChange={handleTitleChange} disabled={isSaving} />
                         </div>
                         <div className="grid gap-2">
                             <div className="flex justify-between items-center">
                                 <Label htmlFor="description">Description</Label>
-                                <span className="text-sm text-muted-foreground">{wordCount}/{MAX_WORDS} words</span>
+                                <span className="text-sm text-muted-foreground">{descriptionWordCount}/{MAX_DESC_WORDS} words</span>
                             </div>
                             <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={handleDescriptionChange} disabled={isSaving} />
                             <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !title || isSaving}>
@@ -275,4 +291,3 @@ export default function EditCardPage() {
         </div>
     );
 }
-
