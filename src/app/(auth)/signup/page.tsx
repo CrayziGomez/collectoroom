@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app, db } from '@/lib/firebase';
@@ -28,34 +28,38 @@ export default function SignupPage() {
 
   const handleSignup = async () => {
     try {
-      // 1. Check if this would be the first user BEFORE creating the user
-      const usersCollectionRef = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollectionRef);
+      // 1. Check if this would be the first user BEFORE creating the account
+      // This is a small race condition, but acceptable for this app's purpose.
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
       const isFirstUser = usersSnapshot.empty;
 
-      // 2. Create the user in Firebase Auth
+      // 2. Create the user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const createdUser = userCredential.user;
       
+      // 3. Update the user's profile in Firebase Auth (e.g., displayName)
       await updateProfile(createdUser, {
         displayName: username,
       });
 
-      // 3. After successful auth creation, create the user document in Firestore
+      // 4. Create the user document in Firestore. This is the critical step.
       const newUser: User = {
         uid: createdUser.uid,
-        id: createdUser.uid, // for consistency
+        id: createdUser.uid, // for consistency in the data model
         username: username,
         email: createdUser.email!,
         tier: tier as User['tier'],
-        isAdmin: isFirstUser, // Make the first user an admin
+        isAdmin: isFirstUser, // The first user to sign up becomes an admin
         avatarUrl: createdUser.photoURL || undefined,
       };
 
+      // Use the user's UID as the document ID in the 'users' collection
       await setDoc(doc(db, "users", createdUser.uid), newUser);
 
-      // 4. Redirect to the main app
+      // 5. Redirect to the main app page
       router.push('/my-collectoroom');
+
     } catch (error: any) {
        toast({
         title: "Signup Failed",
