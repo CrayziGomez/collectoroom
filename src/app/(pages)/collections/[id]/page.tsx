@@ -17,6 +17,7 @@ import type { Collection, Card as CardType, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useChat } from '@/hooks/use-chat';
 
 export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -24,6 +25,7 @@ export default function CollectionPage() {
   const params = useParams();
   const { toast } = useToast();
   const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const { createOrFindChat, isCreatingChat } = useChat();
 
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
   const [collectionOwner, setCollectionOwner] = useState<User | null>(null);
@@ -83,6 +85,15 @@ export default function CollectionPage() {
     return () => unsubscribeCollection();
 
   }, [collectionId, user, router, toast]);
+
+   const handleStartChat = async () => {
+    if (!user || !collectionOwner || user.uid === collectionOwner.uid) return;
+    
+    const chatId = await createOrFindChat(collectionOwner.uid);
+    if (chatId) {
+      router.push(`/messages/${chatId}`);
+    }
+  };
   
   if (loading || authLoading) {
       return (
@@ -129,9 +140,10 @@ export default function CollectionPage() {
                     </Link>
                 </Button>
                 </>
-            ) : user && (
-                 <Button variant="outline" disabled>
-                    <MessageSquare className="mr-2 h-4 w-4" /> Message Owner
+            ) : user && collectionOwner && (
+                 <Button variant="outline" onClick={handleStartChat} disabled={isCreatingChat}>
+                    {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                    Message Owner
                 </Button>
             )}
           </div>

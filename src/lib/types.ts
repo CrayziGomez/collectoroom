@@ -54,3 +54,21 @@ export interface Card {
   category: string;
   status: 'Display only' | 'For sale' | 'For rent' | 'Previously owned' | 'Wish list' | '';
 }
+
+export interface Chat {
+    id: string;
+    participantIds: string[];
+    participants: { [key: string]: Pick<User, 'username' | 'avatarUrl'> };
+    lastMessage?: {
+        text: string;
+        timestamp: any;
+    };
+}
+
+export interface Message {
+    id: string;
+    chatId: string;
+    senderId: string;
+    text: string;
+    timestamp: any;
+}

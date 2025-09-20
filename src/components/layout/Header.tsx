@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -11,6 +12,7 @@ export function Header() {
     { href: '/', label: 'Home' },
     { href: '/gallery', label: 'Gallery' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/messages', label: 'Messages' },
     { href: '/my-collectoroom', label: 'My CollectoRoom' },
   ];
 
