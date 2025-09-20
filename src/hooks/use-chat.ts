@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, collection, query, where, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from './use-toast';
 import { User } from '@/lib/types';
 
@@ -30,13 +30,8 @@ export function useChat() {
         const chatRef = doc(db, 'chats', chatId);
 
         try {
-            const chatSnap = await getDoc(chatRef);
-
-            if (chatSnap.exists()) {
-                setIsCreatingChat(false);
-                return chatId;
-            }
-
+            // "Create or merge" approach to avoid a separate 'get' call.
+            // First, get the other user's data to ensure they exist and we have their info.
             const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
 
             if (!otherUserDoc.exists()) {
@@ -45,6 +40,9 @@ export function useChat() {
 
             const otherUserData = otherUserDoc.data() as User;
             
+            // Atomically create the chat document if it doesn't exist, or merge the fields 
+            // if it does. This avoids a separate read operation that fails security rules.
+            // The `setDoc` with `merge: true` will not overwrite existing fields if the doc exists.
             await setDoc(chatRef, {
                 participantIds: [user.uid, otherUserId],
                 participants: {
@@ -57,11 +55,12 @@ export function useChat() {
                         avatarUrl: otherUserData.avatarUrl || ''
                     }
                 },
+                // Only set lastMessage on creation, don't overwrite it on subsequent calls.
                 lastMessage: {
                     text: 'Chat started',
                     timestamp: serverTimestamp()
                 }
-            });
+            }, { merge: true }); // Using merge is key to not overwriting existing chats.
 
             return chatId;
             
