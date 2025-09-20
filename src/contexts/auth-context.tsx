@@ -20,16 +20,20 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      setLoading(true);
       if (firebaseUser) {
-        setLoading(true);
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          setUser(userDocSnap.data() as AppUser);
-        } else {
-          // If the user doc doesn't exist, it might be a new sign-up.
-          // The signup flow should create it. For now, we treat as logged out.
+        try {
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            setUser(userDocSnap.data() as AppUser);
+          } else {
+            // This case can happen if the user doc creation failed during signup
+            // Or if the user was deleted from firestore but not auth
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Error fetching user document:", error);
           setUser(null);
         }
       } else {
