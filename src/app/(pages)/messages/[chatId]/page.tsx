@@ -38,20 +38,18 @@ export default function ChatPage() {
     }, [messages]);
 
      useEffect(() => {
-        if (authLoading || !user || !chatId) return;
+        if (authLoading || !user || !chatId || !chat) return;
 
         // Reset unread count for the current user when they enter the chat.
         const chatRef = doc(db, 'chats', chatId);
-        getDoc(chatRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const unreadPath = `unreadCount.${user.uid}`;
-                if (docSnap.data()[unreadPath] > 0) {
-                    updateDoc(chatRef, { [unreadPath]: 0 });
-                }
-            }
-        });
+        const unreadPath = `unreadCount.${user.uid}`;
 
-    }, [chatId, user, authLoading]);
+        // We check if the field exists before updating
+        if (chat.unreadCount && chat.unreadCount[user.uid] > 0) {
+            updateDoc(chatRef, { [unreadPath]: 0 });
+        }
+
+    }, [chatId, user, authLoading, chat]);
 
 
     useEffect(() => {
@@ -76,12 +74,14 @@ export default function ChatPage() {
                 
                 setChat(chatData);
                 const otherId = chatData.participantIds.find(id => id !== user.uid);
-                if (otherId) {
+                if (otherId && chatData.participants) {
                     setOtherParticipant(chatData.participants[otherId]);
                 }
 
             } else {
-                router.push('/messages');
+                // It might just be creating, so we don't redirect immediately.
+                // We let the messages query handle the final loading state.
+                console.log("Chat document not found, waiting...");
             }
         });
 
@@ -89,6 +89,9 @@ export default function ChatPage() {
         const unsubscribeMessages = onSnapshot(messagesQuery, (querySnapshot) => {
             const messagesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Message);
             setMessages(messagesData);
+            setLoading(false); // Set loading to false once we have messages (or an empty list)
+        }, (error) => {
+            console.error("Error fetching messages:", error);
             setLoading(false);
         });
 
@@ -118,13 +121,13 @@ export default function ChatPage() {
 
             const chatDocRef = doc(db, 'chats', chat.id);
             // Update last message and increment unread count for the other user
-            await setDoc(chatDocRef, {
+            await updateDoc(chatDocRef, {
                 lastMessage: {
                     text: newMessage,
                     timestamp: serverTimestamp(),
                 },
                 [`unreadCount.${otherId}`]: increment(1),
-            }, { merge: true });
+            });
 
 
             setNewMessage('');
@@ -143,7 +146,15 @@ export default function ChatPage() {
         );
     }
     
-    if (!chat || !otherParticipant) return null;
+    if (!chat || !otherParticipant) {
+        // This state can happen briefly while chat is being created.
+        // The loader above should catch most cases, but this is a fallback.
+        return (
+             <div className="h-[calc(100vh-8rem)] container py-8 flex justify-center items-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="container py-4 h-[calc(100vh-8rem)] flex flex-col max-w-3xl mx-auto">

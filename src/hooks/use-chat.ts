@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from './use-toast';
 import { User } from '@/lib/types';
 
@@ -38,8 +38,10 @@ export function useChat() {
                     throw new Error("The user you're trying to chat with doesn't exist.");
                 }
                 const otherUserData = otherUserDoc.data() as User;
-                
-                await setDoc(chatRef, {
+
+                const batch = writeBatch(db);
+
+                batch.set(chatRef, {
                     participantIds: [user.uid, otherUserId],
                     participants: {
                         [user.uid]: {
@@ -57,9 +59,12 @@ export function useChat() {
                     },
                     unreadCount: {
                         [user.uid]: 0,
-                        [otherUserId]: 1,
+                        [otherUserId]: 0, // Start with 0 unread for both
                     }
                 });
+
+                // Commit the batch
+                await batch.commit();
             }
 
             return chatId;
