@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../ui/badge';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 export function Header() {
   const { user, loading } = useAuth();
@@ -19,7 +20,7 @@ export function Header() {
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
 
   useEffect(() => {
-    if (!user) {
+    if (loading || !user) {
       setUnreadChatsCount(0);
       return;
     }
@@ -35,7 +36,7 @@ export function Header() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, loading]);
 
   const allNavLinks = [
     { href: '/', label: 'Home', auth: 'always' },
@@ -49,7 +50,7 @@ export function Header() {
       if (link.auth === 'always') return true;
       if (link.auth === 'required' && !loading && user) return true;
       return false;
-  })
+  });
 
 
   return (
@@ -76,6 +77,16 @@ export function Header() {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
+           {!loading && !user && (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" asChild>
+                <Link href="/login">Log in</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </div>
+          )}
           <ThemeToggle />
           <UserNav />
         </div>
