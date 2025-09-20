@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Layers, User as UserIcon } from 'lucide-react';
-import { CATEGORIES, CARD_STATUSES } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/constants';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Query, DocumentData } from 'firebase/firestore';
@@ -42,10 +42,8 @@ export default function GalleryPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const categoryParam = searchParams.get('category');
-  const statusParam = searchParams.get('status');
 
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'all');
-  const [selectedStatus, setSelectedStatus] = useState(statusParam || 'all');
 
   useEffect(() => {
     const fetchPublicCollections = async () => {
@@ -56,10 +54,6 @@ export default function GalleryPage() {
             const queryCategory = searchParams.get('category');
             if (queryCategory) {
                  q = query(q, where('category', '==', queryCategory));
-            }
-            const queryStatus = searchParams.get('status');
-            if (queryStatus) {
-                q = query(q, where('cardStatuses', 'array-contains', queryStatus));
             }
 
             const querySnapshot = await getDocs(q);
@@ -81,15 +75,14 @@ export default function GalleryPage() {
   
   useEffect(() => {
     setSelectedCategory(categoryParam || 'all');
-    setSelectedStatus(statusParam || 'all');
-  }, [categoryParam, statusParam]);
+  }, [categoryParam]);
 
-  const handleFilterChange = (type: 'category' | 'status', value: string) => {
+  const handleCategoryChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value === 'all') {
-      params.delete(type);
+      params.delete('category');
     } else {
-      params.set(type, value);
+      params.set('category', value);
     }
     router.push(`/gallery?${params.toString()}`);
   }
@@ -111,14 +104,14 @@ export default function GalleryPage() {
         <p className="text-lg text-muted-foreground mt-2">Explore the amazing collections shared by our community.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <Input 
           placeholder="Search by name or keyword..." 
-          className="md:col-span-3" 
+          className="md:col-span-2" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <Select value={selectedCategory} onValueChange={(value) => handleFilterChange('category', value)}>
+        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
           <SelectTrigger>
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
@@ -126,17 +119,6 @@ export default function GalleryPage() {
             <SelectItem value="all">All Categories</SelectItem>
             {CATEGORIES.map(cat => (
               <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedStatus} onValueChange={(value) => handleFilterChange('status', value)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by card status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {CARD_STATUSES.map(status => (
-              <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -151,7 +133,7 @@ export default function GalleryPage() {
         </div>
       ) : filteredCollections.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-            <p>No public collections found for the selected criteria.</p>
+            <p>No public collections found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

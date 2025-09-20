@@ -16,7 +16,7 @@ import { generateCardDescription } from "@/ai/flows/card-description-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteDoc, increment, arrayUnion, writeBatch, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, increment } from "firebase/firestore";
 import type { Card as CardType, Collection } from "@/lib/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -36,7 +36,6 @@ export default function EditCardPage() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<string>('');
-    const [originalStatus, setOriginalStatus] = useState<string>('');
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -73,7 +72,6 @@ export default function EditCardPage() {
                 setTitle(data.title);
                 setDescription(data.description);
                 setStatus(data.status);
-                setOriginalStatus(data.status);
             } else {
                 notFound();
             }
@@ -140,37 +138,6 @@ export default function EditCardPage() {
         }
     }
 
-    const updateCollectionStatuses = async (collectionRef: any, newStatus: string, oldStatus: string) => {
-        if (newStatus === oldStatus) return;
-
-        // Add the new status
-        await updateDoc(collectionRef, {
-            cardStatuses: arrayUnion(newStatus)
-        });
-
-        // Check if the old status is still used by other cards
-        const otherCardsWithOldStatusQuery = query(
-            collection(db, 'cards'),
-            where('collectionId', '==', collectionId),
-            where('status', '==', oldStatus),
-            where('__name__', '!=', cardId)
-        );
-        
-        const querySnapshot = await getDocs(otherCardsWithOldStatusQuery);
-        if (querySnapshot.empty) {
-            // If no other cards have the old status, we can try to remove it.
-            // This is not a perfect atomic operation without a transaction and read,
-            // but it's a reasonable approach for this app's scale.
-            const currentCollectionSnap = await getDoc(collectionRef);
-            const currentCollectionData = currentCollectionSnap.data() as Collection;
-            const updatedStatuses = currentCollectionData.cardStatuses?.filter(s => s !== oldStatus) ?? [];
-             await updateDoc(collectionRef, {
-                cardStatuses: updatedStatuses
-            });
-        }
-    };
-
-
     const handleSaveChanges = async () => {
         if (!cardData || !title || !status) {
             toast({ title: "Validation Error", description: "Title and Status are required.", variant: "destructive" });
@@ -180,16 +147,11 @@ export default function EditCardPage() {
         setIsSaving(true);
         try {
             const cardRef = doc(db, 'cards', cardId);
-            const collectionRef = doc(db, 'collections', collectionId);
-
             await updateDoc(cardRef, {
                 title,
                 description,
                 status,
             });
-
-            await updateCollectionStatuses(collectionRef, status, originalStatus);
-
             toast({
                 title: "Card Updated!",
                 description: `"${title}" has been updated.`,
@@ -213,26 +175,11 @@ export default function EditCardPage() {
 
         setIsDeleting(true);
         try {
-            const batch = writeBatch(db);
             const cardRef = doc(db, 'cards', cardId);
+            await deleteDoc(cardRef);
+            
             const collectionRef = doc(db, 'collections', collectionId);
-
-            // Delete the card
-            batch.delete(cardRef);
-
-            // Decrement card count
-            batch.update(collectionRef, { cardCount: increment(-1) });
-            
-            await batch.commit();
-
-            // After deletion, recalculate the statuses for the collection
-            const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
-            const cardsSnapshot = await getDocs(cardsQuery);
-            const remainingStatuses = [...new Set(cardsSnapshot.docs.map(doc => doc.data().status as string))];
-            
-            await updateDoc(collectionRef, {
-                cardStatuses: remainingStatuses
-            });
+            await updateDoc(collectionRef, { cardCount: increment(-1) });
             
             toast({
                 title: "Card Deleted",

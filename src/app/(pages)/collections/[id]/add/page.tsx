@@ -16,7 +16,7 @@ import { generateCardDescription } from "@/ai/flows/card-description-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection, updateDoc, increment, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, updateDoc, increment } from "firebase/firestore";
 import type { Collection } from "@/lib/types";
 
 const MAX_DESC_WORDS = 500;
@@ -155,11 +155,10 @@ export default function AddCardPage() {
                 category: collectionData.category,
             });
 
-            // Increment cardCount and update cardStatuses on the collection
+            // Increment cardCount on the collection
             const collectionRef = doc(db, 'collections', collectionData.id);
             await updateDoc(collectionRef, {
-                cardCount: increment(1),
-                cardStatuses: arrayUnion(status)
+                cardCount: increment(1)
             });
 
             toast({
