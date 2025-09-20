@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, DocumentData } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -19,25 +19,25 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This listener handles all authentication state changes.
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      setLoading(true);
       if (firebaseUser) {
-        // User is signed in. Now, listen for their profile document in Firestore.
+        // User is signed in. Listen for their document in Firestore.
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        // onSnapshot creates a real-time subscription to the document.
         const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
-            // The document exists, so we set the user state.
-            setUser(docSnap.data() as AppUser);
+            // The document exists, set the user state.
+            setUser({ uid: docSnap.id, ...docSnap.data() } as AppUser);
             setLoading(false);
           } else {
-            // The document doesn't exist yet. This can happen for a brief moment
-            // after signup while the backend Cloud Function is running.
-            // We'll keep loading, and onSnapshot will fire again when the doc is created.
-            // You might want to add a timeout here in a production app to handle
-            // cases where the function fails.
-            setLoading(true);
+            // Document doesn't exist. This is expected for a moment after signup
+            // while the backend function runs. We'll simply wait.
+            // If it persists, it means the function failed or hasn't run.
+            // A production app might have a timeout here.
+            console.log("User is authenticated, but user document does not exist yet. Waiting for backend function...");
+            setUser(null); // Ensure no stale user data
+            setLoading(true); // Continue loading until doc appears or user signs out
           }
         }, (error) => {
           console.error("Error listening to user document:", error);
@@ -45,8 +45,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           setLoading(false);
         });
 
-        // Return the cleanup function for the document listener.
-        return () => unsubscribeDoc();
+        return () => unsubscribeDoc(); // Cleanup Firestore listener
       } else {
         // User is signed out.
         setUser(null);
@@ -54,8 +53,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       }
     });
 
-    // Return the cleanup function for the auth state listener.
-    return () => unsubscribeAuth();
+    return () => unsubscribe(); // Cleanup auth listener
   }, []);
 
   return (
