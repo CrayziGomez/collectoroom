@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
@@ -36,13 +36,17 @@ export default function SignupPage() {
         displayName: username,
       });
 
+      // Check if this is the first user
+      const usersCollection = await getDocs(collection(db, 'users'));
+      const isFirstUser = usersCollection.empty;
+
       const newUser: User = {
         uid: user.uid,
         id: user.uid,
         username: username,
         email: user.email!,
         tier: tier as User['tier'],
-        isAdmin: false,
+        isAdmin: isFirstUser, // Make the first user an admin
         avatarUrl: user.photoURL || undefined,
       };
 

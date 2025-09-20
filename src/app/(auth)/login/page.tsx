@@ -11,7 +11,7 @@ import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopu
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection } from 'firebase/firestore';
 import type { User } from '@/lib/types';
 
 
@@ -45,13 +45,16 @@ export default function LoginPage() {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
+        const usersCollection = await getDocs(collection(db, 'users'));
+        const isFirstUser = usersCollection.empty;
+
          const newUser: User = {
             uid: user.uid,
             id: user.uid,
             username: user.displayName || 'Google User',
             email: user.email!,
             tier: 'Hobbyist', // Default tier
-            isAdmin: false,
+            isAdmin: isFirstUser,
             avatarUrl: user.photoURL || undefined,
         };
         await setDoc(userDocRef, newUser);
