@@ -40,15 +40,17 @@ export interface Collection {
   cardCount: number;
   coverImage: string;
   coverImageHint: string;
+  keywords?: string;
 }
 
 export interface Card {
   id: string;
   collectionId: string;
+  userId: string;
   title: string;
   description: string;
   imageUrl: string;
   imageHint: string;
   category: string;
-  status: 'Display only' | 'For sale' | 'For rent' | 'Previously owned' | 'Wish list';
+  status: 'Display only' | 'For sale' | 'For rent' | 'Previously owned' | 'Wish list' | '';
 }

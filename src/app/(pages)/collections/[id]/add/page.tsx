@@ -7,33 +7,81 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wand2 } from "lucide-react";
+import { Wand2, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { MOCK_COLLECTIONS } from "@/lib/constants";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { CARD_STATUSES } from "@/lib/constants";
-import { useState }from "react";
+import { useState, useEffect } from "react";
 import { generateCardDescription } from "@/ai/flows/card-description-generator";
 import { useToast } from "@/hooks/use-toast";
-
+import { useAuth } from "@/contexts/auth-context";
+import { db, storage } from "@/lib/firebase";
+import { doc, getDoc, addDoc, collection, updateDoc, increment } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import type { Collection } from "@/lib/types";
 
 export default function AddCardPage({ params }: { params: { id: string } }) {
     const { toast } = useToast();
-    const collection = MOCK_COLLECTIONS.find(c => c.id === params.id);
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
+    
+    const [collectionData, setCollectionData] = useState<Collection | null>(null);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-  
-    if (!collection) {
-      notFound();
-    }
+    const [status, setStatus] = useState<string>('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isCollectionLoading, setIsCollectionLoading] = useState(true);
+
+    useEffect(() => {
+        if (authLoading) return;
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        const fetchCollection = async () => {
+            setIsCollectionLoading(true);
+            const collectionRef = doc(db, 'collections', params.id);
+            const collectionSnap = await getDoc(collectionRef);
+
+            if (collectionSnap.exists()) {
+                const data = collectionSnap.data() as Collection;
+                // Ensure the current user is the owner of the collection
+                if (data.userId !== user.uid) {
+                    toast({ title: "Access Denied", description: "You don't own this collection.", variant: "destructive" });
+                    router.push('/my-collectoroom');
+                } else {
+                    setCollectionData({ ...data, id: collectionSnap.id });
+                }
+            } else {
+                notFound();
+            }
+            setIsCollectionLoading(false);
+        };
+
+        fetchCollection();
+
+    }, [user, authLoading, params.id, router, toast]);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
+    
     const handleGenerateDescription = async () => {
+        if (!collectionData) return;
         setIsGenerating(true);
         try {
             const result = await generateCardDescription({
                 title: title,
-                category: collection.category,
+                category: collectionData.category,
                 existingDescription: description,
             });
             if (result.suggestedDescription) {
@@ -51,11 +99,72 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
         }
     }
 
+    const handleAddCard = async () => {
+        if (!user || !collectionData) {
+            toast({ title: "Error", description: "You must be logged in and have a collection.", variant: "destructive" });
+            return;
+        }
+        if (!title || !status || !imageFile) {
+            toast({ title: "Validation Error", description: "Title, Status, and Image are required.", variant: "destructive" });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // 1. Upload image to Firebase Storage
+            const imageRef = ref(storage, `cards/${user.uid}/${collectionData.id}/${Date.now()}_${imageFile.name}`);
+            const uploadResult = await uploadBytes(imageRef, imageFile);
+            const imageUrl = await getDownloadURL(uploadResult.ref);
+
+            // 2. Create card document in Firestore
+            await addDoc(collection(db, "cards"), {
+                collectionId: collectionData.id,
+                userId: user.uid,
+                title,
+                description,
+                status,
+                imageUrl,
+                imageHint: 'user-uploaded card', // Generic hint for uploaded images
+                category: collectionData.category,
+            });
+
+            // 3. Increment cardCount on the collection
+            const collectionRef = doc(db, 'collections', collectionData.id);
+            await updateDoc(collectionRef, {
+                cardCount: increment(1)
+            });
+
+            toast({
+                title: "Card Added!",
+                description: `"${title}" has been added to your collection.`,
+            });
+            router.push(`/collections/${collectionData.id}`);
+
+        } catch (error: any) {
+            console.error("Error adding card:", error);
+            toast({
+                title: "Error Adding Card",
+                description: error.message || "An unexpected error occurred.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (authLoading || isCollectionLoading || !collectionData) {
+        return (
+            <div className="container py-8 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )
+    }
+
     return (
         <div className="container py-8">
             <div className="max-w-2xl mx-auto">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold font-headline">Add Card to "{collection.name}"</h1>
+                    <h1 className="text-3xl font-bold font-headline">Add Card to "{collectionData.name}"</h1>
                     <p className="text-muted-foreground">Fill in the details for your new card.</p>
                 </div>
 
@@ -63,29 +172,30 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
                     <CardContent className="p-6 grid gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="title">Card Title</Label>
-                            <Input id="title" placeholder="e.g., Action Comics #1" value={title} onChange={(e) => setTitle(e.target.value)} />
+                            <Input id="title" placeholder="e.g., Action Comics #1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isSaving} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={(e) => setDescription(e.target.value)} />
-                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !title}>
+                            <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={(e) => setDescription(e.target.value)} disabled={isSaving} />
+                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !title || isSaving}>
                                 <Wand2 className="mr-2 h-4 w-4" /> 
                                 {isGenerating ? 'Generating...' : 'Suggest with AI'}
                             </Button>
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="image">Image</Label>
-                            <Input id="image" type="file" />
+                            <Input id="image" type="file" onChange={handleImageChange} accept="image/*" disabled={isSaving} />
+                            {imagePreview && <img src={imagePreview} alt="Image preview" className="mt-2 rounded-md max-h-48 object-contain" />}
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="status">Status</Label>
-                             <Select>
+                             <Select onValueChange={setStatus} value={status} disabled={isSaving}>
                                 <SelectTrigger id="status">
                                     <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {CARD_STATUSES.map(status => (
-                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                    {CARD_STATUSES.map(s => (
+                                    <SelectItem key={s} value={s}>{s}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -94,8 +204,11 @@ export default function AddCardPage({ params }: { params: { id: string } }) {
                 </Card>
 
                 <div className="flex justify-end gap-2 mt-6">
-                    <Button variant="outline" asChild><Link href={`/collections/${params.id}`}>Cancel</Link></Button>
-                    <Button>Add Card</Button>
+                    <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${params.id}`}>Cancel</Link></Button>
+                    <Button onClick={handleAddCard} disabled={isSaving || !title || !status || !imageFile}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSaving ? 'Adding...' : 'Add Card'}
+                    </Button>
                 </div>
             </div>
         </div>
