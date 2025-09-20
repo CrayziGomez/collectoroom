@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useEffect, useState } from 'react';
-import { collection, getDocs, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Collection } from '@/lib/types';
 
@@ -33,6 +33,7 @@ import type { User, Collection } from '@/lib/types';
 export default function AdminPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [collections, setCollections] = useState<Collection[]>([]);
+    const [totalCards, setTotalCards] = useState(0);
     
     useEffect(() => {
         const usersQuery = query(collection(db, 'users'));
@@ -41,12 +42,25 @@ export default function AdminPage() {
             setUsers(usersData);
         });
 
-        // Assuming collections are stored in a 'collections' collection
-        const collectionsQuery = query(collection(db, 'collections'));
-        const unsubscribeCollections = onSnapshot(collectionsQuery, (querySnapshot) => {
-            const collectionsData = querySnapshot.docs.map(doc => doc.data() as Collection);
-            setCollections(collectionsData);
+        const fetchCollectionsAndCards = async () => {
+          const collectionsQuery = query(collection(db, 'collections'));
+          const collectionsSnapshot = await getDocs(collectionsQuery);
+          const collectionsData = collectionsSnapshot.docs.map(doc => doc.data() as Collection);
+          setCollections(collectionsData);
+          
+          const totalCardCount = collectionsData.reduce((sum, coll) => sum + (coll.cardCount || 0), 0);
+          setTotalCards(totalCardCount);
+        };
+
+        fetchCollectionsAndCards();
+
+        const unsubscribeCollections = onSnapshot(query(collection(db, 'collections')), (snapshot) => {
+           const collectionsData = snapshot.docs.map(doc => doc.data() as Collection);
+           setCollections(collectionsData);
+           const totalCardCount = collectionsData.reduce((sum, coll) => sum + (coll.cardCount || 0), 0);
+           setTotalCards(totalCardCount);
         });
+
 
         return () => {
             unsubscribeUsers();
@@ -56,7 +70,7 @@ export default function AdminPage() {
 
     const totalUsers = users.length;
     const totalCollections = collections.length;
-    const totalCards = collections.reduce((sum, coll) => sum + coll.cardCount, 0);
+    
 
   return (
     <div className="container py-8 space-y-8">

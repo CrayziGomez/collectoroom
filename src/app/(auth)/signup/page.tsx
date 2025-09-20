@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -38,8 +38,7 @@ export default function SignupPage() {
     }
 
     try {
-      // 1. Check if this would be the first user BEFORE creating the account
-      // This is a small race condition, but acceptable for this app's purpose.
+      // 1. Check if this would be the first user BEFORE creating the account.
       const usersCollection = collection(db, 'users');
       const usersSnapshot = await getDocs(usersCollection);
       const isFirstUser = usersSnapshot.empty;
@@ -53,7 +52,7 @@ export default function SignupPage() {
         displayName: username,
       });
 
-      // 4. Create the user document in Firestore. This is the critical step.
+      // 4. Create the user document object.
       const newUser: User = {
         uid: createdUser.uid,
         id: createdUser.uid, // for consistency in the data model
@@ -64,10 +63,13 @@ export default function SignupPage() {
         avatarUrl: createdUser.photoURL || undefined,
       };
 
-      // Use the user's UID as the document ID in the 'users' collection
+      // 5. Use the user's UID as the document ID in the 'users' collection
       await setDoc(doc(db, "users", createdUser.uid), newUser);
+      
+      // 6. Sign the user in to establish a clear auth session for redirection
+      await signInWithEmailAndPassword(auth, email, password);
 
-      // 5. Redirect to the main app page
+      // 7. Redirect to the main app page
       router.push('/my-collectoroom');
 
     } catch (error: any) {
