@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const tierLimits = {
   Hobbyist: { cards: 50, collections: 2 },
@@ -38,11 +39,40 @@ export default function MyCollectoRoomPage() {
   }, [user, loading, router]);
 
   if (loading || !user) {
-    return <div>Loading...</div>; // Or a proper skeleton loader
+    return (
+        <div className="container py-8">
+            <Card className="mb-8">
+                <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-20 w-20 rounded-full" />
+                    <div>
+                        <Skeleton className="h-8 w-48 mb-2" />
+                        <Skeleton className="h-5 w-32" />
+                    </div>
+                </div>
+                <Skeleton className="h-10 w-36" />
+                </CardHeader>
+                <CardContent>
+                <div className="grid md:grid-cols-2 gap-6 text-sm">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                </div>
+                </CardContent>
+            </Card>
+            <div className="flex justify-between items-center mb-6">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-10 w-40" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <Skeleton className="h-64 w-full rounded-lg" />
+            </div>
+        </div>
+    );
   }
 
   // TODO: Replace with real user data once Firestore is connected for collections
-  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === '1');
+  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.id);
   const totalCards = userCollections.reduce((acc, c) => acc + c.cardCount, 0);
   const cardLimit = tierLimits[user.tier].cards;
   const collectionLimit = tierLimits[user.tier].collections;
