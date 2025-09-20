@@ -41,6 +41,7 @@ export interface Collection {
   coverImage: string;
   coverImageHint: string;
   keywords?: string;
+  cardStatuses?: string[];
 }
 
 export interface Card {

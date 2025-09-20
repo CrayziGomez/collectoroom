@@ -7,11 +7,11 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Layers, User as UserIcon, Loader2 } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
+import { Layers, User as UserIcon } from 'lucide-react';
+import { CATEGORIES, CARD_STATUSES } from '@/lib/constants';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, Query, DocumentData } from 'firebase/firestore';
 import type { Collection, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -42,14 +42,26 @@ export default function GalleryPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const categoryParam = searchParams.get('category');
+  const statusParam = searchParams.get('status');
 
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'all');
+  const [selectedStatus, setSelectedStatus] = useState(statusParam || 'all');
 
   useEffect(() => {
     const fetchPublicCollections = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'collections'), where('isPublic', '==', true));
+            let q: Query<DocumentData> = query(collection(db, 'collections'), where('isPublic', '==', true));
+            
+            const queryCategory = searchParams.get('category');
+            if (queryCategory) {
+                 q = query(q, where('category', '==', queryCategory));
+            }
+            const queryStatus = searchParams.get('status');
+            if (queryStatus) {
+                q = query(q, where('cardStatuses', 'array-contains', queryStatus));
+            }
+
             const querySnapshot = await getDocs(q);
             const collectionsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Collection);
             setAllCollections(collectionsData);
@@ -65,32 +77,32 @@ export default function GalleryPage() {
     };
 
     fetchPublicCollections();
-  }, []);
+  }, [searchParams]);
   
   useEffect(() => {
     setSelectedCategory(categoryParam || 'all');
-  }, [categoryParam]);
+    setSelectedStatus(statusParam || 'all');
+  }, [categoryParam, statusParam]);
 
-  const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value);
+  const handleFilterChange = (type: 'category' | 'status', value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value === 'all') {
-      params.delete('category');
+      params.delete(type);
     } else {
-      params.set('category', value);
+      params.set(type, value);
     }
     router.push(`/gallery?${params.toString()}`);
   }
 
   const filteredCollections = useMemo(() => {
+    // Search term filtering is now done on the client side after the initial query
     return allCollections.filter(collection => {
-      const matchesCategory = selectedCategory === 'all' || (collection.category.toLowerCase() === selectedCategory.toLowerCase());
       const matchesSearch = searchTerm === '' || 
         collection.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         collection.keywords?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesCategory && matchesSearch;
+      return matchesSearch;
     });
-  }, [allCollections, selectedCategory, searchTerm]);
+  }, [allCollections, searchTerm]);
 
   return (
     <div className="container py-8">
@@ -99,21 +111,32 @@ export default function GalleryPage() {
         <p className="text-lg text-muted-foreground mt-2">Explore the amazing collections shared by our community.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Input 
           placeholder="Search by name or keyword..." 
-          className="flex-grow" 
+          className="md:col-span-3" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-          <SelectTrigger className="w-full md:w-[200px]">
+        <Select value={selectedCategory} onValueChange={(value) => handleFilterChange('category', value)}>
+          <SelectTrigger>
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {CATEGORIES.map(cat => (
               <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedStatus} onValueChange={(value) => handleFilterChange('status', value)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by card status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {CARD_STATUSES.map(status => (
+              <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
           </SelectContent>
         </Select>
