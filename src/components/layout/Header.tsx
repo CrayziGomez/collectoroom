@@ -5,14 +5,10 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserNav } from '@/components/UserNav';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import type { Chat } from '@/lib/types';
 import { Badge } from '../ui/badge';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -51,7 +47,7 @@ export function Header() {
   
   const navLinks = allNavLinks.filter(link => {
       if (link.auth === 'always') return true;
-      if (link.auth === 'required' && user) return true;
+      if (link.auth === 'required' && !loading && user) return true;
       return false;
   })
 
@@ -80,12 +76,6 @@ export function Header() {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
-          <div className="relative w-full max-w-sm">
-            <Input type="search" placeholder="Search collections..." className="pr-10" />
-            <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
-              <Search className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </div>
           <ThemeToggle />
           <UserNav />
         </div>
