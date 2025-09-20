@@ -143,7 +143,7 @@ export default function MyCollectoRoomPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                        <Link href={`/collections/${collection.id}`} className="flex items-center w-full">
                         <Settings className="mr-2 h-4 w-4" /> Manage
                        </Link>
