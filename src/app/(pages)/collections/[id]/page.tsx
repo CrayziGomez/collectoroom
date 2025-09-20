@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useState } from 'react';
@@ -15,6 +15,8 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Collection, Card as CardType, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { tierLimits } from '@/lib/constants';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -82,7 +84,7 @@ export default function CollectionPage() {
 
   }, [collectionId, user, authLoading, router, toast]);
   
-  if (loading || authLoading) {
+  if (loading || authLoading || !user) {
       return (
           <div className="container py-8 flex justify-center">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -94,7 +96,9 @@ export default function CollectionPage() {
     return null;
   }
 
-  const isOwner = user?.uid === collectionData.userId;
+  const isOwner = user.uid === collectionData.userId;
+  const cardLimit = tierLimits[user.tier].cards;
+  const hasReachedCardLimit = collectionData.cardCount >= cardLimit;
 
   return (
     <div className="container py-8">
@@ -118,7 +122,7 @@ export default function CollectionPage() {
           {isOwner && (
             <div className="flex gap-2">
               <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit Collection</Button>
-              <Button asChild>
+              <Button asChild disabled={hasReachedCardLimit}>
                 <Link href={`/collections/${collectionData.id}/add`}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Card
                 </Link>
@@ -126,6 +130,16 @@ export default function CollectionPage() {
             </div>
           )}
         </div>
+         {isOwner && hasReachedCardLimit && (
+            <Alert className="mt-6">
+              <Crown className="h-4 w-4" />
+              <AlertTitle>Card Limit Reached!</AlertTitle>
+              <AlertDescription>
+                You've reached your limit of {cardLimit} cards for the {user.tier} plan. 
+                Please <Link href="/pricing" className="font-semibold text-primary underline">upgrade your plan</Link> to add more cards.
+              </AlertDescription>
+            </Alert>
+          )}
       </div>
 
       {/* Cards Grid */}
@@ -153,7 +167,7 @@ export default function CollectionPage() {
                 </div>
               </Card>
             ))}
-            {isOwner && (
+            {isOwner && !hasReachedCardLimit && (
               <Link href={`/collections/${collectionData.id}/add`} className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/4]">
                   <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
                   <p className="text-muted-foreground font-semibold text-center">Add New Card</p>

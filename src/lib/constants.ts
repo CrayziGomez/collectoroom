@@ -81,6 +81,14 @@ export const PRICING_TIERS: PricingTier[] = [
   },
 ];
 
+export const tierLimits = {
+  Hobbyist: { cards: 50, collections: 2 },
+  Explorer: { cards: 300, collections: 10 },
+  Collector: { cards: 600, collections: 30 },
+  Curator: { cards: Infinity, collections: Infinity },
+};
+
+
 export const MOCK_USERS: User[] = [
     { id: '1', email: 'user@collectoroom.com', username: 'JaneDoe', avatarUrl: 'https://picsum.photos/seed/avatar1/100/100', country: 'DE', tier: 'Collector', isAdmin: true },
     { id: '2', email: 'admin@collectoroom.com', username: 'AdminUser', avatarUrl: 'https://picsum.photos/seed/avatar2/100/100', country: 'US', tier: 'Curator', isAdmin: true },

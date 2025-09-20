@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -22,13 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Collection } from '@/lib/types';
-
-const tierLimits = {
-  Hobbyist: { cards: 50, collections: 2 },
-  Explorer: { cards: 300, collections: 10 },
-  Collector: { cards: 600, collections: 30 },
-  Curator: { cards: Infinity, collections: Infinity },
-};
+import { tierLimits } from '@/lib/constants';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function MyCollectoRoomPage() {
   const { user, loading: authLoading } = useAuth();
@@ -94,10 +89,15 @@ export default function MyCollectoRoomPage() {
   }
 
   const totalCards = userCollections.reduce((acc, c) => acc + (c.cardCount || 0), 0);
-  const cardLimit = tierLimits[user.tier].cards;
-  const collectionLimit = tierLimits[user.tier].collections;
-  const cardUsage = cardLimit === Infinity ? 0 : (totalCards / cardLimit) * 100;
-  const collectionUsage = collectionLimit === Infinity ? 0 : (userCollections.length / collectionLimit) * 100;
+  const limits = tierLimits[user.tier];
+  const cardLimit = limits.cards;
+  const collectionLimit = limits.collections;
+
+  const hasReachedCardLimit = totalCards >= cardLimit;
+  const hasReachedCollectionLimit = userCollections.length >= collectionLimit;
+
+  const cardUsage = cardLimit === Infinity ? 0 : Math.min((totalCards / cardLimit) * 100, 100);
+  const collectionUsage = collectionLimit === Infinity ? 0 : Math.min((userCollections.length / collectionLimit) * 100, 100);
 
   return (
     <div className="container py-8">
@@ -133,12 +133,22 @@ export default function MyCollectoRoomPage() {
               <Progress value={collectionUsage} />
             </div>
           </div>
+           {(hasReachedCardLimit || hasReachedCollectionLimit) && (
+            <Alert className="mt-6">
+              <Crown className="h-4 w-4" />
+              <AlertTitle>You've reached a limit!</AlertTitle>
+              <AlertDescription>
+                You've reached your limit for {hasReachedCollectionLimit ? 'collections' : 'cards'}. 
+                Please <Link href="/pricing" className="font-semibold text-primary underline">upgrade your plan</Link> to add more.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
       
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold font-headline">My Collections</h2>
-        <Button asChild>
+        <Button asChild disabled={hasReachedCollectionLimit}>
           <Link href="/my-collectoroom/create">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Collection
@@ -202,12 +212,14 @@ export default function MyCollectoRoomPage() {
               </CardFooter>
             </Card>
           ))}
-           <Link href="/my-collectoroom/create">
-              <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/1.8]">
-                  <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground font-semibold">Create New Collection</p>
-              </div>
-           </Link>
+           {!hasReachedCollectionLimit && (
+             <Link href="/my-collectoroom/create">
+                <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/1.8]">
+                    <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground font-semibold">Create New Collection</p>
+                </div>
+             </Link>
+           )}
         </div>
       )}
     </div>
