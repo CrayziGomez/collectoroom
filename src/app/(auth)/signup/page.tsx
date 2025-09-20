@@ -9,10 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
+import { doc, getDoc, setDoc, getCountFromServer, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function SignupPage() {
   const [username, setUsername] = useState('');
@@ -36,18 +38,10 @@ export default function SignupPage() {
 
     try {
       // Step 1: Create the user in Firebase Authentication.
-      // The database document will be created by a backend Cloud Function.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const createdUser = userCredential.user;
       
-      // Step 2: Update the user's profile in Firebase Auth (displayName)
-      // The tier information is not directly stored here. The backend function will handle it.
-      await updateProfile(createdUser, {
-        displayName: username,
-      });
-
-      // Step 3: Redirect to the main app page.
-      // The AuthContext will handle fetching the user data created by the backend function.
+      // Step 2: Redirect to the main app page.
+      // The AuthContext and backend function will handle the rest.
       router.push('/my-collectoroom');
 
     } catch (error: any) {

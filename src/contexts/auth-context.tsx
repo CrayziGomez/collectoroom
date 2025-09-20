@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -19,18 +19,20 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setLoading(true);
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        setLoading(true);
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        // Use onSnapshot to listen for real-time updates
-        const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
+        
+        // Use onSnapshot to listen for real-time updates to the user document.
+        // This is crucial for when the document is created by a backend function.
+        const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             setUser(docSnap.data() as AppUser);
           } else {
-            // This case might happen if the document creation is delayed or failed.
-            // It's also possible the user was deleted from Firestore but not Auth.
-            setUser(null);
+            // Document might not be created yet by the backend function.
+            // We don't set user to null here immediately, we just wait.
+            // If the document never appears, the user won't be set, and they'll be treated as logged out.
           }
           setLoading(false);
         }, (error) => {
@@ -38,14 +40,19 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           setUser(null);
           setLoading(false);
         });
-        return () => unsubDoc(); // Cleanup snapshot listener
+
+        // Return a cleanup function for the document snapshot listener.
+        return () => unsubscribeDoc();
+
       } else {
+        // No Firebase user.
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    // Return a cleanup function for the auth state listener.
+    return () => unsubscribeAuth();
   }, []);
 
   return (
