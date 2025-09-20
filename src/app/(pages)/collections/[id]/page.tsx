@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useChat } from '@/hooks/use-chat';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -170,6 +171,7 @@ export default function CollectionPage() {
             <p>This collection is empty.</p>
          </div>
        ) : (
+        <TooltipProvider>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {cards.map(card => (
               <Card key={card.id} className="overflow-hidden group">
@@ -191,8 +193,21 @@ export default function CollectionPage() {
                   />
                 </CardContent>
                 <div className="p-4">
-                  <h3 className="font-semibold truncate">{card.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{card.status}</p>
+                  <Tooltip>
+                    <TooltipTrigger className="text-left w-full">
+                      <h3 className="font-semibold truncate">{card.title}</h3>
+                    </TooltipTrigger>
+                    <TooltipContent>{card.title}</TooltipContent>
+                  </Tooltip>
+                  {card.description && (
+                    <Tooltip>
+                      <TooltipTrigger className="text-left w-full">
+                         <p className="text-sm text-muted-foreground mt-1 truncate">{card.description}</p>
+                      </TooltipTrigger>
+                      <TooltipContent>{card.description}</TooltipContent>
+                    </Tooltip>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">{card.status}</p>
                 </div>
               </Card>
             ))}
@@ -203,6 +218,7 @@ export default function CollectionPage() {
               </Link>
             )}
           </div>
+        </TooltipProvider>
        )}
     </div>
   );
