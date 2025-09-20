@@ -8,20 +8,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/constants";
-import { Wand2 } from "lucide-react";
+import { Wand2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { generateCollectionDescription } from "@/ai/flows/collection-description-generator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 export default function CreateCollectionPage() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
+
     const [collectionName, setCollectionName] = useState('');
     const [keywords, setKeywords] = useState('');
     const [description, setDescription] = useState('');
+    const [category, setCategory] = useState('');
+    const [isPublic, setIsPublic] = useState(true);
+
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push('/login');
+        }
+    }, [user, authLoading, router]);
 
     const handleGenerateDescription = async () => {
         setIsGenerating(true);
@@ -42,6 +59,59 @@ export default function CreateCollectionPage() {
         }
     };
 
+    const handleCreateCollection = async () => {
+        if (!user) {
+            toast({ title: "Error", description: "You must be logged in to create a collection.", variant: "destructive" });
+            return;
+        }
+        if (!collectionName || !category) {
+            toast({ title: "Validation Error", description: "Collection Name and Category are required.", variant: "destructive" });
+            return;
+        }
+
+        setIsCreating(true);
+
+        try {
+            const newCollection = {
+                userId: user.uid,
+                name: collectionName,
+                description,
+                keywords,
+                category,
+                isPublic,
+                cardCount: 0,
+                // Using a placeholder for cover image, user can edit this later
+                coverImage: `https://picsum.photos/seed/${Math.random()}/400/300`,
+                coverImageHint: 'collection placeholder'
+            };
+
+            const docRef = await addDoc(collection(db, "collections"), newCollection);
+            toast({
+                title: "Success!",
+                description: `Collection "${collectionName}" has been created.`,
+            });
+            router.push(`/collections/${docRef.id}`);
+
+        } catch (error) {
+            console.error("Error creating collection:", error);
+            toast({
+                title: "Creation Failed",
+                description: "There was an error creating your collection. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreating(false);
+        }
+    }
+
+    if (authLoading || !user) {
+        return (
+            <div className="container py-8 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )
+    }
+
     return (
         <div className="container py-8">
             <div className="max-w-2xl mx-auto">
@@ -54,23 +124,23 @@ export default function CreateCollectionPage() {
                     <CardContent className="p-6 grid gap-4">
                         <div className="grid gap-2">
                             <Label htmlFor="name">Collection Name</Label>
-                            <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} />
+                            <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} disabled={isCreating} />
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="keywords">Keywords</Label>
-                            <Input id="keywords" placeholder="e.g., comic books, vintage, DC, Marvel" value={keywords} onChange={e => setKeywords(e.target.value)} />
+                            <Label htmlFor="keywords">Keywords (for AI suggestions)</Label>
+                            <Input id="keywords" placeholder="e.g., comic books, vintage, DC, Marvel" value={keywords} onChange={e => setKeywords(e.target.value)} disabled={isCreating} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" placeholder="A brief description of what your collection is about." value={description} onChange={e => setDescription(e.target.value)} />
-                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !collectionName || !keywords}>
+                            <Textarea id="description" placeholder="A brief description of what your collection is about." value={description} onChange={e => setDescription(e.target.value)} disabled={isCreating} />
+                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !collectionName || !keywords || isCreating}>
                                 <Wand2 className="mr-2 h-4 w-4" /> 
                                 {isGenerating ? 'Generating...' : 'Suggest with AI'}
                             </Button>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="category">Category</Label>
-                             <Select>
+                             <Select onValueChange={setCategory} value={category} disabled={isCreating}>
                                 <SelectTrigger id="category">
                                     <SelectValue placeholder="Select a category" />
                                 </SelectTrigger>
@@ -82,7 +152,7 @@ export default function CreateCollectionPage() {
                             </Select>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <Checkbox id="isPublic" defaultChecked />
+                            <Checkbox id="isPublic" checked={isPublic} onCheckedChange={(checked) => setIsPublic(Boolean(checked))} disabled={isCreating} />
                             <Label htmlFor="isPublic">Make this collection public</Label>
                         </div>
 
@@ -90,8 +160,11 @@ export default function CreateCollectionPage() {
                 </Card>
 
                 <div className="flex justify-end gap-2 mt-6">
-                    <Button variant="outline" asChild><Link href="/my-collectoroom">Cancel</Link></Button>
-                    <Button>Create Collection</Button>
+                    <Button variant="outline" asChild disabled={isCreating}><Link href="/my-collectoroom">Cancel</Link></Button>
+                    <Button onClick={handleCreateCollection} disabled={isCreating}>
+                        {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isCreating ? 'Creating...' : 'Create Collection'}
+                    </Button>
                 </div>
             </div>
         </div>
