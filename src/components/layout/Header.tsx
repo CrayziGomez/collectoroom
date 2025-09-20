@@ -41,13 +41,20 @@ export function Header() {
     return () => unsubscribe();
   }, [user]);
 
-  const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/gallery', label: 'Gallery' },
-    { href: '/pricing', label: 'Pricing' },
-    { href: '/messages', label: 'Messages', badge: unreadChatsCount },
-    { href: '/my-collectoroom', label: 'My CollectoRoom' },
+  const allNavLinks = [
+    { href: '/', label: 'Home', auth: 'always' },
+    { href: '/gallery', label: 'Gallery', auth: 'always' },
+    { href: '/pricing', label: 'Pricing', auth: 'always' },
+    { href: '/messages', label: 'Messages', badge: unreadChatsCount, auth: 'required' },
+    { href: '/my-collectoroom', label: 'My CollectoRoom', auth: 'required' },
   ];
+  
+  const navLinks = allNavLinks.filter(link => {
+      if (link.auth === 'always') return true;
+      if (link.auth === 'required' && user) return true;
+      return false;
+  })
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
