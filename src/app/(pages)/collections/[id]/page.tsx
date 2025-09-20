@@ -33,7 +33,7 @@ export default function CollectionPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!collectionId) return;
+    if (!collectionId || authLoading) return; // <-- FIX: Wait for auth to be ready
 
     const collectionRef = doc(db, 'collections', collectionId);
 
@@ -84,7 +84,7 @@ export default function CollectionPage() {
 
     return () => unsubscribeCollection();
 
-  }, [collectionId, user, router, toast]);
+  }, [collectionId, user, router, toast, authLoading]);
 
    const handleStartChat = async () => {
     if (authLoading || !user || !collectionOwner || user.uid === collectionOwner.uid) return;
@@ -196,5 +196,3 @@ export default function CollectionPage() {
     </div>
   );
 }
-
-    
