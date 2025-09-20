@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2, Crown, MessageSquare } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useState } from 'react';
@@ -173,7 +173,14 @@ export default function CollectionPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {cards.map(card => (
               <Card key={card.id} className="overflow-hidden group">
-                <CardContent className="p-0">
+                <CardContent className="p-0 relative">
+                   {isOwner && (
+                    <Link href={`/collections/${collectionData.id}/cards/${card.id}/edit`} className="absolute top-2 right-2 z-10">
+                        <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                  )}
                   <Image
                     src={card.imageUrl}
                     alt={card.title}
