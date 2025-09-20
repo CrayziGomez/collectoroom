@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { MOCK_COLLECTIONS, MOCK_USERS } from '@/lib/constants';
+import { MOCK_COLLECTIONS } from '@/lib/constants';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -24,7 +24,7 @@ const tierLimits = {
   Hobbyist: { cards: 50, collections: 2 },
   Explorer: { cards: 300, collections: 10 },
   Collector: { cards: 600, collections: 30 },
-  Curator: { cards: 1000, collections: 300 },
+  Curator: { cards: Infinity, collections: Infinity },
 };
 
 export default function MyCollectoRoomPage() {
@@ -41,7 +41,8 @@ export default function MyCollectoRoomPage() {
     return <div>Loading...</div>; // Or a proper skeleton loader
   }
 
-  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.uid || c.userId === '1'); // temp using mock user 1
+  // TODO: Replace with real user data once Firestore is connected for collections
+  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === '1');
   const totalCards = userCollections.reduce((acc, c) => acc + c.cardCount, 0);
   const cardLimit = tierLimits[user.tier].cards;
   const collectionLimit = tierLimits[user.tier].collections;
@@ -70,14 +71,14 @@ export default function MyCollectoRoomPage() {
             <div>
               <div className="flex justify-between mb-1">
                 <p className="font-medium">Card Usage</p>
-                <p className="text-muted-foreground">{totalCards} / {cardLimit}</p>
+                <p className="text-muted-foreground">{totalCards} / {cardLimit === Infinity ? '∞' : cardLimit}</p>
               </div>
               <Progress value={cardUsage} />
             </div>
             <div>
               <div className="flex justify-between mb-1">
                 <p className="font-medium">Collection Usage</p>
-                <p className="text-muted-foreground">{userCollections.length} / {collectionLimit}</p>
+                <p className="text-muted-foreground">{userCollections.length} / {collectionLimit === Infinity ? '∞' : collectionLimit}</p>
               </div>
               <Progress value={collectionUsage} />
             </div>

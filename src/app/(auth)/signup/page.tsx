@@ -43,7 +43,7 @@ export default function SignupPage() {
         email: user.email,
         tier: tier,
         isAdmin: false, // Default to not admin
-        avatarUrl: user.photoURL,
+        avatarUrl: user.photoURL || null,
       });
 
       router.push('/my-collectoroom');

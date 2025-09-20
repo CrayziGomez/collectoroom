@@ -2,13 +2,15 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import type { User as AppUser } from '@/lib/types';
 
-type UserProfile = User & {
-    tier: 'Hobbyist' | 'Explorer' | 'Collector' | 'Curator';
-    isAdmin: boolean;
+
+type UserProfile = AppUser & {
+    uid: string;
+    email: string;
     username: string;
     avatarUrl?: string;
 }
@@ -33,26 +35,32 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
         if (userDocSnap.exists()) {
           const userProfileData = userDocSnap.data();
            const userProfile: UserProfile = {
-            ...firebaseUser,
+            id: firebaseUser.uid, // from lib/types
             uid: firebaseUser.uid,
             username: userProfileData.username || firebaseUser.displayName || 'User',
+            email: userProfileData.email || firebaseUser.email!,
             tier: userProfileData.tier,
             isAdmin: userProfileData.isAdmin,
             avatarUrl: userProfileData.avatarUrl || firebaseUser.photoURL || undefined,
           };
           setUser(userProfile);
         } else {
-          // This case can happen for users created before firestore integration.
-          // You might want to create a document here, or handle it as an incomplete profile.
-          // For now, we'll create a basic profile.
-           const basicProfile: UserProfile = {
-            ...firebaseUser,
-            username: firebaseUser.displayName || 'User',
-            tier: 'Hobbyist',
-            isAdmin: false,
+           console.log('No user document found, creating one...');
+           const newUserProfile: UserProfile = {
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            username: firebaseUser.displayName || 'Anonymous User',
+            email: firebaseUser.email!,
+            tier: 'Hobbyist', // Default tier
+            isAdmin: false, // Default to not admin
             avatarUrl: firebaseUser.photoURL || undefined,
            };
-           setUser(basicProfile);
+           try {
+            await setDoc(userDocRef, newUserProfile);
+            setUser(newUserProfile);
+           } catch (error) {
+            console.error("Error creating user document:", error);
+           }
         }
       } else {
         setUser(null);

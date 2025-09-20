@@ -32,7 +32,8 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
 
   const collectionOwner = MOCK_USERS.find(u => u.id === collection.userId);
   const cards = MOCK_CARDS.filter(c => c.collectionId === params.id);
-  const isOwner = user?.uid === collection.userId || user?.uid === '1'; // temp using mock user 1
+  // Compare against the logged in user's ID
+  const isOwner = user?.uid === collection.userId;
 
   return (
     <div className="container py-8">
@@ -96,4 +97,3 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
