@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -21,26 +21,16 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        setLoading(true);
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-          const appUser = userDocSnap.data() as AppUser;
-          setUser(appUser);
+          setUser(userDocSnap.data() as AppUser);
         } else {
-            // This case can happen for users who signed up with Google
-            // or if the doc creation failed on signup. We create a default profile.
-            const newUser: AppUser = {
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
-                username: firebaseUser.displayName || 'New User',
-                email: firebaseUser.email!,
-                tier: 'Hobbyist',
-                isAdmin: false,
-                avatarUrl: firebaseUser.photoURL || undefined,
-            };
-            await setDoc(userDocRef, newUser);
-            setUser(newUser);
+          // If the user doc doesn't exist, it might be a new sign-up.
+          // The signup flow should create it. For now, we treat as logged out.
+          setUser(null);
         }
       } else {
         setUser(null);
