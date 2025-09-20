@@ -29,7 +29,12 @@ export default function SignupPage() {
 
   const handleSignup = async () => {
     try {
-      // 1. Create the user in Firebase Auth
+      // 1. Check if this would be the first user BEFORE creating the user
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      const isFirstUser = usersSnapshot.empty;
+
+      // 2. Create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
@@ -37,14 +42,10 @@ export default function SignupPage() {
         displayName: username,
       });
 
-      // 2. After successful creation, create the user document in Firestore
-      // Check if this is the first user
-      const usersCollection = await getDocs(collection(db, 'users'));
-      const isFirstUser = usersCollection.empty;
-
+      // 3. After successful auth creation, create the user document in Firestore
       const newUser: User = {
         uid: user.uid,
-        id: user.uid,
+        id: user.uid, // for consistency
         username: username,
         email: user.email!,
         tier: tier as User['tier'],
@@ -54,7 +55,7 @@ export default function SignupPage() {
 
       await setDoc(doc(db, "users", user.uid), newUser);
 
-      // 3. Redirect to the main app
+      // 4. Redirect to the main app
       router.push('/my-collectoroom');
     } catch (error: any) {
        toast({

@@ -32,18 +32,20 @@ import type { User } from '@/lib/types';
 
 export default function AdminPage() {
     const [users, setUsers] = useState<User[]>([]);
-    const totalUsers = users.length;
     const totalCollections = MOCK_COLLECTIONS.length;
     const totalCards = MOCK_COLLECTIONS.reduce((sum, coll) => sum + coll.cardCount, 0);
 
     useEffect(() => {
         const fetchUsers = async () => {
-            const usersCollection = await getDocs(collection(db, 'users'));
-            const usersData = usersCollection.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
+            const usersCollection = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersCollection);
+            const usersData = usersSnapshot.docs.map(doc => ({ ...doc.data() })) as User[];
             setUsers(usersData);
         };
         fetchUsers();
     }, []);
+
+    const totalUsers = users.length;
 
   return (
     <div className="container py-8 space-y-8">
@@ -102,7 +104,7 @@ export default function AdminPage() {
               </TableHeader>
               <TableBody>
                 {users.map(user => (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.uid}>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell><Badge variant={user.isAdmin ? "destructive" : "secondary"}>{user.isAdmin ? 'Admin' : user.tier}</Badge></TableCell>

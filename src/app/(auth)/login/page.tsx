@@ -11,7 +11,7 @@ import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopu
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import type { User } from '@/lib/types';
 
 
@@ -47,12 +47,13 @@ export default function LoginPage() {
       if (!userDocSnap.exists()) {
         // If the user document doesn't exist, this is their first login with Google.
         // We need to create a profile for them.
-        const usersCollection = await getDocs(collection(db, 'users'));
-        const isFirstUser = usersCollection.empty;
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        const isFirstUser = usersSnapshot.empty;
 
          const newUser: User = {
             uid: user.uid,
-            id: user.uid,
+            id: user.uid, // for consistency
             username: user.displayName || 'New User',
             email: user.email!,
             tier: 'Hobbyist', // Default tier for Google sign-up
