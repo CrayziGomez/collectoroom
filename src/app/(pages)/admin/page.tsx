@@ -1,8 +1,11 @@
+
+'use client';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText } from 'lucide-react';
-import { MOCK_USERS, CATEGORIES, MOCK_COLLECTIONS } from '@/lib/constants';
+import { CATEGORIES, MOCK_COLLECTIONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -21,12 +24,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { useEffect, useState } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { User } from '@/lib/types';
 
 
 export default function AdminPage() {
-    const totalUsers = MOCK_USERS.length;
+    const [users, setUsers] = useState<User[]>([]);
+    const totalUsers = users.length;
     const totalCollections = MOCK_COLLECTIONS.length;
     const totalCards = MOCK_COLLECTIONS.reduce((sum, coll) => sum + coll.cardCount, 0);
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const usersCollection = await getDocs(collection(db, 'users'));
+            const usersData = usersCollection.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
+            setUsers(usersData);
+        };
+        fetchUsers();
+    }, []);
 
   return (
     <div className="container py-8 space-y-8">
@@ -84,7 +101,7 @@ export default function AdminPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_USERS.map(user => (
+                {users.map(user => (
                   <TableRow key={user.id}>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>

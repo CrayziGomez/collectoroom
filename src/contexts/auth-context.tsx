@@ -20,18 +20,16 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setLoading(true);
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const appUser = userDocSnap.data() as AppUser;
-          setUser({ ...appUser, id: userDocSnap.id });
+          setUser(appUser);
         } else {
             // This case can happen for users who signed up with Google
-            // before the Firestore document creation was implemented on the login page,
-            // or if the doc creation failed on signup.
+            // or if the doc creation failed on signup. We create a default profile.
             const newUser: AppUser = {
                 id: firebaseUser.uid,
                 uid: firebaseUser.uid,

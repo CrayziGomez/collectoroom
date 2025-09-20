@@ -30,9 +30,10 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
     }
   }, [user, loading, router, collection.isPublic]);
 
+  // TODO: Replace with real data once Firestore is connected for users
   const collectionOwner = MOCK_USERS.find(u => u.id === collection.userId);
   const cards = MOCK_CARDS.filter(c => c.collectionId === params.id);
-  // Compare against the logged in user's ID
+  
   const isOwner = user?.uid === collection.userId;
 
   return (
