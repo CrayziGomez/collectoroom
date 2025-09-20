@@ -28,49 +28,95 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Collection } from '@/lib/types';
+import { useAuth } from '@/contexts/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ShieldAlert } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 
 export default function AdminPage() {
+    const { user, loading } = useAuth();
+    const router = useRouter();
     const [users, setUsers] = useState<User[]>([]);
     const [collections, setCollections] = useState<Collection[]>([]);
     const [totalCards, setTotalCards] = useState(0);
+    const [dataLoading, setDataLoading] = useState(true);
     
     useEffect(() => {
+        if (loading) {
+            return; // Wait for auth state to be determined
+        }
+
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        if (!user.isAdmin) {
+            setDataLoading(false);
+            return; // Don't fetch data if user is not an admin
+        }
+
+        setDataLoading(true);
+
         const usersQuery = query(collection(db, 'users'));
         const unsubscribeUsers = onSnapshot(usersQuery, (querySnapshot) => {
-            const usersData = querySnapshot.docs.map(doc => doc.data() as User);
+            const usersData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as User);
             setUsers(usersData);
+            if(dataLoading) setDataLoading(false);
+        }, (error) => {
+            console.error("Error fetching users:", error);
+            setDataLoading(false);
         });
 
-        const fetchCollectionsAndCards = async () => {
-          const collectionsQuery = query(collection(db, 'collections'));
-          const collectionsSnapshot = await getDocs(collectionsQuery);
-          const collectionsData = collectionsSnapshot.docs.map(doc => doc.data() as Collection);
-          setCollections(collectionsData);
-          
-          const totalCardCount = collectionsData.reduce((sum, coll) => sum + (coll.cardCount || 0), 0);
-          setTotalCards(totalCardCount);
-        };
-
-        fetchCollectionsAndCards();
-
-        const unsubscribeCollections = onSnapshot(query(collection(db, 'collections')), (snapshot) => {
+        const collectionsQuery = query(collection(db, 'collections'));
+        const unsubscribeCollections = onSnapshot(collectionsQuery, (snapshot) => {
            const collectionsData = snapshot.docs.map(doc => doc.data() as Collection);
            setCollections(collectionsData);
            const totalCardCount = collectionsData.reduce((sum, coll) => sum + (coll.cardCount || 0), 0);
            setTotalCards(totalCardCount);
+        }, (error) => {
+            console.error("Error fetching collections:", error);
         });
-
 
         return () => {
             unsubscribeUsers();
             unsubscribeCollections();
         };
-    }, []);
+    }, [user, loading, router]);
 
-    const totalUsers = users.length;
-    const totalCollections = collections.length;
-    
+
+    if (loading || (!user && !dataLoading)) {
+      return (
+        <div className="container py-8 space-y-8">
+            <Skeleton className="h-12 w-1/3" />
+            <div className="grid gap-4 md:grid-cols-3">
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+            </div>
+             <div className="grid gap-8 md:grid-cols-2">
+                <Skeleton className="h-96 w-full" />
+                <Skeleton className="h-96 w-full" />
+             </div>
+        </div>
+      )
+    }
+
+    if (!user?.isAdmin) {
+        return (
+            <div className="container py-8">
+                <Alert variant="destructive">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Access Denied</AlertTitle>
+                    <AlertDescription>
+                        You do not have permission to view this page.
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
 
   return (
     <div className="container py-8 space-y-8">
@@ -87,7 +133,7 @@ export default function AdminPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
+            <div className="text-2xl font-bold">{users.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -96,7 +142,7 @@ export default function AdminPage() {
             <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCollections}</div>
+            <div className="text-2xl font-bold">{collections.length}</div>
           </CardContent>
         </Card>
         <Card>
