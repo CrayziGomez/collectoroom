@@ -34,7 +34,9 @@ export default function CollectionPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!collectionId || authLoading) return;
+    if (authLoading) return;
+    
+    if (!collectionId) return;
 
     const collectionRef = doc(db, 'collections', collectionId);
 
@@ -175,27 +177,34 @@ export default function CollectionPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {cards.map(card => (
               <Card key={card.id} className="overflow-hidden group">
-                <CardContent className="p-0 relative">
+                <div className="relative">
                    {isOwner && (
-                    <Link href={`/collections/${collectionData.id}/cards/${card.id}/edit`} className="absolute top-2 right-2 z-10">
-                        <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                    </Link>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href={`/collections/${collectionData.id}/cards/${card.id}/edit`} className="absolute top-2 right-2 z-10">
+                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit Card</TooltipContent>
+                    </Tooltip>
                   )}
-                  <Image
-                    src={card.imageUrl}
-                    alt={card.title}
-                    width={300}
-                    height={400}
-                    className="aspect-[3/4] object-cover w-full group-hover:scale-105 transition-transform duration-300"
-                    data-ai-hint={card.imageHint}
-                  />
-                </CardContent>
-                <div className="p-4">
+                  <Link href={`/collections/${collectionData.id}/cards/${card.id}`}>
+                    <Image
+                      src={card.imageUrl}
+                      alt={card.title}
+                      width={300}
+                      height={400}
+                      className="aspect-[3/4] object-cover w-full group-hover:scale-105 transition-transform duration-300"
+                      data-ai-hint={card.imageHint}
+                    />
+                  </Link>
+                </div>
+                <Link href={`/collections/${collectionData.id}/cards/${card.id}`} className="block p-4">
                   <Tooltip>
                     <TooltipTrigger className="text-left w-full">
-                      <h3 className="font-semibold truncate">{card.title}</h3>
+                      <h3 className="font-semibold truncate group-hover:text-primary">{card.title}</h3>
                     </TooltipTrigger>
                     <TooltipContent>{card.title}</TooltipContent>
                   </Tooltip>
@@ -208,7 +217,7 @@ export default function CollectionPage() {
                     </Tooltip>
                   )}
                   <p className="text-xs text-muted-foreground mt-2">{card.status}</p>
-                </div>
+                </Link>
               </Card>
             ))}
             {isOwner && !hasReachedCardLimit && (

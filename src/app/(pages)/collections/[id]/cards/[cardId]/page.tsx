@@ -1,0 +1,142 @@
+
+'use client';
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { notFound, useRouter, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import type { Card as CardType, Collection } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+
+export default function CardDetailPage() {
+    const params = useParams();
+    const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
+    const cardId = Array.isArray(params.cardId) ? params.cardId[0] : params.cardId;
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
+
+    const [cardData, setCardData] = useState<CardType | null>(null);
+    const [collectionData, setCollectionData] = useState<Collection | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (authLoading) return;
+        
+        const fetchCardAndCollection = async () => {
+            if (!collectionId || !cardId) return;
+            setIsLoading(true);
+
+            try {
+                // Fetch card
+                const cardRef = doc(db, 'cards', cardId);
+                const cardSnap = await getDoc(cardRef);
+
+                if (!cardSnap.exists() || cardSnap.data().collectionId !== collectionId) {
+                    notFound();
+                    return;
+                }
+                const card = { ...cardSnap.data(), id: cardSnap.id } as CardType;
+                setCardData(card);
+
+                // Fetch collection
+                const collectionRef = doc(db, 'collections', collectionId);
+                const collectionSnap = await getDoc(collectionRef);
+                
+                if (!collectionSnap.exists()) {
+                     notFound();
+                     return;
+                }
+                const collection = { ...collectionSnap.data(), id: collectionSnap.id } as Collection;
+                setCollectionData(collection);
+
+                // Check permissions
+                const isOwner = user?.uid === collection.userId;
+                if (!collection.isPublic && !isOwner) {
+                    router.push('/gallery');
+                    return;
+                }
+                
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                notFound();
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchCardAndCollection();
+
+    }, [user, authLoading, collectionId, cardId, router]);
+
+
+    if (isLoading || authLoading) {
+        return (
+            <div className="container py-8 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )
+    }
+    
+    if (!cardData || !collectionData) {
+        return null;
+    }
+
+    return (
+        <div className="container py-8">
+            <div className="mb-6">
+                <Button variant="ghost" asChild>
+                    <Link href={`/collections/${collectionId}`}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to "{collectionData.name}"
+                    </Link>
+                </Button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+                <div className="md:col-span-1">
+                    <Card className="overflow-hidden sticky top-24">
+                        <Image
+                            src={cardData.imageUrl}
+                            alt={cardData.title}
+                            width={600}
+                            height={800}
+                            className="w-full aspect-[3/4] object-cover"
+                            data-ai-hint={cardData.imageHint}
+                        />
+                    </Card>
+                </div>
+                <div className="md:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-4xl font-headline">{cardData.title}</CardTitle>
+                            <CardDescription className="text-lg">{cardData.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid gap-6">
+                            <Separator />
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="font-semibold text-muted-foreground">Category</div>
+                                <div>{cardData.category}</div>
+
+                                <div className="font-semibold text-muted-foreground">Status</div>
+                                <div><Badge variant="outline">{cardData.status}</Badge></div>
+                             </div>
+                             <Separator />
+                              {user?.uid === cardData.userId && (
+                                <Button asChild>
+                                    <Link href={`/collections/${collectionId}/cards/${cardId}/edit`}>Edit Card Details</Link>
+                                </Button>
+                             )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+}
