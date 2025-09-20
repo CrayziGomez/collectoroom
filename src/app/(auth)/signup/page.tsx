@@ -35,14 +35,14 @@ export default function SignupPage() {
     }
 
     // Store the chosen username and tier in session storage
-    // The AuthContext will pick this up to create the user document
+    // The AuthContext and/or a Cloud Function will pick this up to create the user document
     sessionStorage.setItem('pendingUsername', username);
     sessionStorage.setItem('pendingTier', tier);
 
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       // On success, the AuthContext's onAuthStateChanged listener will handle
-      // creating the user document and redirecting.
+      // detecting the user and redirecting.
       router.push('/my-collectoroom');
     } catch (error: any) {
       toast({
