@@ -7,7 +7,7 @@ export function Logo() {
       <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
         <Layers3 className="h-5 w-5" />
       </div>
-      <span className="text-xl font-bold tracking-tight">
+      <span className="text-3xl font-bold tracking-tight">
         <span className="text-primary">Collecto</span>
         <span className="text-accent">Room</span>
       </span>
