@@ -6,7 +6,7 @@ import { Logo } from '@/components/Logo';
 import { useEffect, useState } from 'react';
 
 export function Footer() {
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState<number | null>(null);
 
   useEffect(() => {
     setYear(new Date().getFullYear());
@@ -47,7 +47,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {year} CollectoRoom. All rights reserved.</p>
+          <p>&copy; {year || new Date().getFullYear()} CollectoRoom. All rights reserved.</p>
         </div>
       </div>
     </footer>
