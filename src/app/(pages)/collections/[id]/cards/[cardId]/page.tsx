@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Share2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
@@ -14,6 +14,7 @@ import { doc, getDoc } from "firebase/firestore";
 import type { Card as CardType, Collection } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CardDetailPage() {
     const params = useParams();
@@ -21,6 +22,7 @@ export default function CardDetailPage() {
     const cardId = Array.isArray(params.cardId) ? params.cardId[0] : params.cardId;
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    const { toast } = useToast();
 
     const [cardData, setCardData] = useState<CardType | null>(null);
     const [collectionData, setCollectionData] = useState<Collection | null>(null);
@@ -75,6 +77,14 @@ export default function CardDetailPage() {
 
     }, [user, authLoading, collectionId, cardId, router]);
 
+    const handleShare = () => {
+        navigator.clipboard.writeText(window.location.href);
+        toast({
+            title: "Link Copied!",
+            description: "The card link has been copied to your clipboard.",
+        });
+    };
+
 
     if (isLoading || authLoading) {
         return (
@@ -87,6 +97,8 @@ export default function CardDetailPage() {
     if (!cardData || !collectionData) {
         return null;
     }
+
+    const isOwner = user?.uid === cardData.userId;
 
     return (
         <div className="container py-8">
@@ -128,11 +140,16 @@ export default function CardDetailPage() {
                                 <div><Badge variant="outline">{cardData.status}</Badge></div>
                              </div>
                              <Separator />
-                              {user?.uid === cardData.userId && (
+                             <div className="flex flex-wrap gap-2">
+                              {isOwner && (
                                 <Button asChild>
                                     <Link href={`/collections/${collectionId}/cards/${cardId}/edit`}>Edit Card Details</Link>
                                 </Button>
                              )}
+                              <Button variant="outline" onClick={handleShare}>
+                                <Share2 className="mr-2 h-4 w-4" /> Share
+                              </Button>
+                             </div>
                         </CardContent>
                     </Card>
                 </div>

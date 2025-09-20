@@ -24,10 +24,12 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Collection } from '@/lib/types';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 export default function MyCollectoRoomPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [userCollections, setUserCollections] = useState<Collection[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(true);
 
@@ -54,6 +56,15 @@ export default function MyCollectoRoomPage() {
 
     return () => unsubscribe();
   }, [user]);
+
+  const handleShare = (collectionId: string) => {
+    const url = `${window.location.origin}/collections/${collectionId}`;
+    navigator.clipboard.writeText(url);
+    toast({
+        title: "Link Copied!",
+        description: "The collection link has been copied to your clipboard.",
+    });
+  };
 
   if (authLoading || !user) {
     return (
@@ -189,7 +200,7 @@ export default function MyCollectoRoomPage() {
                           <Settings className="mr-2 h-4 w-4" /> Manage
                          </Link>
                       </DropdownMenuItem>
-                       <DropdownMenuItem>
+                       <DropdownMenuItem onClick={() => handleShare(collection.id)}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive">

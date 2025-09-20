@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useState } from 'react';
@@ -101,6 +101,14 @@ export default function CollectionPage() {
     }
   };
   
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast({
+        title: "Link Copied!",
+        description: "The collection link has been copied to your clipboard.",
+    });
+  };
+
   if (loading || authLoading) {
       return (
           <div className="container py-8 flex justify-center">
@@ -141,7 +149,7 @@ export default function CollectionPage() {
                 <>
                 <Button variant="outline" asChild>
                   <Link href={`/collections/${collectionData.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit Collection
+                    <Edit className="mr-2 h-4 w-4" /> Edit
                   </Link>
                 </Button>
                 <Button asChild disabled={hasReachedCardLimit}>
@@ -156,6 +164,9 @@ export default function CollectionPage() {
                     Message Owner
                 </Button>
             )}
+            <Button variant="outline" onClick={handleShare}>
+                <Share2 className="mr-2 h-4 w-4" /> Share
+            </Button>
           </div>
         </div>
          {isOwner && hasReachedCardLimit && (
