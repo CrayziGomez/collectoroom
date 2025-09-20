@@ -15,9 +15,8 @@ import { useState, useEffect } from "react";
 import { generateCardDescription } from "@/ai/flows/card-description-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, updateDoc, increment } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { Collection } from "@/lib/types";
 
 export default function AddCardPage() {
@@ -31,8 +30,6 @@ export default function AddCardPage() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<string>('');
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -68,14 +65,6 @@ export default function AddCardPage() {
         fetchCollection();
 
     }, [user, authLoading, collectionId, router, toast]);
-
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setImageFile(file);
-            setImagePreview(URL.createObjectURL(file));
-        }
-    };
     
     const handleGenerateDescription = async () => {
         if (!collectionData) return;
@@ -106,19 +95,19 @@ export default function AddCardPage() {
             toast({ title: "Error", description: "You must be logged in and have a collection.", variant: "destructive" });
             return;
         }
-        if (!title || !status || !imageFile) {
-            toast({ title: "Validation Error", description: "Title, Status, and Image are required.", variant: "destructive" });
+        if (!title || !status) {
+            toast({ title: "Validation Error", description: "Title and Status are required.", variant: "destructive" });
             return;
         }
 
         setIsSaving(true);
         try {
-            // 1. Upload image to Firebase Storage
-            const imageRef = ref(storage, `cards/${user.uid}/${collectionData.id}/${Date.now()}_${imageFile.name}`);
-            const uploadResult = await uploadBytes(imageRef, imageFile);
-            const imageUrl = await getDownloadURL(uploadResult.ref);
+            // Use a placeholder image instead of uploading a file
+            const randomSeed = Math.floor(Math.random() * 1000);
+            const imageUrl = `https://picsum.photos/seed/${randomSeed}/300/400`;
+            const imageHint = `${collectionData.category} card`;
 
-            // 2. Create card document in Firestore
+            // Create card document in Firestore
             await addDoc(collection(db, "cards"), {
                 collectionId: collectionData.id,
                 userId: user.uid,
@@ -126,11 +115,11 @@ export default function AddCardPage() {
                 description,
                 status,
                 imageUrl,
-                imageHint: 'user-uploaded card', // Generic hint for uploaded images
+                imageHint,
                 category: collectionData.category,
             });
 
-            // 3. Increment cardCount on the collection
+            // Increment cardCount on the collection
             const collectionRef = doc(db, 'collections', collectionData.id);
             await updateDoc(collectionRef, {
                 cardCount: increment(1)
@@ -185,11 +174,6 @@ export default function AddCardPage() {
                             </Button>
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="image">Image</Label>
-                            <Input id="image" type="file" onChange={handleImageChange} accept="image/*" disabled={isSaving} />
-                            {imagePreview && <img src={imagePreview} alt="Image preview" className="mt-2 rounded-md max-h-48 object-contain" />}
-                        </div>
-                         <div className="grid gap-2">
                             <Label htmlFor="status">Status</Label>
                              <Select onValueChange={setStatus} value={status} disabled={isSaving}>
                                 <SelectTrigger id="status">
@@ -207,7 +191,7 @@ export default function AddCardPage() {
 
                 <div className="flex justify-end gap-2 mt-6">
                     <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${collectionId}`}>Cancel</Link></Button>
-                    <Button onClick={handleAddCard} disabled={isSaving || !title || !status || !imageFile}>
+                    <Button onClick={handleAddCard} disabled={isSaving || !title || !status}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? 'Adding...' : 'Add Card'}
                     </Button>
