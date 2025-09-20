@@ -21,12 +21,22 @@ export default function SignupPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [tier, setTier] = useState('Hobbyist');
   const auth = getAuth(app);
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignup = async () => {
+    if (password !== confirmPassword) {
+      toast({
+        title: "Signup Failed",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // 1. Check if this would be the first user BEFORE creating the account
       // This is a small race condition, but acceptable for this app's purpose.
@@ -89,6 +99,10 @@ export default function SignupPage() {
         <div className="grid gap-2">
           <Label htmlFor="password">Password</Label>
           <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="confirm-password">Confirm Password</Label>
+          <Input id="confirm-password" type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
         </div>
          <div className="grid gap-2">
           <Label htmlFor="tier">Choose your plan</Label>

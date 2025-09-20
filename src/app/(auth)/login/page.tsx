@@ -7,12 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { app, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import type { User } from '@/lib/types';
+import { app } from '@/lib/firebase';
 
 
 export default function LoginPage() {
@@ -29,43 +27,6 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-        // If the user document doesn't exist, this is their first login with Google.
-        // We need to create a profile for them.
-        const usersCollection = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersCollection);
-        const isFirstUser = usersSnapshot.empty;
-
-         const newUser: User = {
-            uid: user.uid,
-            id: user.uid, // for consistency
-            username: user.displayName || 'New User',
-            email: user.email!,
-            tier: 'Hobbyist', // Default tier for Google sign-up
-            isAdmin: isFirstUser, // Make the first user an admin
-            avatarUrl: user.photoURL || undefined,
-        };
-        await setDoc(userDocRef, newUser);
-      }
-      router.push('/my-collectoroom');
-    } catch (error: any) {
-       toast({
-        title: "Google Login Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -96,9 +57,6 @@ export default function LoginPage() {
         </div>
         <Button onClick={handleLogin} className="w-full">
           Login
-        </Button>
-        <Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
-          Login with Google
         </Button>
       </CardContent>
       <div className="mt-4 text-center text-sm p-6 pt-0">
