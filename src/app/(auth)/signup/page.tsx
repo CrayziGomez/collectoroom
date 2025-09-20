@@ -9,13 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
-import { getAuth, createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { app, db } from '@/lib/firebase';
-import type { User } from '@/lib/types';
-
+import { app } from '@/lib/firebase';
 
 export default function SignupPage() {
   const [username, setUsername] = useState('');
@@ -38,38 +35,19 @@ export default function SignupPage() {
     }
 
     try {
-      // 1. Check if this would be the first user BEFORE creating the account.
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
-      const isFirstUser = usersSnapshot.empty;
-
-      // 2. Create the user in Firebase Authentication
+      // Step 1: Create the user in Firebase Authentication.
+      // The database document will be created by a backend Cloud Function.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const createdUser = userCredential.user;
       
-      // 3. Update the user's profile in Firebase Auth (e.g., displayName)
+      // Step 2: Update the user's profile in Firebase Auth (displayName)
+      // The tier information is not directly stored here. The backend function will handle it.
       await updateProfile(createdUser, {
         displayName: username,
       });
 
-      // 4. Create the user document object.
-      const newUser: User = {
-        uid: createdUser.uid,
-        id: createdUser.uid, // for consistency in the data model
-        username: username,
-        email: createdUser.email!,
-        tier: tier as User['tier'],
-        isAdmin: isFirstUser, // The first user to sign up becomes an admin
-        avatarUrl: createdUser.photoURL || undefined,
-      };
-
-      // 5. Use the user's UID as the document ID in the 'users' collection
-      await setDoc(doc(db, "users", createdUser.uid), newUser);
-      
-      // 6. Sign the user in to establish a clear auth session for redirection
-      await signInWithEmailAndPassword(auth, email, password);
-
-      // 7. Redirect to the main app page
+      // Step 3: Redirect to the main app page.
+      // The AuthContext will handle fetching the user data created by the backend function.
       router.push('/my-collectoroom');
 
     } catch (error: any) {
