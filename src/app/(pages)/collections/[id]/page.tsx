@@ -43,6 +43,9 @@ export default function CollectionPage() {
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as Collection;
+            
+            // This check needs to happen after we know if a user is logged in or not.
+            // The `authLoading` check at the start of useEffect handles this.
             const isOwner = user?.uid === data.userId;
             const isAdmin = user?.isAdmin === true;
 

@@ -107,7 +107,7 @@ export default function AdminPage() {
     };
 
 
-    if (loading || dataLoading) {
+    if (loading || (user?.isAdmin && dataLoading)) {
       return (
         <div className="container py-8 space-y-8">
             <Skeleton className="h-12 w-1/3" />
