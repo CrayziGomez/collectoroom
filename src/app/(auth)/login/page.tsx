@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import type { User } from '@/lib/types';
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -40,19 +42,20 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Check if user exists in Firestore, if not, create a document
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          username: user.displayName || 'Google User',
-          email: user.email,
-          tier: 'Hobbyist', // Default tier
-          isAdmin: false,
-          avatarUrl: user.photoURL || null,
-        });
+         const newUser: User = {
+            uid: user.uid,
+            id: user.uid,
+            username: user.displayName || 'Google User',
+            email: user.email!,
+            tier: 'Hobbyist', // Default tier
+            isAdmin: false,
+            avatarUrl: user.photoURL || undefined,
+        };
+        await setDoc(userDocRef, newUser);
       }
       router.push('/my-collectoroom');
     } catch (error: any) {

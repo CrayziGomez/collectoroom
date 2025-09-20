@@ -1,7 +1,9 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface User {
   id: string;
+  uid: string;
   email: string;
   username: string;
   avatarUrl?: string;

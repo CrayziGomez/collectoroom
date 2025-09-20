@@ -30,9 +30,11 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           setUser({ ...appUser, id: userDocSnap.id });
         } else {
             // This case can happen for users who signed up with Google
-            // before the Firestore document creation was implemented on the login page.
+            // before the Firestore document creation was implemented on the login page,
+            // or if the doc creation failed on signup.
             const newUser: AppUser = {
                 id: firebaseUser.uid,
+                uid: firebaseUser.uid,
                 username: firebaseUser.displayName || 'New User',
                 email: firebaseUser.email!,
                 tier: 'Hobbyist',

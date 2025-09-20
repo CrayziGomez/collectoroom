@@ -72,7 +72,7 @@ export default function MyCollectoRoomPage() {
   }
 
   // TODO: Replace with real user data once Firestore is connected for collections
-  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.id);
+  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.uid);
   const totalCards = userCollections.reduce((acc, c) => acc + c.cardCount, 0);
   const cardLimit = tierLimits[user.tier].cards;
   const collectionLimit = tierLimits[user.tier].collections;

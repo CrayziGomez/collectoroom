@@ -14,6 +14,7 @@ import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
+import type { User } from '@/lib/types';
 
 
 export default function SignupPage() {
@@ -31,21 +32,21 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Update profile in Firebase Auth
       await updateProfile(user, {
         displayName: username,
       });
 
-      // Create user document in Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      const newUser: User = {
         uid: user.uid,
-        id: user.uid, // Also storing as 'id' to match type
+        id: user.uid,
         username: username,
-        email: user.email,
-        tier: tier,
-        isAdmin: false, // Default to not admin
-        avatarUrl: user.photoURL || null,
-      });
+        email: user.email!,
+        tier: tier as User['tier'],
+        isAdmin: false,
+        avatarUrl: user.photoURL || undefined,
+      };
+
+      await setDoc(doc(db, "users", user.uid), newUser);
 
       router.push('/my-collectoroom');
     } catch (error: any) {
