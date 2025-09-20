@@ -40,7 +40,7 @@ export function Footer() {
              <div>
               <h3 className="font-semibold">Connect</h3>
               <ul className="mt-4 space-y-2">
-                <li><a href="#" className="text-muted-foreground hover:text-foreground">Twitter / X</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground">Facebook</a></li>
                 <li><a href="#" className="text-muted-foreground hover:text-foreground">Instagram</a></li>
               </ul>
             </div>
