@@ -87,7 +87,7 @@ export default function CollectionPage() {
   }, [collectionId, user, router, toast]);
 
    const handleStartChat = async () => {
-    if (!user || !collectionOwner || user.uid === collectionOwner.uid) return;
+    if (authLoading || !user || !collectionOwner || user.uid === collectionOwner.uid) return;
     
     const chatId = await createOrFindChat(collectionOwner.uid);
     if (chatId) {
@@ -141,7 +141,7 @@ export default function CollectionPage() {
                 </Button>
                 </>
             ) : user && collectionOwner && (
-                 <Button variant="outline" onClick={handleStartChat} disabled={isCreatingChat}>
+                 <Button variant="outline" onClick={handleStartChat} disabled={isCreatingChat || authLoading}>
                     {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                     Message Owner
                 </Button>
@@ -196,3 +196,5 @@ export default function CollectionPage() {
     </div>
   );
 }
+
+    
