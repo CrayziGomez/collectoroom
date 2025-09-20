@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, getCountFromServer, collection } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -14,25 +14,65 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
 
+// This function runs once when the user is authenticated for the first time.
+// It creates the user document in Firestore.
+const createUserProfileDocument = async (firebaseUser: FirebaseUser) => {
+  const userDocRef = doc(db, 'users', firebaseUser.uid);
+  const userSnapshot = await getDoc(userDocRef);
+
+  // Check if the user document already exists
+  if (!userSnapshot.exists()) {
+    const { email } = firebaseUser;
+    
+    // Get pending data from session storage (set during signup)
+    const pendingProfileString = sessionStorage.getItem('pendingUserProfile');
+    const pendingProfile = pendingProfileString ? JSON.parse(pendingProfileString) : {};
+    const username = pendingProfile.username || email?.split('@')[0] || 'Anonymous';
+    const tier = pendingProfile.tier || 'Hobbyist';
+    
+    // Check if this is the first user ever
+    const usersCollectionRef = collection(db, "users");
+    const snapshot = await getCountFromServer(usersCollectionRef);
+    const isFirstUser = snapshot.data().count === 0;
+
+    const newUser: AppUser = {
+      uid: firebaseUser.uid,
+      email: email || '',
+      username: username,
+      tier: tier,
+      isAdmin: isFirstUser, // Make the first user an admin
+      // Initialize other fields as needed
+      id: firebaseUser.uid, 
+    };
+
+    try {
+      await setDoc(userDocRef, newUser);
+      sessionStorage.removeItem('pendingUserProfile'); // Clean up session storage
+    } catch (error) {
+      console.error("Error creating user document:", error);
+    }
+  }
+};
+
+
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        setLoading(true);
+        // User is signed in.
+        await createUserProfileDocument(firebaseUser); // Ensure profile exists
+        
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        // Use onSnapshot to listen for real-time updates to the user document.
-        // This is crucial for when the document is created by a backend function.
         const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             setUser(docSnap.data() as AppUser);
           } else {
-            // Document might not be created yet by the backend function.
-            // We don't set user to null here immediately, we just wait.
-            // If the document never appears, the user won't be set, and they'll be treated as logged out.
+             // This might happen in a brief moment before the doc is created.
+             // We don't set user to null here, we just wait for the doc to appear.
           }
           setLoading(false);
         }, (error) => {
@@ -41,17 +81,15 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           setLoading(false);
         });
 
-        // Return a cleanup function for the document snapshot listener.
         return () => unsubscribeDoc();
 
       } else {
-        // No Firebase user.
+        // User is signed out.
         setUser(null);
         setLoading(false);
       }
     });
 
-    // Return a cleanup function for the auth state listener.
     return () => unsubscribeAuth();
   }, []);
 

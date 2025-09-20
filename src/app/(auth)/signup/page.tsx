@@ -13,8 +13,6 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
-import { doc, getDoc, setDoc, getCountFromServer, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 export default function SignupPage() {
   const [username, setUsername] = useState('');
@@ -40,8 +38,15 @@ export default function SignupPage() {
       // Step 1: Create the user in Firebase Authentication.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Step 2: Redirect to the main app page.
-      // The AuthContext and backend function will handle the rest.
+      // Step 2: Store additional info temporarily for the AuthContext to pick up.
+      // This is a simple way to pass data to the context after redirect.
+      sessionStorage.setItem('pendingUserProfile', JSON.stringify({
+          username,
+          tier
+      }));
+
+      // Step 3: Redirect to the main app page.
+      // The AuthContext will handle creating the user document in Firestore.
       router.push('/my-collectoroom');
 
     } catch (error: any) {
