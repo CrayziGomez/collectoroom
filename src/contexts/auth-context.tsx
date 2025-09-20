@@ -3,8 +3,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { MOCK_USERS } from '@/lib/constants'; // using mock for tier and isAdmin
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 type UserProfile = User & {
     tier: 'Hobbyist' | 'Explorer' | 'Collector' | 'Curator';
@@ -25,20 +25,35 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // In a real app, you would fetch user profile from Firestore here
-        // For now, we'll merge with mock data to get tier, admin status, etc.
-        const mockUser = MOCK_USERS.find(u => u.email === firebaseUser.email) || MOCK_USERS[0];
-        const userProfile: UserProfile = {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userProfileData = userDocSnap.data();
+           const userProfile: UserProfile = {
             ...firebaseUser,
             uid: firebaseUser.uid,
-            username: firebaseUser.displayName || mockUser.username,
-            tier: mockUser.tier,
-            isAdmin: mockUser.isAdmin,
-            avatarUrl: firebaseUser.photoURL || mockUser.avatarUrl,
-        };
-        setUser(userProfile);
+            username: userProfileData.username || firebaseUser.displayName || 'User',
+            tier: userProfileData.tier,
+            isAdmin: userProfileData.isAdmin,
+            avatarUrl: userProfileData.avatarUrl || firebaseUser.photoURL || undefined,
+          };
+          setUser(userProfile);
+        } else {
+          // This case can happen for users created before firestore integration.
+          // You might want to create a document here, or handle it as an incomplete profile.
+          // For now, we'll create a basic profile.
+           const basicProfile: UserProfile = {
+            ...firebaseUser,
+            username: firebaseUser.displayName || 'User',
+            tier: 'Hobbyist',
+            isAdmin: false,
+            avatarUrl: firebaseUser.photoURL || undefined,
+           };
+           setUser(basicProfile);
+        }
       } else {
         setUser(null);
       }

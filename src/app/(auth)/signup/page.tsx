@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PRICING_TIERS } from '@/lib/constants';
 import { useState } from 'react';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
@@ -21,16 +22,30 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [tier, setTier] = useState('Hobbyist');
   const auth = getAuth(app);
+  const db = getFirestore(app);
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignup = async () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, {
+      const user = userCredential.user;
+      
+      // Update profile in Firebase Auth
+      await updateProfile(user, {
         displayName: username,
       });
-      // In a real app, you would also save the selected tier to Firestore here.
+
+      // Create user document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        username: username,
+        email: user.email,
+        tier: tier,
+        isAdmin: false, // Default to not admin
+        avatarUrl: user.photoURL,
+      });
+
       router.push('/my-collectoroom');
     } catch (error: any) {
        toast({
