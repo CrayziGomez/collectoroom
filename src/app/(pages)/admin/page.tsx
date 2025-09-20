@@ -66,7 +66,7 @@ export default function AdminPage() {
         const unsubscribeUsers = onSnapshot(usersQuery, (querySnapshot) => {
             const usersData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as User);
             setUsers(usersData);
-            if(dataLoading) setDataLoading(false);
+            setDataLoading(false);
         }, (error) => {
             console.error("Error fetching users:", error);
             setDataLoading(false);
@@ -86,7 +86,7 @@ export default function AdminPage() {
             unsubscribeUsers();
             unsubscribeCollections();
         };
-    }, [user, loading, router, dataLoading]);
+    }, [user, loading, router]);
 
     const handleTierChange = async (userId: string, newTier: User['tier']) => {
         const userRef = doc(db, 'users', userId);
@@ -107,7 +107,7 @@ export default function AdminPage() {
     };
 
 
-    if (loading || (!user && !dataLoading)) {
+    if (loading || dataLoading) {
       return (
         <div className="container py-8 space-y-8">
             <Skeleton className="h-12 w-1/3" />
@@ -215,7 +215,7 @@ export default function AdminPage() {
                               <SelectValue placeholder="Select tier" />
                             </SelectTrigger>
                             <SelectContent>
-                              {PRICING_TIERS.map(tier => (
+                              {PRICING_TIERS.filter(t => t.name !== 'Curator').map(tier => (
                                 <SelectItem key={tier.name} value={tier.name} disabled={tier.isComingSoon}>{tier.name}</SelectItem>
                               ))}
                             </SelectContent>
