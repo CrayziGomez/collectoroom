@@ -1,13 +1,13 @@
 
 'use client';
 
-import { notFound, useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2, Crown } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useState } from 'react';
@@ -38,8 +38,8 @@ export default function CollectionPage() {
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as Collection;
-            const isOwner = !authLoading && user?.uid === data.userId;
-            const isAdmin = !authLoading && user?.isAdmin === true;
+            const isOwner = user?.uid === data.userId;
+            const isAdmin = user?.isAdmin === true;
 
             if (!data.isPublic && !isOwner && !isAdmin) {
                 toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
@@ -49,7 +49,6 @@ export default function CollectionPage() {
 
             setCollectionData({ ...data, id: docSnap.id });
 
-            // Fetch owner data
             if (data.userId) {
                 const ownerRef = doc(db, 'users', data.userId);
                 const ownerSnap = await getDoc(ownerRef);
@@ -58,7 +57,6 @@ export default function CollectionPage() {
                 }
             }
 
-            // Fetch cards for this collection
             const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
             const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
                 const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
@@ -72,19 +70,21 @@ export default function CollectionPage() {
             return () => unsubscribeCards();
 
         } else {
-            notFound();
+            toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
+            router.push('/gallery');
         }
     }, (error) => {
         console.error("Error fetching collection:", error);
         setLoading(false);
-        notFound();
+        toast({ title: "Error", description: "Could not load the collection.", variant: "destructive" });
+        router.push('/gallery');
     });
 
     return () => unsubscribeCollection();
 
-  }, [collectionId, user, authLoading, router, toast]);
+  }, [collectionId, user, router, toast]);
   
-  if (loading || authLoading || !user) {
+  if (loading || authLoading) {
       return (
           <div className="container py-8 flex justify-center">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -96,15 +96,15 @@ export default function CollectionPage() {
     return null;
   }
 
-  const isOwner = user.uid === collectionData.userId;
-  const cardLimit = tierLimits[user.tier].cards;
-  const hasReachedCardLimit = collectionData.cardCount >= cardLimit;
+  const isOwner = user?.uid === collectionData.userId;
+  const cardLimit = user ? tierLimits[user.tier].cards : 0;
+  const hasReachedCardLimit = user ? collectionData.cardCount >= cardLimit : true;
 
   return (
     <div className="container py-8">
       {/* Collection Header */}
       <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <Badge variant="secondary" className="mb-2">{collectionData.category}</Badge>
             <h1 className="text-4xl font-bold font-headline">{collectionData.name}</h1>
@@ -119,23 +119,29 @@ export default function CollectionPage() {
               <span>{collectionData.cardCount || 0} cards</span>
             </div>
           </div>
-          {isOwner && (
-            <div className="flex gap-2">
-              <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit Collection</Button>
-              <Button asChild disabled={hasReachedCardLimit}>
-                <Link href={`/collections/${collectionData.id}/add`}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Card
-                </Link>
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2 flex-shrink-0">
+            {isOwner ? (
+                <>
+                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit Collection</Button>
+                <Button asChild disabled={hasReachedCardLimit}>
+                    <Link href={`/collections/${collectionData.id}/add`}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Card
+                    </Link>
+                </Button>
+                </>
+            ) : user && (
+                 <Button variant="outline" disabled>
+                    <MessageSquare className="mr-2 h-4 w-4" /> Message Owner
+                </Button>
+            )}
+          </div>
         </div>
          {isOwner && hasReachedCardLimit && (
             <Alert className="mt-6">
               <Crown className="h-4 w-4" />
               <AlertTitle>Card Limit Reached!</AlertTitle>
               <AlertDescription>
-                You've reached your limit of {cardLimit} cards for the {user.tier} plan. 
+                You've reached your limit of {cardLimit} cards for the {user?.tier} plan. 
                 Please <Link href="/pricing" className="font-semibold text-primary underline">upgrade your plan</Link> to add more cards.
               </AlertDescription>
             </Alert>
