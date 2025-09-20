@@ -26,7 +26,8 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-          setUser(userDocSnap.data() as AppUser);
+          const appUser = userDocSnap.data() as AppUser;
+          setUser({ ...appUser, id: userDocSnap.id });
         } else {
             // This case can happen for users who signed up with Google
             // before the Firestore document creation was implemented on the login page.
