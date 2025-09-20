@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText } from 'lucide-react';
-import { CATEGORIES, MOCK_COLLECTIONS } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -25,27 +25,38 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User } from '@/lib/types';
+import type { User, Collection } from '@/lib/types';
 
 
 export default function AdminPage() {
     const [users, setUsers] = useState<User[]>([]);
-    const totalCollections = MOCK_COLLECTIONS.length;
-    const totalCards = MOCK_COLLECTIONS.reduce((sum, coll) => sum + coll.cardCount, 0);
-
+    const [collections, setCollections] = useState<Collection[]>([]);
+    
     useEffect(() => {
-        const fetchUsers = async () => {
-            const usersCollection = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersCollection);
-            const usersData = usersSnapshot.docs.map(doc => ({ ...doc.data() })) as User[];
+        const usersQuery = query(collection(db, 'users'));
+        const unsubscribeUsers = onSnapshot(usersQuery, (querySnapshot) => {
+            const usersData = querySnapshot.docs.map(doc => doc.data() as User);
             setUsers(usersData);
+        });
+
+        // Assuming collections are stored in a 'collections' collection
+        const collectionsQuery = query(collection(db, 'collections'));
+        const unsubscribeCollections = onSnapshot(collectionsQuery, (querySnapshot) => {
+            const collectionsData = querySnapshot.docs.map(doc => doc.data() as Collection);
+            setCollections(collectionsData);
+        });
+
+        return () => {
+            unsubscribeUsers();
+            unsubscribeCollections();
         };
-        fetchUsers();
     }, []);
 
     const totalUsers = users.length;
+    const totalCollections = collections.length;
+    const totalCards = collections.reduce((sum, coll) => sum + coll.cardCount, 0);
 
   return (
     <div className="container py-8 space-y-8">
@@ -103,42 +114,48 @@ export default function AdminPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map(user => (
-                  <TableRow key={user.uid}>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell><Badge variant={user.isAdmin ? "destructive" : "secondary"}>{user.isAdmin ? 'Admin' : user.tier}</Badge></TableCell>
-                    <TableCell className="text-right">
-                       <AlertDialog>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem className="text-destructive">
-                                  <Trash2 className="mr-2 h-4 w-4" /> Delete User
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the user account
-                                and remove their data from our servers.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                    </TableCell>
+                 {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-24">No users found.</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  users.map(user => (
+                    <TableRow key={user.uid}>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell><Badge variant={user.isAdmin ? "destructive" : "secondary"}>{user.isAdmin ? 'Admin' : user.tier}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <AlertDialog>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem className="text-destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the user account
+                                  and remove their data from our servers.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
