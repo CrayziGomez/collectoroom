@@ -31,14 +31,14 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
             // Let's create their document in Firestore.
             const username = firebaseUser.email?.split('@')[0] || 'New User';
             const tier = 'Hobbyist'; // Default tier
-            const isAdmin = firebaseUser.email === 'admin@collectoroom.com'; // Check for admin email
+            const isAdmin = firebaseUser.email === 'admin@collectoroom.com';
 
             const newUser: AppUser = {
               uid: firebaseUser.uid,
               id: firebaseUser.uid, // for mock data compatibility
               email: firebaseUser.email || '',
               username: username,
-              tier: isAdmin ? 'Curator' : tier, // Admin gets Curator tier
+              tier: isAdmin ? 'Curator' : tier,
               isAdmin: isAdmin,
             };
 
