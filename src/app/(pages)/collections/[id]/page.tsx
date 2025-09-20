@@ -1,7 +1,7 @@
 
 'use client';
 
-import { notFound, useRouter } from 'next/navigation';
+import { notFound, useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,10 +14,14 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Collection, Card as CardType, User } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
-export default function CollectionPage({ params }: { params: { id: string } }) {
+export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const params = useParams();
+  const { toast } = useToast();
+  const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
   const [collectionOwner, setCollectionOwner] = useState<User | null>(null);
@@ -25,37 +29,45 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!collectionId) return;
+
     setLoading(true);
-    const collectionRef = doc(db, 'collections', params.id);
+    const collectionRef = doc(db, 'collections', collectionId);
 
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as Collection;
+            const isOwner = !authLoading && user?.uid === data.userId;
+            const isAdmin = !authLoading && user?.isAdmin === true;
 
-            // Check for public access or ownership
-            if (!data.isPublic && !authLoading && (!user || user.uid !== data.userId)) {
+            if (!data.isPublic && !isOwner && !isAdmin) {
                 toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
                 router.push('/gallery');
                 return;
             }
+
             setCollectionData({ ...data, id: docSnap.id });
 
             // Fetch owner data
-            const ownerRef = doc(db, 'users', data.userId);
-            const ownerSnap = await getDoc(ownerRef);
-            if (ownerSnap.exists()) {
-                setCollectionOwner(ownerSnap.data() as User);
+            if (data.userId) {
+                const ownerRef = doc(db, 'users', data.userId);
+                const ownerSnap = await getDoc(ownerRef);
+                if (ownerSnap.exists()) {
+                    setCollectionOwner(ownerSnap.data() as User);
+                }
             }
 
             // Fetch cards for this collection
-            const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', params.id));
+            const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
             const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
                 const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
                 setCards(cardsData);
+                if(loading) setLoading(false);
+            }, (error) => {
+                console.error("Error fetching cards:", error);
                 setLoading(false);
             });
             
-            // Return a function to unsubscribe from cards listener when collection changes
             return () => unsubscribeCards();
 
         } else {
@@ -69,7 +81,7 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
 
     return () => unsubscribeCollection();
 
-  }, [params.id, user, authLoading, router]);
+  }, [collectionId, user, authLoading, router, toast, loading]);
   
   if (loading || authLoading) {
       return (
@@ -80,7 +92,6 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
   }
   
   if (!collectionData) {
-    // notFound() would have been called in the useEffect, but this is a fallback
     return null;
   }
 
