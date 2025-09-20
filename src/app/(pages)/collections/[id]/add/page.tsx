@@ -19,6 +19,8 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, updateDoc, increment } from "firebase/firestore";
 import type { Collection } from "@/lib/types";
 
+const MAX_WORDS = 500;
+
 export default function AddCardPage() {
     const params = useParams();
     const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -66,6 +68,21 @@ export default function AddCardPage() {
 
     }, [user, authLoading, collectionId, router, toast]);
     
+    const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const text = e.target.value;
+        const words = text.split(/\s+/).filter(Boolean);
+        if (words.length <= MAX_WORDS) {
+            setDescription(text);
+        } else {
+            // Trim the text to the first MAX_WORDS words
+            const trimmedText = words.slice(0, MAX_WORDS).join(' ');
+            setDescription(trimmedText);
+        }
+    };
+
+    const wordCount = description.split(/\s+/).filter(Boolean).length;
+
+
     const handleGenerateDescription = async () => {
         if (!collectionData) return;
         setIsGenerating(true);
@@ -76,7 +93,13 @@ export default function AddCardPage() {
                 existingDescription: description,
             });
             if (result.suggestedDescription) {
-                setDescription(result.suggestedDescription);
+                const words = result.suggestedDescription.split(/\s+/).filter(Boolean);
+                if (words.length > MAX_WORDS) {
+                    const trimmedText = words.slice(0, MAX_WORDS).join(' ');
+                    setDescription(trimmedText);
+                } else {
+                    setDescription(result.suggestedDescription);
+                }
             }
         } catch (error) {
             console.error("AI description generation failed:", error);
@@ -166,8 +189,11 @@ export default function AddCardPage() {
                             <Input id="title" placeholder="e.g., Action Comics #1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isSaving} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={(e) => setDescription(e.target.value)} disabled={isSaving} />
+                             <div className="flex justify-between items-center">
+                                <Label htmlFor="description">Description</Label>
+                                <span className="text-sm text-muted-foreground">{wordCount}/{MAX_WORDS} words</span>
+                            </div>
+                            <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={handleDescriptionChange} disabled={isSaving} />
                             <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !title || isSaving}>
                                 <Wand2 className="mr-2 h-4 w-4" /> 
                                 {isGenerating ? 'Generating...' : 'Suggest with AI'}
