@@ -63,6 +63,9 @@ export interface Chat {
         text: string;
         timestamp: any;
     };
+    unreadCount?: {
+        [key: string]: number;
+    };
 }
 
 export interface Message {

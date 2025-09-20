@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import type { Chat, Message, User } from '@/lib/types';
 import { Loader2, Send, ArrowLeft } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -36,6 +36,23 @@ export default function ChatPage() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+     useEffect(() => {
+        if (authLoading || !user || !chatId) return;
+
+        // Reset unread count for the current user when they enter the chat.
+        const chatRef = doc(db, 'chats', chatId);
+        getDoc(chatRef).then(docSnap => {
+            if (docSnap.exists()) {
+                const unreadPath = `unreadCount.${user.uid}`;
+                if (docSnap.data()[unreadPath] > 0) {
+                    updateDoc(chatRef, { [unreadPath]: 0 });
+                }
+            }
+        });
+
+    }, [chatId, user, authLoading]);
+
 
     useEffect(() => {
         if (authLoading) return;
@@ -86,6 +103,9 @@ export default function ChatPage() {
         e.preventDefault();
         if (!newMessage.trim() || !user || !chat) return;
 
+        const otherId = chat.participantIds.find(id => id !== user.uid);
+        if (!otherId) return;
+
         setIsSending(true);
         try {
             const messagesColRef = collection(db, 'chats', chat.id, 'messages');
@@ -97,11 +117,13 @@ export default function ChatPage() {
             });
 
             const chatDocRef = doc(db, 'chats', chat.id);
+            // Update last message and increment unread count for the other user
             await setDoc(chatDocRef, {
                 lastMessage: {
                     text: newMessage,
                     timestamp: serverTimestamp(),
                 },
+                [`unreadCount.${otherId}`]: increment(1),
             }, { merge: true });
 
 
@@ -115,7 +137,7 @@ export default function ChatPage() {
     
     if (loading || authLoading) {
         return (
-            <div className="container h-screen py-8 flex justify-center items-center">
+            <div className="h-[calc(100vh-8rem)] container py-8 flex justify-center items-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         );
@@ -124,7 +146,7 @@ export default function ChatPage() {
     if (!chat || !otherParticipant) return null;
 
     return (
-        <div className="container py-4 h-[calc(100vh-8rem)] flex flex-col max-w-3xl">
+        <div className="container py-4 h-[calc(100vh-8rem)] flex flex-col max-w-3xl mx-auto">
              <header className="border-b pb-4 mb-4 flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
                     <Link href="/messages"><ArrowLeft /></Link>

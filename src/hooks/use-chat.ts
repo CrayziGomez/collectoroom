@@ -30,37 +30,37 @@ export function useChat() {
         const chatRef = doc(db, 'chats', chatId);
 
         try {
-            // "Create or merge" approach to avoid a separate 'get' call.
-            // First, get the other user's data to ensure they exist and we have their info.
-            const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
-
-            if (!otherUserDoc.exists()) {
-                throw new Error("The user you're trying to chat with doesn't exist.");
-            }
-
-            const otherUserData = otherUserDoc.data() as User;
+            const chatSnap = await getDoc(chatRef);
             
-            // Atomically create the chat document if it doesn't exist, or merge the fields 
-            // if it does. This avoids a separate read operation that fails security rules.
-            // The `setDoc` with `merge: true` will not overwrite existing fields if the doc exists.
-            await setDoc(chatRef, {
-                participantIds: [user.uid, otherUserId],
-                participants: {
-                    [user.uid]: {
-                        username: user.username,
-                        avatarUrl: user.avatarUrl || ''
-                    },
-                    [otherUserId]: {
-                        username: otherUserData.username,
-                        avatarUrl: otherUserData.avatarUrl || ''
-                    }
-                },
-                // Only set lastMessage on creation, don't overwrite it on subsequent calls.
-                lastMessage: {
-                    text: 'Chat started',
-                    timestamp: serverTimestamp()
+            if (!chatSnap.exists()) {
+                const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
+                if (!otherUserDoc.exists()) {
+                    throw new Error("The user you're trying to chat with doesn't exist.");
                 }
-            }, { merge: true }); // Using merge is key to not overwriting existing chats.
+                const otherUserData = otherUserDoc.data() as User;
+                
+                await setDoc(chatRef, {
+                    participantIds: [user.uid, otherUserId],
+                    participants: {
+                        [user.uid]: {
+                            username: user.username,
+                            avatarUrl: user.avatarUrl || ''
+                        },
+                        [otherUserId]: {
+                            username: otherUserData.username,
+                            avatarUrl: otherUserData.avatarUrl || ''
+                        }
+                    },
+                    lastMessage: {
+                        text: 'Chat started',
+                        timestamp: serverTimestamp()
+                    },
+                    unreadCount: {
+                        [user.uid]: 0,
+                        [otherUserId]: 1,
+                    }
+                });
+            }
 
             return chatId;
             

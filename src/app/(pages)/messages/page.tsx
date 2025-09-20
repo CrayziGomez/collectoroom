@@ -12,6 +12,7 @@ import { Loader2, MessageSquarePlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export default function MessagesPage() {
     const { user, loading: authLoading } = useAuth();
@@ -79,6 +80,8 @@ export default function MessagesPage() {
                     {chats.map(chat => {
                         const otherParticipant = getOtherParticipant(chat);
                         if (!otherParticipant) return null;
+
+                        const hasUnread = user && (chat.unreadCount?.[user.uid] ?? 0) > 0;
                         
                         return (
                             <Link href={`/messages/${chat.id}`} key={chat.id}>
@@ -90,15 +93,18 @@ export default function MessagesPage() {
                                         </Avatar>
                                         <div className="flex-grow overflow-hidden">
                                             <div className="flex justify-between">
-                                                <p className="font-semibold truncate">{otherParticipant.username}</p>
+                                                <p className={cn("font-semibold truncate", hasUnread && "font-bold")}>{otherParticipant.username}</p>
                                                 {chat.lastMessage?.timestamp && (
                                                     <p className="text-xs text-muted-foreground flex-shrink-0 ml-2">
                                                         {formatDistanceToNow(chat.lastMessage.timestamp.toDate(), { addSuffix: true })}
                                                     </p>
                                                 )}
                                             </div>
-                                            <p className="text-sm text-muted-foreground truncate">{chat.lastMessage?.text || 'No messages yet'}</p>
+                                            <p className={cn("text-sm text-muted-foreground truncate", hasUnread && "text-foreground font-medium")}>{chat.lastMessage?.text || 'No messages yet'}</p>
                                         </div>
+                                         {hasUnread && (
+                                            <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0"></div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </Link>
