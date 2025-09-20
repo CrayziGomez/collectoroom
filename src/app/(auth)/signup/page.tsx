@@ -34,28 +34,25 @@ export default function SignupPage() {
       return;
     }
 
-    try {
-      // Step 1: Store profile info for the backend function to pick up.
-      // This is a temporary way to pass data.
-      sessionStorage.setItem('pendingUserProfile', JSON.stringify({
-          username,
-          tier
-      }));
-      
-      // Step 2: Create the user in Firebase Authentication.
-      await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Step 3: Redirect. The AuthContext will handle the rest.
-      // The backend Cloud Function will create the user document.
-      router.push('/my-collectoroom');
+    // Store the chosen username and tier in session storage
+    // The AuthContext will pick this up to create the user document
+    sessionStorage.setItem('pendingUsername', username);
+    sessionStorage.setItem('pendingTier', tier);
 
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      // On success, the AuthContext's onAuthStateChanged listener will handle
+      // creating the user document and redirecting.
+      router.push('/my-collectoroom');
     } catch (error: any) {
-       toast({
+      toast({
         title: "Signup Failed",
         description: error.message,
         variant: "destructive",
       });
-       sessionStorage.removeItem('pendingUserProfile'); // Clean up on failure
+      // Clean up session storage on failure
+      sessionStorage.removeItem('pendingUsername');
+      sessionStorage.removeItem('pendingTier');
     }
   };
 
