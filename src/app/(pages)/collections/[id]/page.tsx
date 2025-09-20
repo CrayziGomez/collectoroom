@@ -31,7 +31,6 @@ export default function CollectionPage() {
   useEffect(() => {
     if (!collectionId) return;
 
-    setLoading(true);
     const collectionRef = doc(db, 'collections', collectionId);
 
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
@@ -62,7 +61,7 @@ export default function CollectionPage() {
             const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
                 const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
                 setCards(cardsData);
-                if(loading) setLoading(false);
+                setLoading(false);
             }, (error) => {
                 console.error("Error fetching cards:", error);
                 setLoading(false);
@@ -81,7 +80,7 @@ export default function CollectionPage() {
 
     return () => unsubscribeCollection();
 
-  }, [collectionId, user, authLoading, router, toast, loading]);
+  }, [collectionId, user, authLoading, router, toast]);
   
   if (loading || authLoading) {
       return (
