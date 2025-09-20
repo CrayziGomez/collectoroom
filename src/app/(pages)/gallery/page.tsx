@@ -26,7 +26,7 @@ async function fetchCollectionOwners(collections: Collection[]): Promise<Record<
     // Fetch users in chunks of 10 which is a firestore limitation for 'in' queries
     for (let i = 0; i < userIds.length; i += 10) {
         const chunk = userIds.slice(i, i + 10);
-        const usersQuery = query(collection(db, 'users'), where('uid', 'in', chunk));
+        const usersQuery = query(collection(db, 'users'), where('id', 'in', chunk));
         const querySnapshot = await getDocs(usersQuery);
         querySnapshot.forEach(doc => {
             owners[doc.id] = doc.data() as User;
