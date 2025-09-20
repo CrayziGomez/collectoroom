@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, PRICING_TIERS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Collection } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
@@ -33,11 +33,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPage() {
     const { user, loading } = useAuth();
     const router = useRouter();
+    const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [collections, setCollections] = useState<Collection[]>([]);
     const [totalCards, setTotalCards] = useState(0);
@@ -84,7 +86,25 @@ export default function AdminPage() {
             unsubscribeUsers();
             unsubscribeCollections();
         };
-    }, [user, loading, router]);
+    }, [user, loading, router, dataLoading]);
+
+    const handleTierChange = async (userId: string, newTier: User['tier']) => {
+        const userRef = doc(db, 'users', userId);
+        try {
+            await updateDoc(userRef, { tier: newTier });
+            toast({
+                title: 'Success',
+                description: `User tier has been updated to ${newTier}.`,
+            });
+        } catch (error: any) {
+            console.error("Error updating tier:", error);
+            toast({
+                title: 'Error',
+                description: 'Failed to update user tier. Please try again.',
+                variant: 'destructive',
+            });
+        }
+    };
 
 
     if (loading || (!user && !dataLoading)) {
@@ -179,11 +199,29 @@ export default function AdminPage() {
                     <TableCell colSpan={4} className="text-center h-24">No users found.</TableCell>
                   </TableRow>
                 ) : (
-                  users.map(user => (
-                    <TableRow key={user.uid}>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell><Badge variant={user.isAdmin ? "destructive" : "secondary"}>{user.isAdmin ? 'Admin' : user.tier}</Badge></TableCell>
+                  users.map(u => (
+                    <TableRow key={u.uid}>
+                      <TableCell className="font-medium">{u.username}</TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>
+                        {u.isAdmin ? (
+                           <Badge variant="destructive">Admin</Badge>
+                        ) : (
+                          <Select
+                            value={u.tier}
+                            onValueChange={(newTier: User['tier']) => handleTierChange(u.uid, newTier)}
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue placeholder="Select tier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PRICING_TIERS.map(tier => (
+                                <SelectItem key={tier.name} value={tier.name} disabled={tier.isComingSoon}>{tier.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <AlertDialog>
                             <DropdownMenu>
@@ -192,7 +230,7 @@ export default function AdminPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
                                 <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem className="text-destructive">
+                                  <DropdownMenuItem className="text-destructive" disabled={u.uid === user.uid}>
                                     <Trash2 className="mr-2 h-4 w-4" /> Delete User
                                   </DropdownMenuItem>
                                 </AlertDialogTrigger>
