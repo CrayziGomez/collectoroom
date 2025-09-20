@@ -70,13 +70,13 @@ export const PRICING_TIERS: PricingTier[] = [
   },
   {
     name: 'Curator',
-    price: '€10',
-    priceSuffix: '/month',
+    price: 'Variable',
+    priceSuffix: 'cost depending on your needs',
     description: 'Ultimate plan for professional collectors and dealers',
     features: ['Up to 1000 digital cards', 'Up to 300 collections', 'Public/Private viewing function', 'Advanced search', 'Bulk upload tools', 'Community access', 'Dedicated support'],
     isPopular: false,
-    isComingSoon: true,
-    cta: 'Coming Soon',
+    isComingSoon: false,
+    cta: 'Contact Us',
   },
 ];
 
