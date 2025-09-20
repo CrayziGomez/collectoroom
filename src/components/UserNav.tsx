@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { app } from '@/lib/firebase';
+import { Skeleton } from './ui/skeleton';
 
 export function UserNav() {
   const { user, loading } = useAuth();
@@ -35,9 +36,9 @@ export function UserNav() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2">
-         <div className="h-9 w-20 animate-pulse rounded-md bg-muted"></div>
-         <div className="h-9 w-20 animate-pulse rounded-md bg-muted"></div>
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-8 w-8 rounded-full" />
       </div>
     );
   }

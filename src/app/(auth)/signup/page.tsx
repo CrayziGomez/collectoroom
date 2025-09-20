@@ -39,6 +39,7 @@ export default function SignupPage() {
       // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
+        id: user.uid, // Also storing as 'id' to match type
         username: username,
         email: user.email,
         tier: tier,

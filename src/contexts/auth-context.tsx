@@ -7,60 +7,39 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
-
-type UserProfile = AppUser & {
-    uid: string;
-    email: string;
-    username: string;
-    avatarUrl?: string;
-}
-
 interface AuthContextType {
-  user: UserProfile | null;
+  user: AppUser | null;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
 
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      setLoading(true);
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-          const userProfileData = userDocSnap.data();
-           const userProfile: UserProfile = {
-            id: firebaseUser.uid, // from lib/types
-            uid: firebaseUser.uid,
-            username: userProfileData.username || firebaseUser.displayName || 'User',
-            email: userProfileData.email || firebaseUser.email!,
-            tier: userProfileData.tier,
-            isAdmin: userProfileData.isAdmin,
-            avatarUrl: userProfileData.avatarUrl || firebaseUser.photoURL || undefined,
-          };
-          setUser(userProfile);
+          setUser(userDocSnap.data() as AppUser);
         } else {
-           console.log('No user document found, creating one...');
-           const newUserProfile: UserProfile = {
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
-            username: firebaseUser.displayName || 'Anonymous User',
-            email: firebaseUser.email!,
-            tier: 'Hobbyist', // Default tier
-            isAdmin: false, // Default to not admin
-            avatarUrl: firebaseUser.photoURL || undefined,
-           };
-           try {
-            await setDoc(userDocRef, newUserProfile);
-            setUser(newUserProfile);
-           } catch (error) {
-            console.error("Error creating user document:", error);
-           }
+            // This case can happen for users who signed up with Google
+            // before the Firestore document creation was implemented on the login page.
+            const newUser: AppUser = {
+                id: firebaseUser.uid,
+                username: firebaseUser.displayName || 'New User',
+                email: firebaseUser.email!,
+                tier: 'Hobbyist',
+                isAdmin: false,
+                avatarUrl: firebaseUser.photoURL || undefined,
+            };
+            await setDoc(userDocRef, newUser);
+            setUser(newUser);
         }
       } else {
         setUser(null);
