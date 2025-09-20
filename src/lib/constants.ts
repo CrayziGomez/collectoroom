@@ -1,3 +1,4 @@
+
 import type { Category, PricingTier, Collection, User, Card } from '@/lib/types';
 import {
   Palette,
@@ -73,7 +74,7 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 'Variable',
     priceSuffix: 'cost depending on your needs',
     description: 'Ultimate plan for professional collectors and dealers',
-    features: ['Up to 1000 digital cards', 'Up to 300 collections', 'Public/Private viewing function', 'Advanced search', 'Bulk upload tools', 'Community access', 'Dedicated support'],
+    features: ['Up to ∞ digital cards', 'Up to ∞ collections', 'Public/Private viewing function', 'Advanced search', 'Bulk upload tools', 'Community access', 'Dedicated support'],
     isPopular: false,
     isComingSoon: false,
     cta: 'Contact Us',
