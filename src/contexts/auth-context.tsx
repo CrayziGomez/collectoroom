@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -23,23 +23,26 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       setLoading(true);
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        try {
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setUser(userDocSnap.data() as AppUser);
+        // Use onSnapshot to listen for real-time updates
+        const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setUser(docSnap.data() as AppUser);
           } else {
-            // This case can happen if the user doc creation failed during signup
-            // Or if the user was deleted from firestore but not auth
+            // This case might happen if the document creation is delayed or failed.
+            // It's also possible the user was deleted from Firestore but not Auth.
             setUser(null);
           }
-        } catch (error) {
+          setLoading(false);
+        }, (error) => {
           console.error("Error fetching user document:", error);
           setUser(null);
-        }
+          setLoading(false);
+        });
+        return () => unsubDoc(); // Cleanup snapshot listener
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

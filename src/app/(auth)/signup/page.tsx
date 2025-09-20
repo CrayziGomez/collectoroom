@@ -13,7 +13,7 @@ import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase
 import { getFirestore, doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { app } from '@/lib/firebase';
+import { app, db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 
 
@@ -23,37 +23,36 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [tier, setTier] = useState('Hobbyist');
   const auth = getAuth(app);
-  const db = getFirestore(app);
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignup = async () => {
     try {
       // 1. Check if this would be the first user BEFORE creating the user
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
+      const usersCollectionRef = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollectionRef);
       const isFirstUser = usersSnapshot.empty;
 
       // 2. Create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const createdUser = userCredential.user;
       
-      await updateProfile(user, {
+      await updateProfile(createdUser, {
         displayName: username,
       });
 
       // 3. After successful auth creation, create the user document in Firestore
       const newUser: User = {
-        uid: user.uid,
-        id: user.uid, // for consistency
+        uid: createdUser.uid,
+        id: createdUser.uid, // for consistency
         username: username,
-        email: user.email!,
+        email: createdUser.email!,
         tier: tier as User['tier'],
         isAdmin: isFirstUser, // Make the first user an admin
-        avatarUrl: user.photoURL || undefined,
+        avatarUrl: createdUser.photoURL || undefined,
       };
 
-      await setDoc(doc(db, "users", user.uid), newUser);
+      await setDoc(doc(db, "users", createdUser.uid), newUser);
 
       // 4. Redirect to the main app
       router.push('/my-collectoroom');
