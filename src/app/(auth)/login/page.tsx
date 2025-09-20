@@ -45,16 +45,18 @@ export default function LoginPage() {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
+        // If the user document doesn't exist, this is their first login with Google.
+        // We need to create a profile for them.
         const usersCollection = await getDocs(collection(db, 'users'));
         const isFirstUser = usersCollection.empty;
 
          const newUser: User = {
             uid: user.uid,
             id: user.uid,
-            username: user.displayName || 'Google User',
+            username: user.displayName || 'New User',
             email: user.email!,
-            tier: 'Hobbyist', // Default tier
-            isAdmin: isFirstUser,
+            tier: 'Hobbyist', // Default tier for Google sign-up
+            isAdmin: isFirstUser, // Make the first user an admin
             avatarUrl: user.photoURL || undefined,
         };
         await setDoc(userDocRef, newUser);
