@@ -35,18 +35,18 @@ export default function SignupPage() {
     }
 
     try {
-      // Step 1: Create the user in Firebase Authentication.
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Step 2: Store additional info temporarily for the AuthContext to pick up.
-      // This is a simple way to pass data to the context after redirect.
+      // Step 1: Store profile info for the backend function to pick up.
+      // This is a temporary way to pass data.
       sessionStorage.setItem('pendingUserProfile', JSON.stringify({
           username,
           tier
       }));
-
-      // Step 3: Redirect to the main app page.
-      // The AuthContext will handle creating the user document in Firestore.
+      
+      // Step 2: Create the user in Firebase Authentication.
+      await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Step 3: Redirect. The AuthContext will handle the rest.
+      // The backend Cloud Function will create the user document.
       router.push('/my-collectoroom');
 
     } catch (error: any) {
@@ -55,6 +55,7 @@ export default function SignupPage() {
         description: error.message,
         variant: "destructive",
       });
+       sessionStorage.removeItem('pendingUserProfile'); // Clean up on failure
     }
   };
 
