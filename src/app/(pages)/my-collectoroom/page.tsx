@@ -114,7 +114,12 @@ export default function MyCollectoRoomPage() {
               <Badge variant="outline" className="mt-2">{user.tier} Plan</Badge>
             </div>
           </div>
-          <Button variant="outline"><Settings className="mr-2 h-4 w-4" />Profile Settings</Button>
+          <Button variant="outline" asChild>
+            <Link href="/my-collectoroom/settings">
+              <Settings className="mr-2 h-4 w-4" />
+              Profile Settings
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 text-sm">
