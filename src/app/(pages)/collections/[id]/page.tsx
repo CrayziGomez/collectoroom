@@ -33,7 +33,7 @@ export default function CollectionPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!collectionId || authLoading) return; // <-- FIX: Wait for auth to be ready
+    if (!collectionId || authLoading) return;
 
     const collectionRef = doc(db, 'collections', collectionId);
 
@@ -133,7 +133,11 @@ export default function CollectionPage() {
           <div className="flex gap-2 flex-shrink-0">
             {isOwner ? (
                 <>
-                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit Collection</Button>
+                <Button variant="outline" asChild>
+                  <Link href={`/collections/${collectionData.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit Collection
+                  </Link>
+                </Button>
                 <Button asChild disabled={hasReachedCardLimit}>
                     <Link href={`/collections/${collectionData.id}/add`}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Card
