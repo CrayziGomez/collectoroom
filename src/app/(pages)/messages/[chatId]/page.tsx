@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Chat, Message, User } from '@/lib/types';
 import { Loader2, Send, ArrowLeft } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -97,16 +97,12 @@ export default function ChatPage() {
             });
 
             const chatDocRef = doc(db, 'chats', chat.id);
-            await getDoc(chatDocRef).then((doc) => {
-                if (doc.exists()) {
-                    doc.ref.update({
-                        lastMessage: {
-                            text: newMessage,
-                            timestamp: serverTimestamp(),
-                        },
-                    });
-                }
-            });
+            await setDoc(chatDocRef, {
+                lastMessage: {
+                    text: newMessage,
+                    timestamp: serverTimestamp(),
+                },
+            }, { merge: true });
 
 
             setNewMessage('');
@@ -128,7 +124,7 @@ export default function ChatPage() {
     if (!chat || !otherParticipant) return null;
 
     return (
-        <div className="container py-4 h-screen flex flex-col max-w-3xl">
+        <div className="container py-4 h-[calc(100vh-8rem)] flex flex-col max-w-3xl">
              <header className="border-b pb-4 mb-4 flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
                     <Link href="/messages"><ArrowLeft /></Link>
@@ -161,7 +157,7 @@ export default function ChatPage() {
                 })}
                 <div ref={messagesEndRef} />
             </main>
-            <footer className="pt-4 mt-auto">
+            <footer className="pt-4">
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     <Input
                         value={newMessage}
