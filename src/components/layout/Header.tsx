@@ -12,6 +12,7 @@ export function Header() {
     { href: '/gallery', label: 'Gallery' },
     { href: '/pricing', label: 'Pricing' },
     { href: '/my-collectoroom', label: 'My CollectoRoom' },
+    { href: '/contact', label: 'Contact' },
   ];
 
   return (
