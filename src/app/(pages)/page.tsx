@@ -103,7 +103,7 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {CATEGORIES.map(category => (
-            <Link href={`/gallery?category=${category.id}`} key={category.id}>
+            <Link href={`/gallery?category=${category.name}`} key={category.id}>
               <div className="group flex flex-col items-center justify-center p-4 border rounded-lg hover:bg-accent/10 hover:shadow-md transition-all h-full">
                 <CategoryIcon categoryName={category.name} className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
                 <p className="mt-2 text-sm font-semibold text-center">{category.name}</p>

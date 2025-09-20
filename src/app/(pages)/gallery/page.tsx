@@ -9,24 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Layers, User as UserIcon, Loader2 } from 'lucide-react';
 import { CATEGORIES } from '@/lib/constants';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { Collection, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSearchParams, useRouter } from 'next/navigation';
 
-// This is a simplified approach to getting user data for the gallery.
-// In a larger app, this might be denormalized onto the collection document
-// or fetched more efficiently in batches.
 async function fetchCollectionOwners(collections: Collection[]): Promise<Record<string, User>> {
     const userIds = [...new Set(collections.map(c => c.userId))];
     if (userIds.length === 0) return {};
     
     const owners: Record<string, User> = {};
-    // Fetch users in chunks of 10 which is a firestore limitation for 'in' queries
     for (let i = 0; i < userIds.length; i += 10) {
         const chunk = userIds.slice(i, i + 10);
-        const usersQuery = query(collection(db, 'users'), where('id', 'in', chunk));
+        const usersQuery = query(collection(db, 'users'), where('uid', 'in', chunk));
         const querySnapshot = await getDocs(usersQuery);
         querySnapshot.forEach(doc => {
             owners[doc.id] = doc.data() as User;
@@ -37,9 +34,16 @@ async function fetchCollectionOwners(collections: Collection[]): Promise<Record<
 
 
 export default function GalleryPage() {
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [owners, setOwners] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const categoryParam = searchParams.get('category');
+
+  const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'all');
 
   useEffect(() => {
     const fetchPublicCollections = async () => {
@@ -48,7 +52,7 @@ export default function GalleryPage() {
             const q = query(collection(db, 'collections'), where('isPublic', '==', true));
             const querySnapshot = await getDocs(q);
             const collectionsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Collection);
-            setCollections(collectionsData);
+            setAllCollections(collectionsData);
             
             const ownerData = await fetchCollectionOwners(collectionsData);
             setOwners(ownerData);
@@ -62,6 +66,31 @@ export default function GalleryPage() {
 
     fetchPublicCollections();
   }, []);
+  
+  useEffect(() => {
+    setSelectedCategory(categoryParam || 'all');
+  }, [categoryParam]);
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') {
+      params.delete('category');
+    } else {
+      params.set('category', value);
+    }
+    router.push(`/gallery?${params.toString()}`);
+  }
+
+  const filteredCollections = useMemo(() => {
+    return allCollections.filter(collection => {
+      const matchesCategory = selectedCategory === 'all' || (collection.category.toLowerCase() === selectedCategory.toLowerCase());
+      const matchesSearch = searchTerm === '' || 
+        collection.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        collection.keywords?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [allCollections, selectedCategory, searchTerm]);
 
   return (
     <div className="container py-8">
@@ -71,15 +100,20 @@ export default function GalleryPage() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <Input placeholder="Search by name or keyword..." className="flex-grow" />
-        <Select>
+        <Input 
+          placeholder="Search by name or keyword..." 
+          className="flex-grow" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
           <SelectTrigger className="w-full md:w-[200px]">
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {CATEGORIES.map(cat => (
-              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+              <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -92,13 +126,13 @@ export default function GalleryPage() {
             <Skeleton className="h-[320px] w-full" />
             <Skeleton className="h-[320px] w-full" />
         </div>
-      ) : collections.length === 0 ? (
+      ) : filteredCollections.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-            <p>No public collections found.</p>
+            <p>No public collections found for the selected criteria.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {collections.map(collection => {
+          {filteredCollections.map(collection => {
             const owner = owners[collection.userId];
             return (
               <Card key={collection.id} className="overflow-hidden group">
