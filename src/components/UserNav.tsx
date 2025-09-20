@@ -1,6 +1,6 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Avatar,
@@ -18,26 +18,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreditCard, LogOut, Settings, User as UserIcon, Shield } from 'lucide-react';
-import { MOCK_USERS } from '@/lib/constants';
-
-// Mock auth state
-const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // In a real app, you'd fetch the user session here
-    const loggedInUser = MOCK_USERS[0];
-    setUser(loggedInUser);
-    setLoading(false);
-  }, []);
-
-  return { user, loading };
-};
-
+import { useAuth } from '@/contexts/auth-context';
+import { getAuth, signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { app } from '@/lib/firebase';
 
 export function UserNav() {
   const { user, loading } = useAuth();
+  const auth = getAuth(app);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
 
   if (loading) {
     return (
@@ -66,8 +60,8 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatarUrl} alt={`@${user.username}`} />
-            <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={user.avatarUrl || ''} alt={`@${user.username}`} />
+            <AvatarFallback>{user.username?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -106,7 +100,7 @@ export function UserNav() {
           )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

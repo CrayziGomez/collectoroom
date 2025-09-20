@@ -16,10 +16,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-// Mock data, in a real app this would come from a context or server fetch
-const user = MOCK_USERS[0]; 
-const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.id);
 const tierLimits = {
   Hobbyist: { cards: 50, collections: 2 },
   Explorer: { cards: 300, collections: 10 },
@@ -28,6 +28,20 @@ const tierLimits = {
 };
 
 export default function MyCollectoRoomPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div>Loading...</div>; // Or a proper skeleton loader
+  }
+
+  const userCollections = MOCK_COLLECTIONS.filter(c => c.userId === user.uid || c.userId === '1'); // temp using mock user 1
   const totalCards = userCollections.reduce((acc, c) => acc + c.cardCount, 0);
   const cardLimit = tierLimits[user.tier].cards;
   const collectionLimit = tierLimits[user.tier].collections;
@@ -40,8 +54,8 @@ export default function MyCollectoRoomPage() {
         <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20 border-2 border-primary">
-              <AvatarImage src={user.avatarUrl} alt={user.username} />
-              <AvatarFallback className="text-3xl">{user.username.charAt(0)}</AvatarFallback>
+              <AvatarImage src={user.avatarUrl || ''} alt={user.username} />
+              <AvatarFallback className="text-3xl">{user.username?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div>
               <h1 className="text-3xl font-bold font-headline">{user.username}</h1>

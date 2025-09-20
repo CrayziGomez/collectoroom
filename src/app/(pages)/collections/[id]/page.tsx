@@ -1,6 +1,8 @@
 
+'use client';
+
 import { MOCK_COLLECTIONS, MOCK_CARDS, MOCK_USERS } from '@/lib/constants';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,20 +10,29 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
+import { useEffect } from 'react';
 
-// This is a mock auth check. In a real app, you'd get this from a session.
-const loggedInUserId = '1';
 
 export default function CollectionPage({ params }: { params: { id: string } }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
   const collection = MOCK_COLLECTIONS.find(c => c.id === params.id);
   
   if (!collection) {
     notFound();
   }
+  
+  useEffect(() => {
+    if (!loading && !user && !collection.isPublic) {
+      router.push('/login');
+    }
+  }, [user, loading, router, collection.isPublic]);
 
   const collectionOwner = MOCK_USERS.find(u => u.id === collection.userId);
   const cards = MOCK_CARDS.filter(c => c.collectionId === params.id);
-  const isOwner = loggedInUserId === collection.userId;
+  const isOwner = user?.uid === collection.userId || user?.uid === '1'; // temp using mock user 1
 
   return (
     <div className="container py-8">
@@ -85,3 +96,4 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
