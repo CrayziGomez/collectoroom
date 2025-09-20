@@ -1,3 +1,52 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-image",
+      "description": "A vibrant and organized collection of various items on shelves.",
+      "imageUrl": "https://picsum.photos/seed/hero/1200/600",
+      "imageHint": "collection display"
+    },
+    {
+      "id": "gallery-1",
+      "description": "A close-up of a vintage stamp collection.",
+      "imageUrl": "https://picsum.photos/seed/stamp/400/300",
+      "imageHint": "stamp collection"
+    },
+    {
+      "id": "gallery-2",
+      "description": "A collection of colorful vinyl records.",
+      "imageUrl": "https://picsum.photos/seed/vinyl/400/300",
+      "imageHint": "vinyl records"
+    },
+    {
+      "id": "gallery-3",
+      "description": "An assortment of rare coins.",
+      "imageUrl": "https://picsum.photos/seed/coins/400/300",
+      "imageHint": "rare coins"
+    },
+    {
+      "id": "gallery-4",
+      "description": "A display of classic toy cars.",
+      "imageUrl": "https://picsum.photos/seed/toycars/400/300",
+      "imageHint": "toy cars"
+    },
+    {
+      "id": "gallery-5",
+      "description": "A collection of vintage cameras.",
+      "imageUrl": "https://picsum.photos/seed/cameras/400/300",
+      "imageHint": "vintage cameras"
+    },
+    {
+      "id": "gallery-6",
+      "description": "A bookshelf filled with old books.",
+      "imageUrl": "https://picsum.photos/seed/books/400/300",
+      "imageHint": "old books"
+    },
+    {
+      "id": "avatar-1",
+      "description": "A placeholder avatar image.",
+      "imageUrl": "https://picsum.photos/seed/avatar1/100/100",
+      "imageHint": "person portrait"
+    }
+  ]
 }
