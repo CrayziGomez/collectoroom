@@ -1,7 +1,6 @@
 
 'use server';
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getAdminInstances } from '@/lib/firebase-admin';
 import type { SiteContent } from '@/lib/types';
 
@@ -9,9 +8,9 @@ import type { SiteContent } from '@/lib/types';
 export async function updateSiteContent(input: any) {
   try {
     const { adminDb } = getAdminInstances();
-    const docRef = doc(adminDb, 'siteContent', input.id);
+    const docRef = adminDb.collection('siteContent').doc(input.id);
     const { id, ...content } = input;
-    await setDoc(docRef, content, { merge: true });
+    await docRef.set(content, { merge: true });
     return { success: true, message: 'Content updated successfully.' };
   } catch (error: any) {
     console.error('Error updating document:', error);
@@ -22,20 +21,24 @@ export async function updateSiteContent(input: any) {
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent | null> {
     try {
         const { adminDb } = getAdminInstances();
-        const docRef = doc(adminDb, 'siteContent', input.pageId);
-        const docSnap = await getDoc(docRef);
+        const docRef = adminDb.collection('siteContent').doc(input.pageId);
+        const docSnap = await docRef.get();
 
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
             return { id: docSnap.id, ...docSnap.data() } as SiteContent;
         } else {
              if (input.pageId === 'homePage') {
-                return {
+                // Return default content if the document doesn't exist in Firestore
+                const defaultContent: SiteContent = {
                     id: 'homePage',
                     title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
                     description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
                     imageUrl: 'https://picsum.photos/seed/hero/1200/600',
                     imageHint: 'collection display',
                 };
+                // Optionally, save this default content to Firestore for future edits
+                await adminDb.collection('siteContent').doc('homePage').set(defaultContent);
+                return defaultContent;
             }
             return null;
         }
