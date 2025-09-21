@@ -240,7 +240,6 @@ export default function CollectionPage() {
                       <TooltipContent>{card.description}</TooltipContent>
                     </Tooltip>
                   )}
-                  <p className="text-xs text-muted-foreground mt-2">{card.status}</p>
                   {collectionOwner?.username && (
                     <p className="text-xs text-muted-foreground mt-2">By {collectionOwner.username}</p>
                   )}
