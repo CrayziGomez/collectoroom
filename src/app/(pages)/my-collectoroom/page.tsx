@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown, Users } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -137,12 +137,20 @@ export default function MyCollectoRoomPage() {
               </div>
             </div>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/my-collectoroom/settings">
-              <Settings className="mr-2 h-4 w-4" />
-              Profile Settings
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+                <Link href="/my-collectoroom/connections">
+                    <Users className="mr-2 h-4 w-4" />
+                    My Connections
+                </Link>
+            </Button>
+            <Button variant="outline" asChild>
+                <Link href="/my-collectoroom/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                Profile Settings
+                </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 text-sm">
