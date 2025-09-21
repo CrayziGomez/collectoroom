@@ -5,12 +5,11 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "APIKEY",
-  authDomain: "nextn-33230.firebaseapp.com",
-  projectId: "nextn-33230",
-  storageBucket: "nextn-33230.appspot.com",
-  messagingSenderId: "831317065634",
-  appId: "1:831317065634:web:8067ce9553f86c29995133"
+  "projectId": "studio-7145415565-66e7d",
+  "appId": "1:47670381092:web:6e67a8da3455b65518a6b1",
+  "apiKey": "AIzaSyD81Q7lwEparRgB4pRKq5ezOuS2KzrMLMk",
+  "authDomain": "studio-7145415565-66e7d.firebaseapp.com",
+  "messagingSenderId": "47670381092"
 };
 
 // Initialize Firebase
