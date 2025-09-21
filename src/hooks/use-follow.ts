@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, onSnapshot, DocumentSnapshot } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, onSnapshot } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
 export function useFollow(targetUserId: string) {
@@ -15,11 +15,7 @@ export function useFollow(targetUserId: string) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (authLoading) {
-            setIsLoading(true);
-            return;
-        }
-        if (!user || !targetUserId) {
+        if (authLoading || !user || !targetUserId) {
             setIsLoading(false);
             setIsFollowing(false);
             return;
@@ -58,32 +54,35 @@ export function useFollow(targetUserId: string) {
             
             const currentUserData = currentUserDoc.data() || {};
             const targetUserData = targetUserDoc.data() || {};
+            const isCurrentlyFollowing = (await getDoc(followingRef)).exists();
 
-            if (isFollowing) {
+            if (isCurrentlyFollowing) {
                 // Unfollow logic
                 batch.delete(followingRef);
                 batch.delete(followerRef);
                 batch.update(currentUserRef, { followingCount: Math.max(0, (currentUserData.followingCount || 0) - 1) });
                 batch.update(targetUserRef, { followerCount: Math.max(0, (targetUserData.followerCount || 0) - 1) });
+                
+                await batch.commit();
                 toast({ title: "Unfollowed", description: `You are no longer following this user.` });
+
             } else {
                 // Follow logic
                 batch.set(followingRef, { timestamp: new Date() });
                 batch.set(followerRef, { timestamp: new Date() });
                 batch.update(currentUserRef, { followingCount: (currentUserData.followingCount || 0) + 1 });
                 batch.update(targetUserRef, { followerCount: (targetUserData.followerCount || 0) + 1 });
+
+                await batch.commit();
                 toast({ title: "Followed!", description: `You are now following this user.` });
             }
-            
-            await batch.commit();
-
         } catch (error: any) {
             console.error("Error toggling follow:", error);
             toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
         }
-    }, [user, targetUserId, isFollowing, isProcessing, toast]);
+    }, [user, targetUserId, isProcessing, toast]);
 
     return { isFollowing, toggleFollow, isLoading, isProcessing };
 }
