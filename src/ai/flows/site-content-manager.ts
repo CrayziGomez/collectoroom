@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { app as clientApp } from '@/lib/firebase';
 import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
