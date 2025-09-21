@@ -16,7 +16,7 @@ import { auth } from 'firebase-admin';
 // Ensure Firebase Admin is initialized
 if (!getApps().length) {
     try {
-        const serviceAccount = require('../../../serviceAccountKey.json');
+        const serviceAccount = require('../../serviceAccountKey.json');
         initializeApp({
             credential: cert(serviceAccount)
         });
