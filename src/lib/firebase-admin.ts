@@ -1,19 +1,15 @@
 
-// src/lib/firebase-admin.ts
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-// This will hold the initialized instances
 let adminInstances: { adminApp: App; adminAuth: Auth; adminDb: Firestore; } | null = null;
 
-function getAdminInstances() {
-    // If instances are already initialized, return them
+export function getAdminInstances() {
     if (adminInstances) {
         return adminInstances;
     }
 
-    // Check if there are any initialized apps
     if (getApps().length === 0) {
         if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
             throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
@@ -31,7 +27,6 @@ function getAdminInstances() {
             throw new Error('Firebase Admin SDK initialization failed. Make sure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string.');
         }
     } else {
-        // If an app is already initialized, use it
         const app = getApps()[0];
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -40,5 +35,3 @@ function getAdminInstances() {
     
     return adminInstances;
 }
-
-export { getAdminInstances };

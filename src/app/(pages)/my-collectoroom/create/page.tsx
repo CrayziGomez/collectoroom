@@ -8,15 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/constants";
-import { Wand2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
-import { generateCollectionDescription } from "@/ai/flows/collection-description-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -30,8 +29,6 @@ export default function CreateCollectionPage() {
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('');
     const [isPublic, setIsPublic] = useState(true);
-
-    const [isGenerating, setIsGenerating] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
@@ -39,25 +36,6 @@ export default function CreateCollectionPage() {
             router.push('/login');
         }
     }, [user, authLoading, router]);
-
-    const handleGenerateDescription = async () => {
-        setIsGenerating(true);
-        try {
-            const result = await generateCollectionDescription({ collectionName, keywords });
-            if (result.description) {
-                setDescription(result.description);
-            }
-        } catch (error) {
-            console.error("AI description generation failed:", error);
-            toast({
-                title: "Error",
-                description: "Failed to generate AI description. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsGenerating(false);
-        }
-    };
 
     const handleCreateCollection = async () => {
         if (!user) {
@@ -125,16 +103,12 @@ export default function CreateCollectionPage() {
                             <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} disabled={isCreating} />
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="keywords">Keywords (for AI suggestions)</Label>
+                            <Label htmlFor="keywords">Keywords</Label>
                             <Input id="keywords" placeholder="e.g., comic books, vintage, DC, Marvel" value={keywords} onChange={e => setKeywords(e.target.value)} disabled={isCreating} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
                             <Textarea id="description" placeholder="A brief description of what your collection is about." value={description} onChange={e => setDescription(e.target.value)} disabled={isCreating} />
-                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !collectionName || !keywords || isCreating}>
-                                <Wand2 className="mr-2 h-4 w-4" /> 
-                                {isGenerating ? 'Generating...' : 'Suggest with AI'}
-                            </Button>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="category">Category</Label>

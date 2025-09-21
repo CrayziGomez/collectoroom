@@ -7,12 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wand2, Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
 import { CARD_STATUSES } from "@/lib/constants";
 import { useState, useEffect } from "react";
-import { generateCardDescription } from "@/ai/flows/card-description-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { db } from "@/lib/firebase";
@@ -37,7 +36,6 @@ export default function EditCardPage() {
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<string>('');
 
-    const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +51,6 @@ export default function EditCardPage() {
             if (!collectionId || !cardId) return;
             setIsLoading(true);
 
-            // Fetch collection
             const collectionRef = doc(db, 'collections', collectionId);
             const collectionSnap = await getDoc(collectionRef);
             if (!collectionSnap.exists() || collectionSnap.data().userId !== user.uid) {
@@ -63,7 +60,6 @@ export default function EditCardPage() {
             }
             setCollectionData({ ...collectionSnap.data(), id: collectionSnap.id } as Collection);
 
-            // Fetch card
             const cardRef = doc(db, 'cards', cardId);
             const cardSnap = await getDoc(cardRef);
             if (cardSnap.exists() && cardSnap.data().collectionId === collectionId) {
@@ -99,7 +95,6 @@ export default function EditCardPage() {
         if (words.length <= MAX_DESC_WORDS) {
             setDescription(text);
         } else {
-            // Trim the text to the first MAX_DESC_WORDS words
             const trimmedText = words.slice(0, MAX_DESC_WORDS).join(' ');
             setDescription(trimmedText);
         }
@@ -107,36 +102,6 @@ export default function EditCardPage() {
 
     const titleWordCount = title.split(/\s+/).filter(Boolean).length;
     const descriptionWordCount = description.split(/\s+/).filter(Boolean).length;
-    
-    const handleGenerateDescription = async () => {
-        if (!collectionData) return;
-        setIsGenerating(true);
-        try {
-            const result = await generateCardDescription({
-                title: title,
-                category: collectionData.category,
-                existingDescription: description,
-            });
-            if (result.suggestedDescription) {
-                 const words = result.suggestedDescription.split(/\s+/).filter(Boolean);
-                if (words.length > MAX_DESC_WORDS) {
-                    const trimmedText = words.slice(0, MAX_DESC_WORDS).join(' ');
-                    setDescription(trimmedText);
-                } else {
-                    setDescription(result.suggestedDescription);
-                }
-            }
-        } catch (error) {
-            console.error("AI description generation failed:", error);
-            toast({
-                title: "Error",
-                description: "Failed to generate AI description. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsGenerating(false);
-        }
-    }
 
     const handleSaveChanges = async () => {
         if (!cardData || !title || !status) {
@@ -255,10 +220,6 @@ export default function EditCardPage() {
                                 <span className="text-sm text-muted-foreground">{descriptionWordCount}/{MAX_DESC_WORDS} words</span>
                             </div>
                             <Textarea id="description" placeholder="Details about the item, its condition, history, etc." value={description} onChange={handleDescriptionChange} disabled={isSaving} />
-                            <Button variant="outline" className="w-fit text-sm" onClick={handleGenerateDescription} disabled={isGenerating || !title || isSaving}>
-                                <Wand2 className="mr-2 h-4 w-4" /> 
-                                {isGenerating ? 'Generating...' : 'Suggest with AI'}
-                            </Button>
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="status">Status</Label>
