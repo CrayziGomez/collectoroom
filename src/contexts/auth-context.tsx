@@ -6,8 +6,6 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
-import { initializeApp as initializeAdminApp, getApps as getAdminApps } from 'firebase-admin/app';
-import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 
 
 interface EnrichedFirebaseUser extends FirebaseUser {
@@ -35,12 +33,14 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
+        // The onSnapshot listener will handle the user state.
+        // We don't need to do anything here except set up the listener.
         const unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
-          setLoading(true);
+          setLoading(true); // Start loading when we get a new snapshot
           if (docSnap.exists()) {
             const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
             setUser({ ...appUser, firebaseUser });
-            setLoading(false);
+            setLoading(false); // Only stop loading after user is fully loaded
           } else {
             // Document doesn't exist, this is likely a new user.
             const username = firebaseUser.email?.split('@')[0] || 'New User';
@@ -60,15 +60,14 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
             try {
               await setDoc(userDocRef, newUser);
-              // Explicitly set the user here to avoid race conditions
-              setUser({ ...newUser, firebaseUser });
+              // After setting the doc, the onSnapshot listener above will fire,
+              // so we don't need to set the user here. We just wait for the update.
                sessionStorage.removeItem('pendingUsername');
                sessionStorage.removeItem('pendingTier');
             } catch (error) {
               console.error("Error creating user document:", error);
               setUser(null);
-            } finally {
-               setLoading(false);
+              setLoading(false); // Stop loading on error
             }
           }
         }, (error) => {
