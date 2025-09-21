@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, onSnapshot, DocumentSnapshot, increment } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, onSnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
 export function useFollow(targetUserId: string) {
@@ -15,42 +15,37 @@ export function useFollow(targetUserId: string) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // If auth is loading, we are loading.
         if (authLoading) {
             setIsLoading(true);
             return;
         }
-
-        // If there's no user or no target, we are done loading and are not following.
         if (!user || !targetUserId) {
             setIsLoading(false);
             setIsFollowing(false);
             return;
         }
-        
-        // At this point, user is authenticated. Set up the real-time listener.
+
         setIsLoading(true);
         const followingRef = doc(db, 'users', user.uid, 'following', targetUserId);
         
         const unsubscribe = onSnapshot(followingRef, (docSnap) => {
             setIsFollowing(docSnap.exists());
-            setIsLoading(false); // We have our answer, so loading is done.
+            setIsLoading(false);
         }, (error) => {
             console.error("Error checking follow status:", error);
-            setIsLoading(false); // Stop loading even if there's an error.
+            setIsLoading(false);
             setIsFollowing(false);
         });
         
-        // This cleanup function is crucial. It runs when the component unmounts
-        // OR when the dependencies (user, targetUserId) change.
         return () => unsubscribe();
         
     }, [user, targetUserId, authLoading]);
     
-    const toggleFollow = async () => {
-        if (!user || !targetUserId || user.uid === targetUserId) return;
+    const toggleFollow = useCallback(async () => {
+        if (!user || !targetUserId || user.uid === targetUserId || isProcessing) return;
 
         setIsProcessing(true);
+        
         const currentUserRef = doc(db, 'users', user.uid);
         const targetUserRef = doc(db, 'users', targetUserId);
         const followingRef = doc(currentUserRef, 'following', targetUserId);
@@ -58,20 +53,25 @@ export function useFollow(targetUserId: string) {
 
         try {
             const batch = writeBatch(db);
+            const currentUserDoc = await getDoc(currentUserRef);
+            const targetUserDoc = await getDoc(targetUserRef);
             
+            const currentUserData = currentUserDoc.data() || {};
+            const targetUserData = targetUserDoc.data() || {};
+
             if (isFollowing) {
                 // Unfollow logic
                 batch.delete(followingRef);
                 batch.delete(followerRef);
-                batch.update(currentUserRef, { followingCount: increment(-1) });
-                batch.update(targetUserRef, { followerCount: increment(-1) });
+                batch.update(currentUserRef, { followingCount: Math.max(0, (currentUserData.followingCount || 0) - 1) });
+                batch.update(targetUserRef, { followerCount: Math.max(0, (targetUserData.followerCount || 0) - 1) });
                 toast({ title: "Unfollowed", description: `You are no longer following this user.` });
             } else {
                 // Follow logic
                 batch.set(followingRef, { timestamp: new Date() });
                 batch.set(followerRef, { timestamp: new Date() });
-                batch.update(currentUserRef, { followingCount: increment(1) });
-                batch.update(targetUserRef, { followerCount: increment(1) });
+                batch.update(currentUserRef, { followingCount: (currentUserData.followingCount || 0) + 1 });
+                batch.update(targetUserRef, { followerCount: (targetUserData.followerCount || 0) + 1 });
                 toast({ title: "Followed!", description: `You are now following this user.` });
             }
             
@@ -79,36 +79,11 @@ export function useFollow(targetUserId: string) {
 
         } catch (error: any) {
             console.error("Error toggling follow:", error);
-            // Attempt to read and write if increment fails
-            if (error.code === 'not-found' || error.code === 'invalid-argument') {
-                console.log('Increment failed, falling back to read-and-write method.');
-                try {
-                    const currentUserDoc = await getDoc(currentUserRef);
-                    const targetUserDoc = await getDoc(targetUserRef);
-                    const newBatch = writeBatch(db);
-
-                    const currentUserData = currentUserDoc.data() || {};
-                    const targetUserData = targetUserDoc.data() || {};
-
-                    if (isFollowing) {
-                         newBatch.update(currentUserRef, { followingCount: Math.max(0, (currentUserData.followingCount || 0) - 1) });
-                         newBatch.update(targetUserRef, { followerCount: Math.max(0, (targetUserData.followerCount || 0) - 1) });
-                    } else {
-                         newBatch.update(currentUserRef, { followingCount: (currentUserData.followingCount || 0) + 1 });
-                         newBatch.update(targetUserRef, { followerCount: (targetUserData.followerCount || 0) + 1 });
-                    }
-                    await newBatch.commit();
-                } catch (fallbackError) {
-                     console.error("Fallback follow toggle failed:", fallbackError);
-                     toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
-                }
-            } else {
-                toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
-            }
+            toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
         }
-    };
+    }, [user, targetUserId, isFollowing, isProcessing, toast]);
 
     return { isFollowing, toggleFollow, isLoading, isProcessing };
 }
