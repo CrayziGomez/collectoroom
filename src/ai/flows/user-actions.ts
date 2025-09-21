@@ -6,12 +6,6 @@
  *
  * - toggleFollow - Toggles the follow state between two users.
  */
-import { config } from 'dotenv';
-import { resolve } from 'path';
-
-// Load environment variables from .env file
-config({ path: resolve(process.cwd(), '.env') });
-
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore, doc, runTransaction } from 'firebase/firestore';

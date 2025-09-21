@@ -7,12 +7,6 @@
  * - getSiteContent - Retrieves content for a given page.
  * - updateSiteContent - Updates content for a given page (admin only).
  */
-import { config } from 'dotenv';
-import { resolve } from 'path';
-
-// Load environment variables from .env file
-config({ path: resolve(process.cwd(), '.env') });
-
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
