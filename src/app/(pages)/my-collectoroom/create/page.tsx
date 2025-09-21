@@ -16,7 +16,7 @@ import { generateCollectionDescription } from "@/ai/flows/collection-description
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, getDocs, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, writeBatch, serverTimestamp, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -74,6 +74,9 @@ export default function CreateCollectionPage() {
         try {
             const batch = writeBatch(db);
 
+            // Correctly create a new document reference with an auto-generated ID
+            const collectionRef = doc(collection(db, "collections"));
+
             const newCollection = {
                 userId: user.uid,
                 name: collectionName,
@@ -85,17 +88,17 @@ export default function CreateCollectionPage() {
                 coverImage: `https://picsum.photos/seed/${Math.random()}/400/300`,
                 coverImageHint: 'collection placeholder'
             };
-            const collectionRef = addDoc(collection(db, "collections"), {}); // Placeholder for ID
             batch.set(collectionRef, newCollection);
 
 
             // If the collection is public, notify followers
-            if (isPublic) {
+            if (isPublic && user.uid) {
                 const followersQuery = query(collection(db, `users/${user.uid}/followers`));
                 const followersSnapshot = await getDocs(followersQuery);
                 
                 followersSnapshot.forEach(followerDoc => {
-                    const notificationRef = addDoc(collection(db, `notifications`), {}); // Placeholder for ID
+                    // Correctly create a new document reference for the notification
+                    const notificationRef = doc(collection(db, `notifications`));
                     batch.set(notificationRef, {
                         recipientId: followerDoc.id,
                         senderId: user.uid,
