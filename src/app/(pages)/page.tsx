@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useAuth } from '@/contexts/auth-context';
-import { getSiteContent, updateSiteContent, SiteContent } from '@/ai/flows/site-content-manager';
+import { getSiteContent, updateSiteContent } from '@/ai/flows/site-content-manager';
+import { SiteContent } from '@/lib/types';
 import { useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -40,23 +41,24 @@ export default function HomePage() {
   const [isSavingImage, setIsSavingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchContent = async () => {
-    try {
-      const result = await getSiteContent({ pageId: 'homePage' });
-      setContent(result);
-    } catch (error) {
-      console.error("Error fetching site content:", error);
-      toast({ title: 'Error', description: 'Could not load page content.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        setLoading(true);
+        const result = await getSiteContent({ pageId: 'homePage' });
+        setContent(result);
+      } catch (error) {
+        console.error("Error fetching site content:", error);
+        toast({ title: 'Error', description: 'Could not load page content.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (!authLoading) {
       fetchContent();
     }
-  }, [authLoading]);
+  }, [authLoading, toast]);
 
   const handleOpenTextDialog = () => {
     if (content) {
@@ -77,16 +79,21 @@ export default function HomePage() {
         .replace(/\n/g, '<br />')
         .replace(/Digitized & Showcased./g, '<span class="text-primary">Digitized &amp; Showcased.</span>');
 
-      await updateSiteContent({
+      const result = await updateSiteContent({
         id: content.id,
         title: formattedTitle,
         description: editedDescription,
         idToken,
       });
 
-      toast({ title: 'Success', description: 'Hero content updated!' });
-      setIsTextDialogOpen(false);
-      fetchContent(); // Re-fetch content to show changes
+      if (result.success) {
+        toast({ title: 'Success', description: 'Hero content updated!' });
+        setIsTextDialogOpen(false);
+        setContent(prev => prev ? { ...prev, title: formattedTitle, description: editedDescription } : null);
+      } else {
+        throw new Error(result.message);
+      }
+
     } catch (error: any) {
       console.error("Error updating content:", error);
       toast({ title: 'Error', description: error.message || 'Failed to update content.', variant: 'destructive' });
@@ -124,17 +131,19 @@ export default function HomePage() {
       const downloadURL = await getDownloadURL(uploadResult.ref);
 
       // 2. Update Firestore with new image URL
-      await updateSiteContent({
+      const result = await updateSiteContent({
         id: content.id,
-        title: content.title,
-        description: content.description,
         imageUrl: downloadURL,
         idToken,
       });
       
-      toast({ title: 'Success', description: 'Hero image updated!' });
-      setIsImageDialogOpen(false);
-      fetchContent();
+      if (result.success) {
+        toast({ title: 'Success', description: 'Hero image updated!' });
+        setIsImageDialogOpen(false);
+        setContent(prev => prev ? { ...prev, imageUrl: downloadURL } : null);
+      } else {
+        throw new Error(result.message);
+      }
 
     } catch (error: any) {
       console.error("Error updating image:", error);
@@ -145,6 +154,7 @@ export default function HomePage() {
   };
   
   const heroContent = content || {
+    id: 'homePage',
     title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
     description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
     imageUrl: 'https://picsum.photos/seed/hero/1200/600',
@@ -176,19 +186,30 @@ export default function HomePage() {
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6 text-center md:text-left">
              <div className="relative">
-              {user?.isAdmin && (
+              {user?.isAdmin && !loading && (
                 <Button onClick={handleOpenTextDialog} variant="ghost" size="icon" className="absolute -top-4 right-0 h-8 w-8">
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              <h1
-                className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
-                dangerouslySetInnerHTML={{ __html: heroContent.title }}
-              />
+              {loading ? (
+                <div className="space-y-4">
+                    <div className="h-10 w-3/4 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></div>
+                    <div className="h-10 w-1/2 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></div>
+                </div>
+              ) : (
+                <h1
+                  className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
+                  dangerouslySetInnerHTML={{ __html: heroContent.title }}
+                />
+              )}
             </div>
-            <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
-              {heroContent.description}
-            </p>
+             {loading ? (
+                <div className="h-12 w-full bg-muted animate-pulse rounded-md max-w-xl mx-auto md:mx-0"></div>
+              ) : (
+                <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
+                  {heroContent.description}
+                </p>
+             )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Button size="lg" asChild>
                 <Link href="/signup">Start Your Collection <ArrowRight className="ml-2 h-5 w-5" /></Link>
@@ -270,7 +291,7 @@ export default function HomePage() {
           <DialogHeader>
             <DialogTitle>Edit Hero Content</DialogTitle>
             <DialogDescription>
-              Make changes to the main title and description on the home page. Use '&lt;span class="text-primary"&gt;...&lt;/span&gt;' to highlight text.
+              Make changes to the main title and description on the home page. Use a new line for the title's second line. The "Digitized & Showcased." part will be automatically highlighted.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -347,3 +368,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    
