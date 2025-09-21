@@ -8,13 +8,17 @@ import { doc, getDoc, writeBatch, increment, onSnapshot } from 'firebase/firesto
 import { useToast } from './use-toast';
 
 export function useFollow(targetUserId: string) {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const [isFollowing, setIsFollowing] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (authLoading) {
+            // Wait for authentication to resolve
+            return;
+        }
         if (!user || !targetUserId) {
             setIsLoading(false);
             return;
@@ -22,16 +26,20 @@ export function useFollow(targetUserId: string) {
         
         setIsLoading(true);
         const followingRef = doc(db, 'users', user.uid, 'following', targetUserId);
+        
+        // Setup the listener only when auth is done and user is available.
         const unsubscribe = onSnapshot(followingRef, (docSnap) => {
             setIsFollowing(docSnap.exists());
             setIsLoading(false);
         }, (error) => {
             console.error("Error checking follow status:", error);
+            // This could be a permissions error if rules are not set up correctly
+            // or if the user is logged out while the listener is active.
             setIsLoading(false);
         });
         
         return () => unsubscribe();
-    }, [user, targetUserId]);
+    }, [user, targetUserId, authLoading]);
     
     const toggleFollow = async () => {
         if (!user || !targetUserId || user.uid === targetUserId) return;
@@ -62,7 +70,7 @@ export function useFollow(targetUserId: string) {
             }
             
             await batch.commit();
-            setIsFollowing(!isFollowing);
+            // The onSnapshot listener will automatically update the isFollowing state.
 
         } catch (error: any) {
             console.error("Error toggling follow:", error);
@@ -78,3 +86,4 @@ export function useFollow(targetUserId: string) {
 
     return { isFollowing, toggleFollow, isLoading, isProcessing };
 }
+
