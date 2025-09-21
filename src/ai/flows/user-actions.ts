@@ -9,26 +9,24 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getFirestore, doc, runTransaction, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, runTransaction } from 'firebase/firestore';
 import { app as clientApp } from '@/lib/firebase';
-import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { auth } from 'firebase-admin';
-import { config } from 'dotenv';
-import { resolve } from 'path';
-
-// Specify the path to the .env file in the project root
-config({ path: resolve(process.cwd(), '.env') });
-
 
 // Ensure Firebase Admin is initialized
 if (!getApps().length) {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set. The Admin SDK requires this for initialization.');
+    }
     try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
         initializeApp({
             credential: cert(serviceAccount)
         });
     } catch (e: any) {
-        console.error('Failed to initialize Firebase Admin SDK. Ensure FIREBASE_SERVICE_ACCOUNT_KEY is set correctly.', e.message);
+        console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY or initialize Firebase Admin SDK.', e.message);
+        throw new Error('Firebase Admin SDK initialization failed.');
     }
 }
 
