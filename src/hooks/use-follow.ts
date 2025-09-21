@@ -15,9 +15,13 @@ export function useFollow(targetUserId: string) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Strict check to prevent running before auth is resolved.
-        if (authLoading || !user || !targetUserId) {
+        if (authLoading) {
+            setIsLoading(true);
+            return;
+        }
+        if (!user || !targetUserId) {
             setIsLoading(false);
+            setIsFollowing(false);
             return;
         }
         
