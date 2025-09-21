@@ -15,28 +15,31 @@ export function useFollow(targetUserId: string) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (authLoading) {
-            setIsLoading(true);
-            return;
-        }
-        if (!user || !targetUserId) {
-            setIsLoading(false);
+        // Set initial loading state based on auth status
+        setIsLoading(authLoading);
+
+        if (authLoading || !user || !targetUserId) {
+            // If not authenticated or no target, ensure we are not in a following state.
             setIsFollowing(false);
             return;
         }
         
-        setIsLoading(true);
+        // At this point, user is authenticated and we have a target.
+        // Set up the real-time listener.
         const followingRef = doc(db, 'users', user.uid, 'following', targetUserId);
-        
         const unsubscribe = onSnapshot(followingRef, (docSnap) => {
             setIsFollowing(docSnap.exists());
-            setIsLoading(false);
+            setIsLoading(false); // We have our answer, so loading is done.
         }, (error) => {
             console.error("Error checking follow status:", error);
-            setIsLoading(false);
+            setIsLoading(false); // Stop loading even if there's an error.
         });
         
+        // This cleanup function is crucial. It runs when the component unmounts
+        // OR when the dependencies (user, targetUserId) change. This prevents
+        // dangling listeners when the user logs out.
         return () => unsubscribe();
+        
     }, [user, targetUserId, authLoading]);
     
     const toggleFollow = async () => {
