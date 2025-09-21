@@ -36,6 +36,9 @@ export function Header() {
 
     const unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
       setUnreadChatsCount(querySnapshot.size);
+    }, (error) => {
+      console.error("Error fetching unread chats count:", error);
+      setUnreadChatsCount(0);
     });
     
     const notificationsQuery = query(
@@ -46,6 +49,9 @@ export function Header() {
 
     const unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
       setUnreadNotificationsCount(querySnapshot.size);
+    }, (error) => {
+      console.error("Error fetching unread notifications count:", error);
+      setUnreadNotificationsCount(0);
     });
 
     return () => {
