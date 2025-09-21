@@ -11,10 +11,24 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { app } from '@/lib/firebase';
+import { app as clientApp } from '@/lib/firebase';
+import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
 import { auth } from 'firebase-admin';
 
-const db = getFirestore(app);
+// Ensure Firebase Admin is initialized
+if (!getApps().length) {
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+        initializeApp({
+            credential: cert(serviceAccount)
+        });
+    } catch (e: any) {
+        console.error('Failed to initialize Firebase Admin SDK:', e.message);
+    }
+}
+
+
+const db = getFirestore(clientApp);
 
 // Define Zod schemas for input and output.
 const SiteContentSchema = z.object({
