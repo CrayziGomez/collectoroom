@@ -4,9 +4,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, DocumentReference } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from './use-toast';
-import type { User } from '@/lib/types';
+import { toggleFollow as toggleFollowFlow } from '@/ai/flows/user-actions';
 
 export function useFollow(targetUserId: string) {
     const { user, loading: authLoading } = useAuth();
@@ -15,18 +15,11 @@ export function useFollow(targetUserId: string) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Effect to check the initial follow status
     useEffect(() => {
-        // This function runs once to check the initial follow status.
         const checkInitialFollowStatus = async () => {
-            // We only run this check if auth is resolved, we have a user, and a target user.
-            if (authLoading || !user || !targetUserId) {
-                setIsLoading(false);
+            if (authLoading || !user || !targetUserId || user.uid === targetUserId) {
                 setIsFollowing(false);
-                return;
-            }
-
-            // Don't check if the user is looking at their own profile.
-            if (user.uid === targetUserId) {
                 setIsLoading(false);
                 return;
             }
@@ -47,8 +40,9 @@ export function useFollow(targetUserId: string) {
         checkInitialFollowStatus();
     }, [user, targetUserId, authLoading]);
     
+    // The actual follow/unfollow action
     const toggleFollow = useCallback(async () => {
-        if (!user || !targetUserId || user.uid === targetUserId || isProcessing || authLoading) {
+        if (!user || !user.firebaseUser || !targetUserId || user.uid === targetUserId || isProcessing || authLoading) {
             if (!user && !authLoading) {
                 toast({ title: 'Please log in', description: 'You need to be logged in to follow users.', variant: 'destructive' });
             }
@@ -56,58 +50,31 @@ export function useFollow(targetUserId: string) {
         }
 
         setIsProcessing(true);
-        const newFollowState = !isFollowing;
+        const originalFollowState = isFollowing;
 
         // Optimistic UI update
-        setIsFollowing(newFollowState);
+        setIsFollowing(!originalFollowState);
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const currentUserRef = doc(db, 'users', user.uid);
-                const targetUserRef = doc(db, 'users', targetUserId);
-                const followingRef = doc(currentUserRef, 'following', targetUserId);
-                const followerRef = doc(targetUserRef, 'followers', user.uid);
-                
-                if (newFollowState) {
-                    // Follow logic
-                    transaction.set(followingRef, { timestamp: new Date() });
-                    transaction.set(followerRef, { timestamp: new Date() });
-                    
-                    const currentUserDoc = await transaction.get(currentUserRef);
-                    const targetUserDoc = await transaction.get(targetUserRef);
+            const idToken = await user.firebaseUser.getIdToken();
+            const result = await toggleFollowFlow({ idToken, targetUserId });
 
-                    const newFollowingCount = (currentUserDoc.data()?.followingCount || 0) + 1;
-                    const newFollowerCount = (targetUserDoc.data()?.followerCount || 0) + 1;
-                    
-                    transaction.update(currentUserRef, { followingCount: newFollowingCount });
-                    transaction.update(targetUserRef, { followerCount: newFollowerCount });
-
-                } else {
-                    // Unfollow logic
-                    transaction.delete(followingRef);
-                    transaction.delete(followerRef);
-
-                    const currentUserDoc = await transaction.get(currentUserRef);
-                    const targetUserDoc = await transaction.get(targetUserRef);
-
-                    const newFollowingCount = Math.max(0, (currentUserDoc.data()?.followingCount || 0) - 1);
-                    const newFollowerCount = Math.max(0, (targetUserDoc.data()?.followerCount || 0) - 1);
-
-                    transaction.update(currentUserRef, { followingCount: newFollowingCount });
-                    transaction.update(targetUserRef, { followerCount: newFollowerCount });
-                }
-            });
-
+            // The backend confirms the new state. If it's different, we correct the UI.
+            const confirmedState = result.newState === 'followed';
+            if (isFollowing !== confirmedState) {
+                setIsFollowing(confirmedState);
+            }
+            
             toast({
-                title: newFollowState ? "Followed!" : "Unfollowed",
-                description: `You are ${newFollowState ? 'now following' : 'no longer following'} this user.`,
+                title: confirmedState ? "Followed!" : "Unfollowed",
+                description: `You are ${confirmedState ? 'now following' : 'no longer following'} this user.`,
             });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error toggling follow:", error);
             // Revert optimistic update on error
-            setIsFollowing(!newFollowState); 
-            toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
+            setIsFollowing(originalFollowState); 
+            toast({ title: 'Error', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
         }
