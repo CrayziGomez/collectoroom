@@ -54,7 +54,7 @@ export default function ConnectionsPage() {
     const [loading, setLoading] = useState(true);
 
     const fetchConnections = useCallback(async () => {
-        if (!user) return;
+        if (!user || !db) return; // Guard against uninitialized db
         setLoading(true);
         try {
             // Fetch following
