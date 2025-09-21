@@ -21,9 +21,7 @@ export default function MessagesPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (authLoading) {
-            return; // Wait until auth state is resolved
-        }
+        if (authLoading) return;
         if (!user) {
             router.push('/login');
             return;

@@ -34,13 +34,11 @@ export default function MyCollectoRoomPage() {
   const [collectionsLoading, setCollectionsLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return;
+    if (!user) {
       router.push('/login');
+      return;
     }
-  }, [user, authLoading, router]);
-  
-  useEffect(() => {
-    if (!user) return;
 
     setCollectionsLoading(true);
     const q = query(collection(db, 'collections'), where('userId', '==', user.uid));
@@ -55,8 +53,8 @@ export default function MyCollectoRoomPage() {
     });
 
     return () => unsubscribe();
-  }, [user]);
-
+  }, [user, authLoading, router]);
+  
   const handleShare = (collectionId: string) => {
     const url = `${window.location.origin}/collections/${collectionId}`;
     navigator.clipboard.writeText(url);

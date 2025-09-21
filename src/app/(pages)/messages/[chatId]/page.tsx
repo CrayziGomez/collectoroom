@@ -38,7 +38,8 @@ export default function ChatPage() {
     }, [messages]);
 
      useEffect(() => {
-        if (authLoading || !user || !chatId || !chat) return;
+        if (authLoading || !user) return;
+        if (!chatId || !chat) return;
 
         // Reset unread count for the current user when they enter the chat.
         const chatRef = doc(db, 'chats', chatId);
@@ -53,9 +54,8 @@ export default function ChatPage() {
 
 
     useEffect(() => {
-        if (authLoading) return;
-        if (!user) {
-            router.push('/login');
+        if (authLoading || !user) {
+            if (!authLoading) router.push('/login');
             return;
         }
         if (!chatId) return;
