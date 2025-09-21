@@ -11,7 +11,8 @@ config({ path: resolve(process.cwd(), '.env') });
 // to avoid pulling in dependencies that might cause issues.
 // For example, if a flow depends on a service that depends on a native module,
 // it might be better to comment it out here during development if not actively working on it.
-import '@/ai/flows/card-description-generator.ts';
-import '@/ai/flows/collection-description-generator.ts';
-import '@/ai/flows/site-content-manager.ts';
-import '@/ai/flows/user-actions.ts';
+// import '@/ai/flows/card-description-generator.ts';
+// import '@/ai/flows/collection-description-generator.ts';
+// import '@/ai/flows/site-content-manager.ts';
+// import '@/ai/flows/user-actions.ts';
+
