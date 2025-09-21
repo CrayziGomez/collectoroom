@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, writeBatch, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
 export function useFollow(targetUserId: string) {
@@ -15,10 +15,12 @@ export function useFollow(targetUserId: string) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        // This function runs once to check the initial follow status.
         const checkInitialFollowStatus = async () => {
+            // We only run this check if auth is resolved, we have a user, and a target user.
             if (authLoading || !user || !targetUserId) {
                 setIsLoading(false);
-                setIsFollowing(false); // Ensure it's false if no user
+                setIsFollowing(false);
                 return;
             }
 
@@ -39,7 +41,12 @@ export function useFollow(targetUserId: string) {
     }, [user, targetUserId, authLoading]);
     
     const toggleFollow = useCallback(async () => {
-        if (!user || !targetUserId || user.uid === targetUserId || isProcessing) return;
+        if (!user || !targetUserId || user.uid === targetUserId || isProcessing || authLoading) {
+            if (!user && !authLoading) {
+                toast({ title: 'Please log in', description: 'You need to be logged in to follow users.', variant: 'destructive' });
+            }
+            return;
+        }
 
         setIsProcessing(true);
         const newFollowState = !isFollowing;
@@ -56,7 +63,7 @@ export function useFollow(targetUserId: string) {
                 const targetUserDoc = await transaction.get(targetUserRef);
 
                 if (!currentUserDoc.exists() || !targetUserDoc.exists()) {
-                    throw "User not found";
+                    throw new Error("User not found.");
                 }
                 
                 const currentUserData = currentUserDoc.data();
@@ -92,12 +99,12 @@ export function useFollow(targetUserId: string) {
 
         } catch (error) {
             console.error("Error toggling follow:", error);
-            setIsFollowing(!newFollowState); // Revert optimistic update
+            setIsFollowing(!newFollowState); // Revert optimistic update on error
             toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
         }
-    }, [user, targetUserId, isFollowing, isProcessing, toast]);
+    }, [user, authLoading, targetUserId, isFollowing, isProcessing, toast]);
 
     return { isFollowing, toggleFollow, isLoading, isProcessing };
 }
