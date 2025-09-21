@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CreditCard, LogOut, Settings, User as UserIcon, Shield } from 'lucide-react';
+import { CreditCard, LogOut, Settings, User as UserIcon, Shield, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -37,23 +37,14 @@ export function UserNav() {
   if (loading) {
     return (
       <div className="flex items-center gap-4">
-        <Skeleton className="h-8 w-24" />
         <Skeleton className="h-8 w-8 rounded-full" />
       </div>
     );
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" asChild>
-          <Link href="/login">Log in</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/signup">Sign Up</Link>
-        </Button>
-      </div>
-    );
+    // This case is handled by the main header now
+    return null;
   }
 
   return (
@@ -83,13 +74,21 @@ export function UserNav() {
               <span>My CollectoRoom</span>
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/notifications">
+              <Bell className="mr-2 h-4 w-4" />
+              <span>Notifications</span>
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Billing</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
+          <DropdownMenuItem asChild>
+             <Link href="/my-collectoroom/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+             </Link>
           </DropdownMenuItem>
            {user.isAdmin && (
             <DropdownMenuItem asChild>

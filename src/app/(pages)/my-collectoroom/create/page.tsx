@@ -16,7 +16,7 @@ import { generateCollectionDescription } from "@/ai/flows/collection-description
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -72,6 +72,8 @@ export default function CreateCollectionPage() {
         setIsCreating(true);
 
         try {
+            const batch = writeBatch(db);
+
             const newCollection = {
                 userId: user.uid,
                 name: collectionName,
@@ -80,17 +82,40 @@ export default function CreateCollectionPage() {
                 category,
                 isPublic,
                 cardCount: 0,
-                // Using a placeholder for cover image, user can edit this later
                 coverImage: `https://picsum.photos/seed/${Math.random()}/400/300`,
                 coverImageHint: 'collection placeholder'
             };
+            const collectionRef = addDoc(collection(db, "collections"), {}); // Placeholder for ID
+            batch.set(collectionRef, newCollection);
 
-            const docRef = await addDoc(collection(db, "collections"), newCollection);
+
+            // If the collection is public, notify followers
+            if (isPublic) {
+                const followersQuery = query(collection(db, `users/${user.uid}/followers`));
+                const followersSnapshot = await getDocs(followersQuery);
+                
+                followersSnapshot.forEach(followerDoc => {
+                    const notificationRef = addDoc(collection(db, `notifications`), {}); // Placeholder for ID
+                    batch.set(notificationRef, {
+                        recipientId: followerDoc.id,
+                        senderId: user.uid,
+                        senderName: user.username,
+                        type: 'NEW_COLLECTION',
+                        message: `${user.username} created a new collection: "${collectionName}"`,
+                        link: `/collections/${collectionRef.id}`,
+                        isRead: false,
+                        timestamp: serverTimestamp(),
+                    });
+                });
+            }
+
+            await batch.commit();
+
             toast({
                 title: "Success!",
                 description: `Collection "${collectionName}" has been created.`,
             });
-            router.push(`/collections/${docRef.id}`);
+            router.push(`/collections/${collectionRef.id}`);
 
         } catch (error) {
             console.error("Error creating collection:", error);

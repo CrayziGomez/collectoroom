@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 
 export default function SettingsPage() {
     const { user, loading: authLoading } = useAuth();
@@ -87,7 +88,7 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Profile Settings</CardTitle>
-                        <CardDescription>Update your username and profile details here.</CardDescription>
+                        <CardDescription>Update your username and view your profile details here.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
                         <div className="grid gap-2">
@@ -103,6 +104,23 @@ export default function SettingsPage() {
                                 onChange={(e) => setUsername(e.target.value)}
                                 disabled={isSaving}
                             />
+                        </div>
+                         <div className="flex gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-bold text-foreground">{user.followerCount || 0}</span> Followers
+                            </div>
+                             <div className="flex items-center gap-1 text-muted-foreground">
+                                <span className="font-bold text-foreground">{user.followingCount || 0}</span> Following
+                            </div>
+                        </div>
+                        <div>
+                             <Label>Current Plan</Label>
+                              <div className="flex items-center gap-4 mt-2">
+                                <Badge variant="outline">{user.tier} Plan</Badge>
+                                <Button variant="secondary" size="sm" asChild>
+                                  <Link href="/pricing">Change Plan</Link>
+                                </Button>
+                              </div>
                         </div>
                          <Button onClick={handleSaveChanges} disabled={isSaving}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

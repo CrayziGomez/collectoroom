@@ -13,15 +13,18 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { UserNav } from '../UserNav';
+import { Bell } from 'lucide-react';
 
 export function Header() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   useEffect(() => {
     if (loading || !user) {
       setUnreadChatsCount(0);
+      setUnreadNotificationsCount(0);
       return;
     }
 
@@ -31,15 +34,27 @@ export function Header() {
       where(`unreadCount.${user.uid}`, '>', 0)
     );
 
-    const unsubscribe = onSnapshot(chatsQuery, (querySnapshot) => {
+    const unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
       setUnreadChatsCount(querySnapshot.size);
-    }, (error) => {
-      console.error("Error fetching unread chats count:", error);
-      setUnreadChatsCount(0);
+    });
+    
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', user.uid),
+      where('isRead', '==', false)
+    );
+
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
+      setUnreadNotificationsCount(querySnapshot.size);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeChats();
+      unsubscribeNotifications();
+    }
   }, [user, loading]);
+  
+  const totalUnread = unreadChatsCount + unreadNotificationsCount;
 
   const allNavLinks = [
     { href: '/', label: 'Home', auth: 'always' },
@@ -88,6 +103,21 @@ export function Header() {
               <Button asChild>
                 <Link href="/signup">Sign Up</Link>
               </Button>
+            </div>
+          )}
+          {user && (
+            <div className="relative">
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/notifications">
+                  <Bell className="h-5 w-5" />
+                   <span className="sr-only">Notifications</span>
+                </Link>
+              </Button>
+               {totalUnread > 0 && (
+                <div className="absolute top-0 right-0 h-4 w-4 transform translate-x-1/2 -translate-y-1/2">
+                  <Badge variant="destructive" className="h-5 w-5 justify-center p-0">{totalUnread}</Badge>
+                </div>
+              )}
             </div>
           )}
           <ThemeToggle />

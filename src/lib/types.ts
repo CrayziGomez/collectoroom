@@ -1,4 +1,5 @@
 
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface User {
@@ -10,6 +11,8 @@ export interface User {
   country?: string;
   tier: 'Hobbyist' | 'Explorer' | 'Collector' | 'Curator';
   isAdmin: boolean;
+  followerCount?: number;
+  followingCount?: number;
 }
 
 export interface Category {
@@ -82,4 +85,16 @@ export interface SiteContent {
   description: string;
   imageUrl?: string;
   imageHint?: string;
+}
+
+export interface Notification {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  senderName: string;
+  type: 'NEW_COLLECTION';
+  message: string;
+  link: string;
+  isRead: boolean;
+  timestamp: any;
 }

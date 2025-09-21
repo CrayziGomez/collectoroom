@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 import { initializeApp as initializeAdminApp, getApps as getAdminApps } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
@@ -54,6 +54,8 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
               username: sessionStorage.getItem('pendingUsername') || username,
               tier: isAdmin ? 'Curator' : (tier as AppUser['tier']),
               isAdmin: isAdmin,
+              followerCount: 0,
+              followingCount: 0,
             };
 
             try {

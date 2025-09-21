@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2 } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2, UserPlus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useChat } from '@/hooks/use-chat';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { useFollow } from '@/hooks/use-follow';
 
 export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -33,6 +34,9 @@ export default function CollectionPage() {
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { isFollowing, toggleFollow, isLoading: isFollowLoading, isProcessing: isFollowProcessing } = useFollow(collectionOwner?.uid || '');
+
+
   useEffect(() => {
     if (authLoading) return;
     
@@ -44,8 +48,6 @@ export default function CollectionPage() {
         if (docSnap.exists()) {
             const data = docSnap.data() as Collection;
             
-            // This check needs to happen after we know if a user is logged in or not.
-            // The `authLoading` check at the start of useEffect handles this.
             const isOwner = user?.uid === data.userId;
             const isAdmin = user?.isAdmin === true;
 
@@ -61,7 +63,7 @@ export default function CollectionPage() {
                 const ownerRef = doc(db, 'users', data.userId);
                 const ownerSnap = await getDoc(ownerRef);
                 if (ownerSnap.exists()) {
-                    setCollectionOwner(ownerSnap.data() as User);
+                    setCollectionOwner({...(ownerSnap.data() as User), uid: ownerSnap.id});
                 }
             }
 
@@ -125,6 +127,8 @@ export default function CollectionPage() {
   const cardLimit = user ? tierLimits[user.tier].cards : 0;
   const hasReachedCardLimit = user ? collectionData.cardCount >= cardLimit : true;
 
+  const FollowButtonIcon = isFollowing ? UserCheck : UserPlus;
+
   return (
     <div className="container py-8">
       {/* Collection Header */}
@@ -159,10 +163,16 @@ export default function CollectionPage() {
                 </Button>
                 </>
             ) : user && collectionOwner && (
+                <div className="flex items-center gap-2">
+                 <Button variant="outline" onClick={toggleFollow} disabled={isFollowLoading || isFollowProcessing}>
+                    {isFollowProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FollowButtonIcon className="mr-2 h-4 w-4" />}
+                    {isFollowing ? 'Following' : 'Follow'}
+                 </Button>
                  <Button variant="outline" onClick={handleStartChat} disabled={isCreatingChat || authLoading}>
                     {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                    Message Owner
+                    Message
                 </Button>
+                </div>
             )}
             <Button variant="outline" onClick={handleShare}>
                 <Share2 className="mr-2 h-4 w-4" /> Share
