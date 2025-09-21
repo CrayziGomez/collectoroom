@@ -241,6 +241,9 @@ export default function CollectionPage() {
                     </Tooltip>
                   )}
                   <p className="text-xs text-muted-foreground mt-2">{card.status}</p>
+                  {collectionOwner?.username && (
+                    <p className="text-xs text-muted-foreground mt-2">By {collectionOwner.username}</p>
+                  )}
                 </Link>
               </Card>
             ))}
