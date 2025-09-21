@@ -26,31 +26,31 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUserWithFirebase | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [userLoading, setUserLoading] = useState(false); // Tracks loading of the user doc from Firestore
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // onAuthStateChanged returns an unsubscriber
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
-      setAuthLoading(true);
+      let unsubscribeDoc: (() => void) | null = null;
+      setLoading(true);
+
       if (firebaseUser) {
-        setUserLoading(true); // Start loading user doc
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        const unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
+        unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
           if (docSnap.exists()) {
             const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
             setUser({ ...appUser, firebaseUser });
-            setUserLoading(false); // Stop loading user doc
-            setAuthLoading(false); // Auth process is complete
+            setLoading(false);
           } else {
-            // Document doesn't exist, this is likely a new user.
+            // New user scenario
             const username = firebaseUser.email?.split('@')[0] || 'New User';
             const tier = sessionStorage.getItem('pendingTier') || 'Hobbyist';
             const isAdmin = firebaseUser.email === 'admin@collectoroom.com';
 
             const newUser: AppUser = {
               uid: firebaseUser.uid,
-              id: firebaseUser.uid, // for mock data compatibility
+              id: firebaseUser.uid,
               email: firebaseUser.email || '',
               username: sessionStorage.getItem('pendingUsername') || username,
               tier: isAdmin ? 'Curator' : (tier as AppUser['tier']),
@@ -61,39 +61,39 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
             try {
               await setDoc(userDocRef, newUser);
-              // The onSnapshot listener will fire again with the new doc,
-              // so we don't need to set user state here. We just wait.
+              // The onSnapshot listener will then fire with the new data, setting loading to false.
               sessionStorage.removeItem('pendingUsername');
               sessionStorage.removeItem('pendingTier');
             } catch (error) {
               console.error("Error creating user document:", error);
               setUser(null);
-              setUserLoading(false);
-              setAuthLoading(false);
+              setLoading(false);
             }
           }
         }, (error) => {
           console.error("Error listening to user document:", error);
           setUser(null);
-          setUserLoading(false);
-          setAuthLoading(false);
+          setLoading(false);
         });
-
-        return () => unsubscribeDoc();
       } else {
+        // User is not logged in
         setUser(null);
-        setAuthLoading(false);
-        setUserLoading(false);
+        setLoading(false);
       }
+      
+      // Return a cleanup function that unsubscribes from both auth and doc listeners
+      return () => {
+        if (unsubscribeDoc) {
+          unsubscribeDoc();
+        }
+      };
     });
 
+    // Cleanup the auth listener when the component unmounts
     return () => unsubscribeAuth();
   }, []);
 
-  const contextValue = {
-    user,
-    loading: authLoading || userLoading, // The app is loading if either auth or user doc is loading
-  };
+  const contextValue = { user, loading };
 
   return (
     <AuthContext.Provider value={contextValue}>
@@ -103,3 +103,4 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 };
 
 export const useAuth = () => useContext(AuthContext);
+
