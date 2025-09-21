@@ -8,7 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from './use-toast';
 import { toggleFollow as toggleFollowFlow } from '@/ai/flows/user-actions';
 
-export function useFollow(targetUserId: string) {
+export function useFollow(targetUserId: string, onSuccess?: () => void) {
     const { user, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const [isFollowing, setIsFollowing] = useState(false);
@@ -59,7 +59,6 @@ export function useFollow(targetUserId: string) {
             const idToken = await user.firebaseUser.getIdToken();
             const result = await toggleFollowFlow({ idToken, targetUserId });
 
-            // The backend confirms the new state. If it's different, we correct the UI.
             const confirmedState = result.newState === 'followed';
             if (isFollowing !== confirmedState) {
                 setIsFollowing(confirmedState);
@@ -69,6 +68,9 @@ export function useFollow(targetUserId: string) {
                 title: confirmedState ? "Followed!" : "Unfollowed",
                 description: `You are ${confirmedState ? 'now following' : 'no longer following'} this user.`,
             });
+            
+            // Call the success callback if it exists
+            onSuccess?.();
 
         } catch (error: any) {
             console.error("Error toggling follow:", error);
@@ -78,7 +80,7 @@ export function useFollow(targetUserId: string) {
         } finally {
             setIsProcessing(false);
         }
-    }, [user, authLoading, targetUserId, isFollowing, isProcessing, toast]);
+    }, [user, authLoading, targetUserId, isFollowing, isProcessing, toast, onSuccess]);
 
     return { isFollowing, toggleFollow, isLoading, isProcessing };
 }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -16,8 +16,8 @@ import Link from 'next/link';
 import { useFollow } from '@/hooks/use-follow';
 
 // A component for a single user row, including the follow button
-function UserRow({ userToList, currentUser }: { userToList: User, currentUser: User }) {
-  const { isFollowing, toggleFollow, isLoading, isProcessing } = useFollow(userToList.uid);
+function UserRow({ userToList, currentUser, onFollowToggle }: { userToList: User, currentUser: User, onFollowToggle: () => void }) {
+  const { isFollowing, toggleFollow, isLoading, isProcessing } = useFollow(userToList.uid, onFollowToggle);
   const isSelf = currentUser.uid === userToList.uid;
 
   return (
@@ -53,6 +53,42 @@ export default function ConnectionsPage() {
     const [followers, setFollowers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const fetchConnections = useCallback(async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            // Fetch following
+            const followingQuery = query(collection(db, `users/${user.uid}/following`));
+            const followingSnapshot = await getDocs(followingQuery);
+            const followingIds = followingSnapshot.docs.map(d => d.id);
+            if (followingIds.length > 0) {
+                const followingPromises = followingIds.map(id => getDoc(doc(db, 'users', id)));
+                const followingDocs = await Promise.all(followingPromises);
+                setFollowing(followingDocs.map(d => ({ ...d.data(), uid: d.id }) as User));
+            } else {
+                 setFollowing([]);
+            }
+
+            // Fetch followers
+            const followersQuery = query(collection(db, `users/${user.uid}/followers`));
+            const followersSnapshot = await getDocs(followersQuery);
+            const followersIds = followersSnapshot.docs.map(d => d.id);
+             if (followersIds.length > 0) {
+                const followersPromises = followersIds.map(id => getDoc(doc(db, 'users', id)));
+                const followersDocs = await Promise.all(followersPromises);
+                setFollowers(followersDocs.map(d => ({ ...d.data(), uid: d.id }) as User));
+             } else {
+                setFollowers([]);
+             }
+
+        } catch (error) {
+            console.error("Error fetching connections:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+
     useEffect(() => {
         if (authLoading) return;
         if (!user) {
@@ -60,34 +96,8 @@ export default function ConnectionsPage() {
             return;
         }
 
-        const fetchConnections = async () => {
-            setLoading(true);
-            try {
-                // Fetch following
-                const followingQuery = query(collection(db, `users/${user.uid}/following`));
-                const followingSnapshot = await getDocs(followingQuery);
-                const followingIds = followingSnapshot.docs.map(d => d.id);
-                const followingPromises = followingIds.map(id => getDoc(doc(db, 'users', id)));
-                const followingDocs = await Promise.all(followingPromises);
-                setFollowing(followingDocs.map(d => ({ ...d.data(), uid: d.id }) as User));
-
-                // Fetch followers
-                const followersQuery = query(collection(db, `users/${user.uid}/followers`));
-                const followersSnapshot = await getDocs(followersQuery);
-                const followersIds = followersSnapshot.docs.map(d => d.id);
-                const followersPromises = followersIds.map(id => getDoc(doc(db, 'users', id)));
-                const followersDocs = await Promise.all(followersPromises);
-                setFollowers(followersDocs.map(d => ({ ...d.data(), uid: d.id }) as User));
-
-            } catch (error) {
-                console.error("Error fetching connections:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchConnections();
-    }, [user, authLoading, router]);
+    }, [user, authLoading, router, fetchConnections]);
 
     if (authLoading || loading || !user) {
         return (
@@ -121,7 +131,7 @@ export default function ConnectionsPage() {
                         <CardContent className="p-0">
                            {following.length > 0 ? (
                                 <div className="divide-y">
-                                    {following.map(f => <UserRow key={f.uid} userToList={f} currentUser={user} />)}
+                                    {following.map(f => <UserRow key={f.uid} userToList={f} currentUser={user} onFollowToggle={fetchConnections} />)}
                                 </div>
                            ): (
                             <p className="p-8 text-center text-muted-foreground">You are not following anyone yet.</p>
@@ -134,7 +144,7 @@ export default function ConnectionsPage() {
                         <CardContent className="p-0">
                              {followers.length > 0 ? (
                                 <div className="divide-y">
-                                    {followers.map(f => <UserRow key={f.uid} userToList={f} currentUser={user} />)}
+                                    {followers.map(f => <UserRow key={f.uid} userToList={f} currentUser={user} onFollowToggle={fetchConnections} />)}
                                 </div>
                              ) : (
                                 <p className="p-8 text-center text-muted-foreground">You have no followers yet.</p>
