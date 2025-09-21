@@ -4,8 +4,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, DocumentReference } from 'firebase/firestore';
 import { useToast } from './use-toast';
+import type { User } from '@/lib/types';
 
 export function useFollow(targetUserId: string) {
     const { user, loading: authLoading } = useAuth();
@@ -24,6 +25,12 @@ export function useFollow(targetUserId: string) {
                 return;
             }
 
+            // Don't check if the user is looking at their own profile.
+            if (user.uid === targetUserId) {
+                setIsLoading(false);
+                return;
+            }
+            
             setIsLoading(true);
             try {
                 const followingRef = doc(db, 'users', user.uid, 'following', targetUserId);
@@ -50,7 +57,9 @@ export function useFollow(targetUserId: string) {
 
         setIsProcessing(true);
         const newFollowState = !isFollowing;
-        setIsFollowing(newFollowState); // Optimistic UI update
+
+        // Optimistic UI update
+        setIsFollowing(newFollowState);
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -58,34 +67,31 @@ export function useFollow(targetUserId: string) {
                 const targetUserRef = doc(db, 'users', targetUserId);
                 const followingRef = doc(currentUserRef, 'following', targetUserId);
                 const followerRef = doc(targetUserRef, 'followers', user.uid);
-
-                const currentUserDoc = await transaction.get(currentUserRef);
-                const targetUserDoc = await transaction.get(targetUserRef);
-
-                if (!currentUserDoc.exists() || !targetUserDoc.exists()) {
-                    throw new Error("User not found.");
-                }
                 
-                const currentUserData = currentUserDoc.data();
-                const targetUserData = targetUserDoc.data();
-
                 if (newFollowState) {
                     // Follow logic
                     transaction.set(followingRef, { timestamp: new Date() });
                     transaction.set(followerRef, { timestamp: new Date() });
                     
-                    const newFollowingCount = (currentUserData.followingCount || 0) + 1;
-                    const newFollowerCount = (targetUserData.followerCount || 0) + 1;
+                    const currentUserDoc = await transaction.get(currentUserRef);
+                    const targetUserDoc = await transaction.get(targetUserRef);
+
+                    const newFollowingCount = (currentUserDoc.data()?.followingCount || 0) + 1;
+                    const newFollowerCount = (targetUserDoc.data()?.followerCount || 0) + 1;
                     
                     transaction.update(currentUserRef, { followingCount: newFollowingCount });
                     transaction.update(targetUserRef, { followerCount: newFollowerCount });
+
                 } else {
                     // Unfollow logic
                     transaction.delete(followingRef);
                     transaction.delete(followerRef);
 
-                    const newFollowingCount = Math.max(0, (currentUserData.followingCount || 0) - 1);
-                    const newFollowerCount = Math.max(0, (targetUserData.followerCount || 0) - 1);
+                    const currentUserDoc = await transaction.get(currentUserRef);
+                    const targetUserDoc = await transaction.get(targetUserRef);
+
+                    const newFollowingCount = Math.max(0, (currentUserDoc.data()?.followingCount || 0) - 1);
+                    const newFollowerCount = Math.max(0, (targetUserDoc.data()?.followerCount || 0) - 1);
 
                     transaction.update(currentUserRef, { followingCount: newFollowingCount });
                     transaction.update(targetUserRef, { followerCount: newFollowerCount });
@@ -99,7 +105,8 @@ export function useFollow(targetUserId: string) {
 
         } catch (error) {
             console.error("Error toggling follow:", error);
-            setIsFollowing(!newFollowState); // Revert optimistic update on error
+            // Revert optimistic update on error
+            setIsFollowing(!newFollowState); 
             toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
