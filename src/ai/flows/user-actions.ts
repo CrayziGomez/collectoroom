@@ -15,17 +15,14 @@ import { auth } from 'firebase-admin';
 
 // Ensure Firebase Admin is initialized
 if (!getApps().length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set. The Admin SDK requires this for initialization.');
-    }
     try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        const serviceAccount = require('../../../studio-7145415565-66e7d-firebase-adminsdk-fbsvc-33919b5548.json');
         initializeApp({
             credential: cert(serviceAccount)
         });
     } catch (e: any) {
-        console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY or initialize Firebase Admin SDK.', e.message);
-        throw new Error('Firebase Admin SDK initialization failed.');
+        console.error('Failed to initialize Firebase Admin SDK from service account file.', e.message);
+        throw new Error('Firebase Admin SDK initialization failed. Make sure the service account file exists at the project root.');
     }
 }
 
