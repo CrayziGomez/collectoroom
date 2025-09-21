@@ -3,14 +3,148 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, CheckCircle, Database, Edit3, Share2 } from 'lucide-react';
+import { ArrowRight, CheckCircle, Database, Edit3, Share2, Pencil, Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { useAuth } from '@/contexts/auth-context';
+import { getSiteContent, updateSiteContent, SiteContent } from '@/ai/flows/site-content-manager';
+import { useEffect, useState, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { app } from '@/lib/firebase';
+
+const storage = getStorage(app);
 
 export default function HomePage() {
-  const heroContent = {
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [content, setContent] = useState<SiteContent | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Edit Text Dialog State
+  const [isTextDialogOpen, setIsTextDialogOpen] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [isSavingText, setIsSavingText] = useState(false);
+  
+  // Edit Image Dialog State
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchContent = async () => {
+    try {
+      const result = await getSiteContent({ pageId: 'homePage' });
+      setContent(result);
+    } catch (error) {
+      console.error("Error fetching site content:", error);
+      toast({ title: 'Error', description: 'Could not load page content.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchContent();
+    }
+  }, [authLoading]);
+
+  const handleOpenTextDialog = () => {
+    if (content) {
+      setEditedTitle(content.title.replace(/<br \/>/g, '\n').replace(/<\/?span[^>]*>/g, ''));
+      setEditedDescription(content.description);
+      setIsTextDialogOpen(true);
+    }
+  };
+
+  const handleSaveText = async () => {
+    if (!user || !content) return;
+    setIsSavingText(true);
+    try {
+      const idToken = await user.firebaseUser?.getIdToken();
+      if (!idToken) throw new Error("Authentication token not found.");
+      
+      const formattedTitle = editedTitle
+        .replace(/\n/g, '<br />')
+        .replace(/Digitized & Showcased./g, '<span class="text-primary">Digitized &amp; Showcased.</span>');
+
+      await updateSiteContent({
+        id: content.id,
+        title: formattedTitle,
+        description: editedDescription,
+        idToken,
+      });
+
+      toast({ title: 'Success', description: 'Hero content updated!' });
+      setIsTextDialogOpen(false);
+      fetchContent(); // Re-fetch content to show changes
+    } catch (error: any) {
+      console.error("Error updating content:", error);
+      toast({ title: 'Error', description: error.message || 'Failed to update content.', variant: 'destructive' });
+    } finally {
+      setIsSavingText(false);
+    }
+  };
+
+  const handleOpenImageDialog = () => {
+    setImageFile(null);
+    setImagePreview(content?.imageUrl || null);
+    setIsImageDialogOpen(true);
+  };
+  
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
+  const handleSaveImage = async () => {
+    if (!user || !content || !imageFile) return;
+    setIsSavingImage(true);
+
+    try {
+      const idToken = await user.firebaseUser?.getIdToken();
+      if (!idToken) throw new Error("Authentication token not found.");
+
+      // 1. Upload image to Firebase Storage
+      const storageRef = ref(storage, `site-content/homePage-hero-${Date.now()}`);
+      const uploadResult = await uploadBytes(storageRef, imageFile);
+      const downloadURL = await getDownloadURL(uploadResult.ref);
+
+      // 2. Update Firestore with new image URL
+      await updateSiteContent({
+        id: content.id,
+        title: content.title,
+        description: content.description,
+        imageUrl: downloadURL,
+        idToken,
+      });
+      
+      toast({ title: 'Success', description: 'Hero image updated!' });
+      setIsImageDialogOpen(false);
+      fetchContent();
+
+    } catch (error: any) {
+      console.error("Error updating image:", error);
+      toast({ title: 'Error', description: error.message || 'Failed to update image.', variant: 'destructive' });
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+  
+  const heroContent = content || {
     title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
     description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
     imageUrl: 'https://picsum.photos/seed/hero/1200/600',
@@ -41,10 +175,17 @@ export default function HomePage() {
       <section className="container py-12 md:py-24">
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6 text-center md:text-left">
-            <h1
-              className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
-              dangerouslySetInnerHTML={{ __html: heroContent.title }}
-            />
+             <div className="relative">
+              {user?.isAdmin && (
+                <Button onClick={handleOpenTextDialog} variant="ghost" size="icon" className="absolute -top-4 right-0 h-8 w-8">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              <h1
+                className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
+                dangerouslySetInnerHTML={{ __html: heroContent.title }}
+              />
+            </div>
             <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
               {heroContent.description}
             </p>
@@ -57,15 +198,25 @@ export default function HomePage() {
               </Button>
             </div>
           </div>
-          <div>
-            <Image
-              src={heroContent.imageUrl}
-              alt={heroContent.description}
-              width={600}
-              height={400}
-              className="rounded-lg shadow-lg aspect-video object-cover"
-              data-ai-hint={heroContent.imageHint}
-            />
+          <div className="relative">
+            {loading ? (
+              <div className="rounded-lg shadow-lg aspect-video bg-muted animate-pulse" />
+            ) : (
+              <Image
+                src={heroContent.imageUrl || 'https://picsum.photos/seed/hero/1200/600'}
+                alt={heroContent.description}
+                width={600}
+                height={400}
+                className="rounded-lg shadow-lg aspect-video object-cover"
+                data-ai-hint={heroContent.imageHint}
+                key={heroContent.imageUrl} // force re-render on change
+              />
+            )}
+            {user?.isAdmin && !loading && (
+              <Button onClick={handleOpenImageDialog} variant="secondary" size="icon" className="absolute top-4 right-4 h-8 w-8">
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </section>
@@ -103,7 +254,7 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {CATEGORIES.map(category => (
-            <Link href={`/gallery?category=${category.name}`} key={category.id}>
+            <Link href={`/gallery?category=${encodeURIComponent(category.name)}`} key={category.id}>
               <div className="group flex flex-col items-center justify-center p-4 border rounded-lg hover:bg-accent/10 hover:shadow-md transition-all h-full">
                 <CategoryIcon categoryName={category.name} className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
                 <p className="mt-2 text-sm font-semibold text-center">{category.name}</p>
@@ -112,6 +263,87 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+      
+      {/* Edit Text Dialog */}
+       <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Hero Content</DialogTitle>
+            <DialogDescription>
+              Make changes to the main title and description on the home page. Use '&lt;span class="text-primary"&gt;...&lt;/span&gt;' to highlight text.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Title</Label>
+              <Textarea
+                id="title"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                className="min-h-[100px]"
+                placeholder="Enter title. Use new lines for line breaks."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                className="min-h-[150px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleSaveText} disabled={isSavingText}>
+              {isSavingText && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Image Dialog */}
+      <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Hero Image</DialogTitle>
+            <DialogDescription>
+              Upload a new image for the hero section banner. Recommended size: 1200x600.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+              <div 
+                className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                  {imagePreview ? (
+                     <Image src={imagePreview} alt="New image preview" width={400} height={200} className="w-full h-auto object-contain rounded-md" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <UploadCloud className="h-10 w-10" />
+                      <p>Click or drag to upload an image</p>
+                    </div>
+                  )}
+              </div>
+              <Input 
+                ref={fileInputRef}
+                type="file" 
+                className="hidden" 
+                accept="image/png, image/jpeg, image/gif, image/webp" 
+                onChange={handleImageSelect}
+              />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleSaveImage} disabled={isSavingImage || !imageFile}>
+              {isSavingImage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Image
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -6,16 +6,28 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
+import { initializeApp as initializeAdminApp, getApps as getAdminApps } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+
+
+interface EnrichedFirebaseUser extends FirebaseUser {
+    isAdmin?: boolean;
+}
+
+interface AppUserWithFirebase extends AppUser {
+    firebaseUser: EnrichedFirebaseUser | null;
+}
+
 
 interface AuthContextType {
-  user: AppUser | null;
+  user: AppUserWithFirebase | null;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
 
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [user, setUser] = useState<AppUserWithFirebase | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +38,8 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
         const unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
           setLoading(true);
           if (docSnap.exists()) {
-            setUser({ uid: docSnap.id, ...docSnap.data() } as AppUser);
+            const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
+            setUser({ ...appUser, firebaseUser });
             setLoading(false);
           } else {
             // Document doesn't exist, this is likely a new user.
@@ -46,7 +59,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
             try {
               await setDoc(userDocRef, newUser);
               // Explicitly set the user here to avoid race conditions
-              setUser(newUser);
+              setUser({ ...newUser, firebaseUser });
                sessionStorage.removeItem('pendingUsername');
                sessionStorage.removeItem('pendingTier');
             } catch (error) {

@@ -75,3 +75,11 @@ export interface Message {
     text: string;
     timestamp: any;
 }
+
+export interface SiteContent {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  imageHint?: string;
+}
