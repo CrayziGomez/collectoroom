@@ -1,6 +1,10 @@
 
 import { config } from 'dotenv';
-config();
+import { resolve } from 'path';
+
+// Specify the path to the .env file in the project root
+config({ path: resolve(process.cwd(), '.env') });
+
 
 // Flows are imported here to be registered with Genkit
 import '@/ai/flows/card-description-generator.ts';

@@ -14,6 +14,12 @@ import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { app as clientApp } from '@/lib/firebase';
 import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
 import { auth } from 'firebase-admin';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Specify the path to the .env file in the project root
+config({ path: resolve(process.cwd(), '.env') });
+
 
 // Ensure Firebase Admin is initialized
 if (!getApps().length) {
