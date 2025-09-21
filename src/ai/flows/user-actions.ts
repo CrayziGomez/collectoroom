@@ -23,7 +23,7 @@ if (!getApps().length) {
             credential: cert(serviceAccount)
         });
     } catch (e: any) {
-        console.error('Failed to initialize Firebase Admin SDK:', e.message);
+        console.error('Failed to initialize Firebase Admin SDK. Ensure FIREBASE_SERVICE_ACCOUNT_KEY is set correctly.', e.message);
     }
 }
 
