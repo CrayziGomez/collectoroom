@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Share2, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
@@ -15,6 +15,7 @@ import type { Card as CardType, Collection } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function CardDetailPage() {
     const params = useParams();
@@ -26,6 +27,7 @@ export default function CardDetailPage() {
 
     const [cardData, setCardData] = useState<CardType | null>(null);
     const [collectionData, setCollectionData] = useState<Collection | null>(null);
+    const [collectionOwner, setCollectionOwner] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -57,6 +59,15 @@ export default function CardDetailPage() {
                 }
                 const collection = { ...collectionSnap.data(), id: collectionSnap.id } as Collection;
                 setCollectionData(collection);
+
+                // Fetch collection owner
+                if (collection.userId) {
+                    const ownerRef = doc(db, 'users', collection.userId);
+                    const ownerSnap = await getDoc(ownerRef);
+                    if (ownerSnap.exists()) {
+                        setCollectionOwner({...(ownerSnap.data()), uid: ownerSnap.id});
+                    }
+                }
 
                 // Check permissions
                 const isOwner = user?.uid === collection.userId;
@@ -128,7 +139,16 @@ export default function CardDetailPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-4xl font-headline">{cardData.title}</CardTitle>
-                            <CardDescription className="text-lg">{cardData.description}</CardDescription>
+                            {collectionOwner && (
+                                <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                                    <Avatar className="h-6 w-6">
+                                        {collectionOwner.avatarUrl && <AvatarImage src={collectionOwner.avatarUrl} alt={collectionOwner.username} />}
+                                        <AvatarFallback>{collectionOwner.username?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <span>By {collectionOwner.username}</span>
+                                </div>
+                            )}
+                            <CardDescription className="text-lg pt-4">{cardData.description}</CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-6">
                             <Separator />
