@@ -8,29 +8,8 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getFirestore, doc, runTransaction } from 'firebase/firestore';
-import { app as clientApp } from '@/lib/firebase';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { auth } from 'firebase-admin';
-
-// Ensure Firebase Admin is initialized
-if (!getApps().length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set. The Admin SDK requires this for initialization.');
-    }
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        initializeApp({
-            credential: cert(serviceAccount)
-        });
-    } catch (e: any) {
-        console.error('Failed to parse or initialize Firebase Admin SDK from environment variable.', e.message);
-        throw new Error('Firebase Admin SDK initialization failed. Make sure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string.');
-    }
-}
-
-
-const db = getFirestore(clientApp);
+import { doc, runTransaction } from 'firebase/firestore';
+import { adminAuth, adminDb } from '@/lib/firebase-admin'; // Use centralized admin
 
 const ToggleFollowInputSchema = z.object({
   idToken: z.string().describe("The user's Firebase ID token."),
@@ -54,7 +33,7 @@ export const toggleFollow = ai.defineFlow(
   async ({ idToken, targetUserId }) => {
     let decodedToken;
     try {
-      decodedToken = await auth().verifyIdToken(idToken);
+      decodedToken = await adminAuth.verifyIdToken(idToken);
     } catch (error) {
       console.error('Error verifying ID token:', error);
       throw new Error('Authentication failed.');
@@ -66,9 +45,10 @@ export const toggleFollow = ai.defineFlow(
     }
 
     try {
-      const newState = await runTransaction(db, async (transaction) => {
-        const currentUserRef = doc(db, 'users', currentUserId);
-        const targetUserRef = doc(db, 'users', targetUserId);
+      // Use the adminDb from firebase-admin for the transaction
+      const newState = await runTransaction(adminDb, async (transaction) => {
+        const currentUserRef = doc(adminDb, 'users', currentUserId);
+        const targetUserRef = doc(adminDb, 'users', targetUserId);
         const followingRef = doc(currentUserRef, 'following', targetUserId);
 
         const followingSnap = await transaction.get(followingRef);
@@ -99,7 +79,7 @@ export const toggleFollow = ai.defineFlow(
           transaction.set(followerRef, { timestamp: new Date() });
 
           const currentUserDoc = await transaction.get(currentUserRef);
-          const targetUserDoc = await transaction.get(targetUserRef);
+          const targetUserDoc = await transaction.get(targetUserDoc);
           
           const newFollowingCount = (currentUserDoc.data()?.followingCount || 0) + 1;
           const newFollowerCount = (targetUserDoc.data()?.followerCount || 0) + 1;

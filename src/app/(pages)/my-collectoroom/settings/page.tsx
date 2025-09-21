@@ -124,7 +124,7 @@ export default function SettingsPage() {
                                 </Button>
                               </div>
                         </div>
-                         <Button onClick={handleSaveChanges} disabled={isSaving}>
+                         <Button onClick={handleSaveChanges} disabled={isSaving || username.length < 3}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </Button>

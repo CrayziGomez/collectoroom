@@ -34,7 +34,11 @@ export default function MyCollectoRoomPage() {
   const [collectionsLoading, setCollectionsLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
+    // Wait for auth to finish before doing anything
+    if (authLoading) {
+      return;
+    }
+    // If auth is done and there's no user, redirect
     if (!user) {
       router.push('/login');
       return;
@@ -64,7 +68,7 @@ export default function MyCollectoRoomPage() {
     });
   };
 
-  if (authLoading || !user) {
+  if (authLoading || collectionsLoading || !user) {
     return (
         <div className="container py-8">
             <Card className="mb-8">

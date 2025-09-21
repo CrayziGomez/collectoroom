@@ -9,31 +9,11 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { app as clientApp } from '@/lib/firebase';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { auth } from 'firebase-admin';
-
-// Ensure Firebase Admin is initialized
-if (!getApps().length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set. The Admin SDK requires this for initialization.');
-    }
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        initializeApp({
-            credential: cert(serviceAccount)
-        });
-    } catch (e: any) {
-        console.error('Failed to parse or initialize Firebase Admin SDK from environment variable.', e.message);
-        throw new Error('Firebase Admin SDK initialization failed. Make sure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string.');
-    }
-}
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Client SDK for types if needed, but actions use admin
+import { adminAuth, adminDb } from '@/lib/firebase-admin'; // Use centralized admin
 
 
-const db = getFirestore(clientApp);
-
-// Define Zod schemas for input and output.
 const SiteContentSchema = z.object({
   id: z.string().describe('The ID of the content document (e.g., "homePage")'),
   title: z.string().describe('The main title text.'),
@@ -67,7 +47,8 @@ export const getSiteContent = ai.defineFlow(
     outputSchema: SiteContentSchema.nullable(),
   },
   async ({ pageId }) => {
-    const docRef = doc(db, 'siteContent', pageId);
+    // Use the adminDb from firebase-admin
+    const docRef = doc(adminDb, 'siteContent', pageId);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -96,7 +77,7 @@ export const getSiteContent = ai.defineFlow(
  */
 async function verifyAdmin(idToken: string): Promise<boolean> {
   try {
-    const decodedToken = await auth().verifyIdToken(idToken);
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
     return decodedToken.admin === true;
   } catch (error) {
     console.error('Error verifying ID token:', error);
@@ -124,7 +105,7 @@ export const updateSiteContent = ai.defineFlow(
     }
 
     try {
-      const docRef = doc(db, 'siteContent', id);
+      const docRef = doc(adminDb, 'siteContent', id);
       await setDoc(docRef, content, { merge: true });
       return { success: true, message: 'Content updated successfully.' };
     } catch (error: any) {

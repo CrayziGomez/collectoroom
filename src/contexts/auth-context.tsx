@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, app } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
@@ -27,8 +27,20 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUserWithFirebase | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
+  
+  useEffect(() => {
+    // This effect only runs once to confirm Firebase client is ready.
+    // The `app` import from `@/lib/firebase` ensures the client is initialized.
+    // We can add a small delay or a more robust check if needed, but for now, this signals it's ready.
+    if(app) {
+        setFirebaseInitialized(true);
+    }
+  }, []);
 
   useEffect(() => {
+    if (!firebaseInitialized) return;
+
     // onAuthStateChanged returns an unsubscriber
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       let unsubscribeDoc: (() => void) | null = null;
@@ -61,7 +73,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
             try {
               await setDoc(userDocRef, newUser);
-              // The onSnapshot listener will then fire with the new data, setting loading to false.
+              // The onSnapshot listener will then fire with the new data, setting user and loading state.
               sessionStorage.removeItem('pendingUsername');
               sessionStorage.removeItem('pendingTier');
             } catch (error) {
@@ -81,7 +93,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
         setLoading(false);
       }
       
-      // Return a cleanup function that unsubscribes from both auth and doc listeners
+      // Return a cleanup function that unsubscribes from the doc listener
       return () => {
         if (unsubscribeDoc) {
           unsubscribeDoc();
@@ -91,7 +103,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 
     // Cleanup the auth listener when the component unmounts
     return () => unsubscribeAuth();
-  }, []);
+  }, [firebaseInitialized]);
 
   const contextValue = { user, loading };
 
@@ -103,4 +115,3 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
 };
 
 export const useAuth = () => useContext(AuthContext);
-

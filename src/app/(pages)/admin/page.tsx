@@ -37,7 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPage() {
-    const { user, loading } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
@@ -46,16 +46,17 @@ export default function AdminPage() {
     const [dataLoading, setDataLoading] = useState(true);
     
     useEffect(() => {
-        // Strictest guard: Do not proceed until auth is resolved, user exists, and is an admin.
-        if (loading || !user) {
-            if (!loading) {
-                router.push('/login');
-            }
+        // Wait for auth to resolve
+        if (authLoading) {
             return;
         }
 
-        if (!user.isAdmin) {
-            setDataLoading(false); // No need to load data if not admin
+        // If auth is resolved, but no user or user is not admin, redirect or deny access
+        if (!user || !user.isAdmin) {
+            setDataLoading(false); 
+            if (!user) {
+              router.push('/login');
+            }
             return; 
         }
 
@@ -85,7 +86,7 @@ export default function AdminPage() {
             unsubscribeUsers();
             unsubscribeCollections();
         };
-    }, [user, loading, router]);
+    }, [user, authLoading, router]);
 
     const handleTierChange = async (userId: string, newTier: User['tier']) => {
         const userRef = doc(db, 'users', userId);
@@ -106,7 +107,7 @@ export default function AdminPage() {
     };
 
 
-    if (loading || (user?.isAdmin && dataLoading)) {
+    if (authLoading || (user?.isAdmin && dataLoading)) {
       return (
         <div className="container py-8 space-y-8">
             <Skeleton className="h-12 w-1/3" />

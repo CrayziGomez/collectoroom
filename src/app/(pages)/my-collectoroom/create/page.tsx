@@ -159,7 +159,7 @@ export default function CreateCollectionPage() {
 
                 <div className="flex justify-end gap-2 mt-6">
                     <Button variant="outline" asChild disabled={isCreating}><Link href="/my-collectoroom">Cancel</Link></Button>
-                    <Button onClick={handleCreateCollection} disabled={isCreating}>
+                    <Button onClick={handleCreateCollection} disabled={isCreating || !collectionName || !category}>
                         {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isCreating ? 'Creating...' : 'Create Collection'}
                     </Button>
