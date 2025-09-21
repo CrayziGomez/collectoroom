@@ -106,12 +106,14 @@ export default function SettingsPage() {
                             />
                         </div>
                          <div className="flex gap-4 text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                                <span className="font-bold text-foreground">{user.followerCount || 0}</span> Followers
-                            </div>
-                             <div className="flex items-center gap-1 text-muted-foreground">
-                                <span className="font-bold text-foreground">{user.followingCount || 0}</span> Following
-                            </div>
+                            <Link href="/my-collectoroom/connections" className="hover:underline">
+                                <span className="font-bold text-foreground">{user.followerCount || 0}</span>
+                                <span className="text-muted-foreground"> Followers</span>
+                            </Link>
+                             <Link href="/my-collectoroom/connections" className="hover:underline">
+                                <span className="font-bold text-foreground">{user.followingCount || 0}</span>
+                                <span className="text-muted-foreground"> Following</span>
+                            </Link>
                         </div>
                         <div>
                              <Label>Current Plan</Label>
