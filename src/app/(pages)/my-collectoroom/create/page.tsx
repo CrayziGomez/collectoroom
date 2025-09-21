@@ -74,7 +74,6 @@ export default function CreateCollectionPage() {
         try {
             const batch = writeBatch(db);
 
-            // Correctly create a new document reference with an auto-generated ID
             const collectionRef = doc(collection(db, "collections"));
 
             const newCollection = {
@@ -97,7 +96,6 @@ export default function CreateCollectionPage() {
                 const followersSnapshot = await getDocs(followersQuery);
                 
                 followersSnapshot.forEach(followerDoc => {
-                    // Correctly create a new document reference for the notification
                     const notificationRef = doc(collection(db, `notifications`));
                     batch.set(notificationRef, {
                         recipientId: followerDoc.id,
