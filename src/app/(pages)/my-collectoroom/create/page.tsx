@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CATEGORIES } from "@/lib/constants";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,8 +14,9 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type { Category } from '@/lib/types';
 
 
 export default function CreateCollectionPage() {
@@ -24,17 +24,30 @@ export default function CreateCollectionPage() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
 
+    const [categories, setCategories] = useState<Category[]>([]);
     const [collectionName, setCollectionName] = useState('');
     const [keywords, setKeywords] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('');
     const [isPublic, setIsPublic] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
 
     useEffect(() => {
         if (!authLoading && !user) {
             router.push('/login');
         }
+        
+        const fetchCategories = async () => {
+            setIsCategoriesLoading(true);
+            const querySnapshot = await getDocs(collection(db, 'categories'));
+            const categoriesData = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
+            setCategories(categoriesData);
+            setIsCategoriesLoading(false);
+        };
+        
+        fetchCategories();
+
     }, [user, authLoading, router]);
 
     const handleCreateCollection = async () => {
@@ -112,12 +125,12 @@ export default function CreateCollectionPage() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="category">Category</Label>
-                             <Select onValueChange={setCategory} value={category} disabled={isCreating}>
+                             <Select onValueChange={setCategory} value={category} disabled={isCreating || isCategoriesLoading}>
                                 <SelectTrigger id="category">
-                                    <SelectValue placeholder="Select a category" />
+                                    <SelectValue placeholder={isCategoriesLoading ? 'Loading...' : 'Select a category'} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {CATEGORIES.map(cat => (
+                                    {categories.map(cat => (
                                     <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                                     ))}
                                 </SelectContent>

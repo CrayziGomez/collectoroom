@@ -6,10 +6,9 @@ import Link from 'next/link';
 import { ArrowRight, CheckCircle, Database, Edit3, Share2, Pencil, Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useAuth } from '@/contexts/auth-context';
-import type { SiteContent } from '@/lib/types';
+import type { SiteContent, Category } from '@/lib/types';
 import { useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -17,8 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { app } from '@/lib/firebase';
+import { app, db } from '@/lib/firebase';
 import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
+import { collection, getDocs } from 'firebase/firestore';
 
 
 const storage = getStorage(app);
@@ -27,6 +27,7 @@ export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState<SiteContent | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Edit Text Dialog State
@@ -48,6 +49,11 @@ export default function HomePage() {
         setLoading(true);
         const result = await getSiteContent({ pageId: 'homePage' });
         setContent(result);
+        
+        const catQuerySnapshot = await getDocs(collection(db, 'categories'));
+        const categoriesData = catQuerySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
+        setCategories(categoriesData);
+
       } catch (error) {
         console.error("Error fetching site content:", error);
         toast({ title: 'Error', description: 'Could not load page content.', variant: 'destructive' });
@@ -265,10 +271,10 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Discover public collections across a wide range of interests.</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {CATEGORIES.map(category => (
+          {categories.map(category => (
             <Link href={`/gallery?category=${encodeURIComponent(category.name)}`} key={category.id}>
               <div className="group flex flex-col items-center justify-center p-4 border rounded-lg hover:bg-accent/10 hover:shadow-md transition-all h-full">
-                <CategoryIcon categoryName={category.name} className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                <CategoryIcon categoryName={category.icon} className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
                 <p className="mt-2 text-sm font-semibold text-center">{category.name}</p>
               </div>
             </Link>

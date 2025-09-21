@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CATEGORIES } from "@/lib/constants";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,9 +14,9 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter, useParams, notFound } from "next/navigation";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Collection } from "@/lib/types";
+import type { Collection, Category } from "@/lib/types";
 
 
 export default function EditCollectionPage() {
@@ -28,6 +27,7 @@ export default function EditCollectionPage() {
     const router = useRouter();
 
     const [collectionData, setCollectionData] = useState<Collection | null>(null);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [collectionName, setCollectionName] = useState('');
     const [keywords, setKeywords] = useState('');
     const [description, setDescription] = useState('');
@@ -44,9 +44,16 @@ export default function EditCollectionPage() {
             return;
         }
 
-        const fetchCollection = async () => {
+        const fetchCollectionAndCategories = async () => {
             if (!collectionId) return;
             setIsLoading(true);
+
+            // Fetch categories
+            const catQuerySnapshot = await getDocs(collection(db, 'categories'));
+            const categoriesData = catQuerySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
+            setCategories(categoriesData);
+
+            // Fetch collection
             const collectionRef = doc(db, 'collections', collectionId);
             const collectionSnap = await getDoc(collectionRef);
 
@@ -69,7 +76,7 @@ export default function EditCollectionPage() {
             setIsLoading(false);
         };
 
-        fetchCollection();
+        fetchCollectionAndCategories();
 
     }, [user, authLoading, collectionId, router, toast]);
 
@@ -144,12 +151,12 @@ export default function EditCollectionPage() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="category">Category</Label>
-                             <Select onValueChange={setCategory} value={category} disabled={isSaving}>
+                             <Select onValueChange={setCategory} value={category} disabled={isSaving || categories.length === 0}>
                                 <SelectTrigger id="category">
-                                    <SelectValue placeholder="Select a category" />
+                                    <SelectValue placeholder={categories.length === 0 ? 'Loading...' : 'Select a category'} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {CATEGORIES.map(cat => (
+                                    {categories.map(cat => (
                                     <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                                     ))}
                                 </SelectContent>

@@ -4,8 +4,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText } from 'lucide-react';
-import { CATEGORIES, PRICING_TIERS } from '@/lib/constants';
+import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2 } from 'lucide-react';
+import { SEED_CATEGORIES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -24,10 +24,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { useEffect, useState, useCallback } from 'react';
+import { collection, onSnapshot, query, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Collection } from '@/lib/types';
+import type { User, Collection, Category } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -35,29 +36,48 @@ import { ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { PRICING_TIERS } from '@/lib/constants';
+import { addCategory } from '@/app/actions/category-actions';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    
+    // Data states
     const [users, setUsers] = useState<User[]>([]);
     const [collections, setCollections] = useState<Collection[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [totalCards, setTotalCards] = useState(0);
-    const [dataLoading, setDataLoading] = useState(true);
-    
-    useEffect(() => {
-        // Wait for auth to resolve
-        if (authLoading) {
-            return;
-        }
 
-        // If auth is resolved, but no user or user is not admin, redirect or deny access
-        if (!user || !user.isAdmin) {
-            setDataLoading(false); 
-            if (!user) {
-              router.push('/login');
-            }
-            return; 
+    // Loading states
+    const [dataLoading, setDataLoading] = useState(true);
+
+    // Dialog state for adding a category
+    const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryDesc, setNewCategoryDesc] = useState('');
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+    const seedCategories = useCallback(async () => {
+        const categoriesRef = collection(db, 'categories');
+        toast({ title: 'Seeding database', description: 'Populating categories for the first time...' });
+        const batch = writeBatch(db);
+        SEED_CATEGORIES.forEach(category => {
+          const docRef = doc(categoriesRef);
+          batch.set(docRef, category);
+        });
+        await batch.commit();
+        toast({ title: 'Success', description: 'Categories have been seeded.' });
+    }, [toast]);
+
+    useEffect(() => {
+        if (authLoading) return;
+        if (!user) {
+            router.push('/login');
+            return;
         }
 
         setDataLoading(true);
@@ -66,11 +86,7 @@ export default function AdminPage() {
         const unsubscribeUsers = onSnapshot(usersQuery, (querySnapshot) => {
             const usersData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as User);
             setUsers(usersData);
-            setDataLoading(false);
-        }, (error) => {
-            console.error("Error fetching users:", error);
-            setDataLoading(false);
-        });
+        }, (error) => console.error("Error fetching users:", error));
 
         const collectionsQuery = query(collection(db, 'collections'));
         const unsubscribeCollections = onSnapshot(collectionsQuery, (snapshot) => {
@@ -78,15 +94,26 @@ export default function AdminPage() {
            setCollections(collectionsData);
            const totalCardCount = collectionsData.reduce((sum, coll) => sum + (coll.cardCount || 0), 0);
            setTotalCards(totalCardCount);
-        }, (error) => {
-            console.error("Error fetching collections:", error);
-        });
+        }, (error) => console.error("Error fetching collections:", error));
+        
+        const categoriesQuery = query(collection(db, 'categories'));
+        const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
+            if (snapshot.empty && user.isAdmin) {
+                seedCategories();
+            } else {
+                const categoriesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Category);
+                setCategories(categoriesData);
+            }
+        }, (error) => console.error("Error fetching categories:", error));
+
+        setDataLoading(false);
 
         return () => {
             unsubscribeUsers();
             unsubscribeCollections();
+            unsubscribeCategories();
         };
-    }, [user, authLoading, router]);
+    }, [user, authLoading, router, seedCategories]);
 
     const handleTierChange = async (userId: string, newTier: User['tier']) => {
         const userRef = doc(db, 'users', userId);
@@ -105,9 +132,27 @@ export default function AdminPage() {
             });
         }
     };
+    
+    const handleAddCategory = async () => {
+        if (!newCategoryName) {
+            toast({ title: 'Error', description: 'Category name is required.', variant: 'destructive' });
+            return;
+        }
+        setIsAddingCategory(true);
+        const result = await addCategory({ name: newCategoryName, description: newCategoryDesc });
+        if (result.success) {
+            toast({ title: 'Success', description: result.message });
+            setIsAddCategoryOpen(false);
+            setNewCategoryName('');
+            setNewCategoryDesc('');
+        } else {
+            toast({ title: 'Error', description: result.message, variant: 'destructive' });
+        }
+        setIsAddingCategory(false);
+    };
 
 
-    if (authLoading || (user?.isAdmin && dataLoading)) {
+    if (authLoading || dataLoading) {
       return (
         <div className="container py-8 space-y-8">
             <Skeleton className="h-12 w-1/3" />
@@ -139,6 +184,7 @@ export default function AdminPage() {
     }
 
   return (
+    <>
     <div className="container py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
@@ -266,32 +312,80 @@ export default function AdminPage() {
               <CardTitle>Category Management</CardTitle>
               <CardDescription>Create and manage collection categories.</CardDescription>
             </div>
-            <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Add</Button>
+            <Button size="sm" onClick={() => setIsAddCategoryOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add</Button>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Category</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {CATEGORIES.map(category => (
-                  <TableRow key={category.id}>
-                    <TableCell className="font-medium">{category.name}</TableCell>
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                    </TableCell>
+                 {categories.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center h-24">No categories found.</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  categories.map(category => (
+                    <TableRow key={category.id}>
+                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell>{category.description}</TableCell>
+                      <TableCell className="text-right">
+                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
     </div>
+    
+    {/* Add Category Dialog */}
+    <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Category</DialogTitle>
+            <DialogDescription>
+              Enter the details for the new category. The icon will be set to a default.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="category-name">Name</Label>
+              <Input
+                id="category-name"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="e.g., Sports Memorabilia"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="category-desc">Description</Label>
+               <Input
+                id="category-desc"
+                value={newCategoryDesc}
+                onChange={(e) => setNewCategoryDesc(e.target.value)}
+                placeholder="e.g., Jerseys, balls, cards, etc."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleAddCategory} disabled={isAddingCategory}>
+              {isAddingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

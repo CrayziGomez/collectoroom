@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Layers, User as UserIcon } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Query, DocumentData } from 'firebase/firestore';
-import type { Collection, User } from '@/lib/types';
+import type { Collection, User, Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -36,6 +35,7 @@ async function fetchCollectionOwners(collections: Collection[]): Promise<Record<
 export default function GalleryPage() {
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [owners, setOwners] = useState<Record<string, User>>({});
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -46,9 +46,15 @@ export default function GalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'all');
 
   useEffect(() => {
-    const fetchPublicCollections = async () => {
+    const fetchPublicData = async () => {
         setLoading(true);
         try {
+            // Fetch categories
+            const catQuerySnapshot = await getDocs(collection(db, 'categories'));
+            const categoriesData = catQuerySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
+            setCategories(categoriesData);
+
+            // Fetch collections
             let q: Query<DocumentData> = query(collection(db, 'collections'), where('isPublic', '==', true));
             
             const queryCategory = searchParams.get('category');
@@ -64,13 +70,13 @@ export default function GalleryPage() {
             setOwners(ownerData);
 
         } catch (error) {
-            console.error("Error fetching public collections:", error);
+            console.error("Error fetching public data:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    fetchPublicCollections();
+    fetchPublicData();
   }, [searchParams]);
   
   useEffect(() => {
@@ -117,7 +123,7 @@ export default function GalleryPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
             ))}
           </SelectContent>

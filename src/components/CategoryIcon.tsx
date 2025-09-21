@@ -1,13 +1,14 @@
-import { CATEGORIES } from '@/lib/constants';
-import { Layers3, type LucideProps } from 'lucide-react';
 
-interface CategoryIconProps extends LucideProps {
+import { ICONS } from '@/lib/constants';
+import * as Lucide from 'lucide-react';
+
+interface CategoryIconProps extends Lucide.LucideProps {
   categoryName: string;
 }
 
 export function CategoryIcon({ categoryName, ...props }: CategoryIconProps) {
-  const category = CATEGORIES.find(c => c.name === categoryName);
-  const IconComponent = category ? category.icon : Layers3;
+  const iconName = categoryName as keyof typeof ICONS;
+  const IconComponent = ICONS[iconName] || Lucide.Layers3;
 
   return <IconComponent {...props} />;
 }

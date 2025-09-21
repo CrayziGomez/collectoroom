@@ -1,5 +1,5 @@
 
-import type { Category, PricingTier, Collection, User, Card } from '@/lib/types';
+import type { PricingTier, Collection, User, Card, Category } from '@/lib/types';
 import {
   Palette,
   BookOpen,
@@ -17,26 +17,32 @@ import {
   Plane,
   Car,
   Clock,
+  Layers3
 } from 'lucide-react';
 
-export const CATEGORIES: Category[] = [
-  { id: 'art', name: 'Art', icon: Palette, description: 'Paintings, sculptures, photography etc' },
-  { id: 'books', name: 'Books & Magazines', icon: BookOpen, description: '' },
-  { id: 'coins', name: 'Coins & Banknotes', icon: CircleDollarSign, description: '' },
-  { id: 'ephemera', name: 'Ephemera', icon: Ticket, description: 'Flyers, Tickets, Stickers, etc' },
-  { id: 'fashion', name: 'Fashion', icon: Shirt, description: 'Clothes, Hats, Bags, Accessories etc' },
-  { id: 'food', name: 'Food & Beverage', icon: UtensilsCrossed, description: 'Bottles, Tins, Caps, Coasters etc' },
-  { id: 'history', name: 'Historic Memorabilia', icon: Landmark, description: '' },
-  { id: 'music', name: 'Music', icon: Music, description: 'Records, Cassettes, Instruments, etc' },
-  { id: 'nature', name: 'Nature', icon: Leaf, description: 'Rocks, Fossils, Shells, Plants etc' },
-  { id: 'pop_culture', name: 'Pop Culture', icon: Star, description: 'Tickets, Autographs, Posters etc' },
-  { id: 'stamps', name: 'Stamps', icon: Mail, description: '' },
-  { id: 'technology', name: 'Technology', icon: Laptop, description: 'Electronics, Gadgets, Manuals, etc' },
-  { id: 'toys', name: 'Toys & Games', icon: ToyBrick, description: '' },
-  { id: 'travel', name: 'Travel Souvenirs', icon: Plane, description: '' },
-  { id: 'vehicles', name: 'Vehicles', icon: Car, description: 'Cars, Motorcycles, Boats etc' },
-  { id: 'watches', name: 'Watches & Clocks', icon: Clock, description: '' },
+export const ICONS = {
+    Palette, BookOpen, CircleDollarSign, Ticket, Shirt, UtensilsCrossed, Landmark, Music, Leaf, Star, Mail, Laptop, ToyBrick, Plane, Car, Clock, Layers3
+};
+
+export const SEED_CATEGORIES: Omit<Category, 'id'>[] = [
+  { name: 'Art', icon: 'Palette', description: 'Paintings, sculptures, photography, and more' },
+  { name: 'Books & Magazines', icon: 'BookOpen', description: 'Rare editions, vintage publications' },
+  { name: 'Coins & Banknotes', icon: 'CircleDollarSign', description: 'Currency from around the world' },
+  { name: 'Ephemera', icon: 'Ticket', description: 'Flyers, tickets, stickers, and everyday relics' },
+  { name: 'Fashion', icon: 'Shirt', description: 'Clothing, accessories, and iconic styles' },
+  { name: 'Food & Beverage', icon: 'UtensilsCrossed', description: 'Menus, tins, coasters, and packaging' },
+  { name: 'Historic Memorabilia', icon: 'Landmark', description: 'Artifacts from significant moments' },
+  { name: 'Music', icon: 'Music', description: 'Records, tapes, instruments, and memorabilia' },
+  { name: 'Nature', icon: 'Leaf', description: 'Fossils, shells, rocks, and botanical finds' },
+  { name: 'Pop Culture', icon: 'Star', description: 'Posters, autographs, and media icons' },
+  { name: 'Stamps', icon: 'Mail', description: 'Postal history and philatelic treasures' },
+  { name: 'Technology', icon: 'Laptop', description: 'Gadgets, manuals, and vintage electronics' },
+  { name: 'Toys & Games', icon: 'ToyBrick', description: 'Nostalgic playthings and collectibles' },
+  { name: 'Travel Souvenirs', icon: 'Plane', description: 'Mementos from around the globe' },
+  { name: 'Vehicles', icon: 'Car', description: 'Classic cars, motorcycles, and boats' },
+  { name: 'Watches & Clocks', icon: 'Clock', description: 'Timepieces with character and history' },
 ];
+
 
 export const PRICING_TIERS: PricingTier[] = [
   {
