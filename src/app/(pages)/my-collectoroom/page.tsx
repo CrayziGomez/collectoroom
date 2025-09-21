@@ -122,7 +122,19 @@ export default function MyCollectoRoomPage() {
             <div>
               <h1 className="text-3xl font-bold font-headline">{user.username}</h1>
               <p className="text-muted-foreground">My digital collection space</p>
-              <Badge variant="outline" className="mt-2">{user.tier} Plan</Badge>
+              <div className="flex items-center gap-4 mt-2">
+                 <Badge variant="outline">{user.tier} Plan</Badge>
+                 <div className="flex gap-4 text-sm">
+                    <Link href="/my-collectoroom/connections" className="hover:underline">
+                        <span className="font-bold text-foreground">{user.followerCount || 0}</span>
+                        <span className="text-muted-foreground"> Followers</span>
+                    </Link>
+                     <Link href="/my-collectoroom/connections" className="hover:underline">
+                        <span className="font-bold text-foreground">{user.followingCount || 0}</span>
+                        <span className="text-muted-foreground"> Following</span>
+                    </Link>
+                </div>
+              </div>
             </div>
           </div>
           <Button variant="outline" asChild>
