@@ -1,28 +1,34 @@
 // src/lib/firebase-admin.ts
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-let app: App;
+let adminApp: App;
+let adminAuth: Auth;
+let adminDb: Firestore;
 
-if (!getApps().length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+function getAdminInstances() {
+    if (!getApps().length) {
+        if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+        }
+        try {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            adminApp = initializeApp({
+                credential: cert(serviceAccount),
+            });
+            adminAuth = getAuth(adminApp);
+            adminDb = getFirestore(adminApp);
+        } catch (e: any) {
+            console.error('Failed to parse or initialize Firebase Admin SDK from environment variable.', e.message);
+            throw new Error('Firebase Admin SDK initialization failed. Make sure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string.');
+        }
+    } else {
+        adminApp = getApps()[0];
+        adminAuth = getAuth(adminApp);
+        adminDb = getFirestore(adminApp);
     }
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        app = initializeApp({
-            credential: cert(serviceAccount),
-        });
-    } catch (e: any) {
-        console.error('Failed to parse or initialize Firebase Admin SDK from environment variable.', e.message);
-        throw new Error('Firebase Admin SDK initialization failed. Make sure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string.');
-    }
-} else {
-    app = getApps()[0];
+    return { adminApp, adminAuth, adminDb };
 }
 
-const adminAuth = getAuth(app);
-const adminDb = getFirestore(app);
-
-export { app as adminApp, adminAuth, adminDb };
+export { getAdminInstances };

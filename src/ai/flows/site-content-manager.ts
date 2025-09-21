@@ -10,8 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Client SDK for types if needed, but actions use admin
-import { adminAuth, adminDb } from '@/lib/firebase-admin'; // Use centralized admin
+import { getAdminInstances } from '@/lib/firebase-admin'; 
 
 
 const SiteContentSchema = z.object({
@@ -47,7 +46,7 @@ export const getSiteContent = ai.defineFlow(
     outputSchema: SiteContentSchema.nullable(),
   },
   async ({ pageId }) => {
-    // Use the adminDb from firebase-admin
+    const { adminDb } = getAdminInstances();
     const docRef = doc(adminDb, 'siteContent', pageId);
     const docSnap = await getDoc(docRef);
 
@@ -77,6 +76,7 @@ export const getSiteContent = ai.defineFlow(
  */
 async function verifyAdmin(idToken: string): Promise<boolean> {
   try {
+    const { adminAuth } = getAdminInstances();
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     return decodedToken.admin === true;
   } catch (error) {
@@ -105,6 +105,7 @@ export const updateSiteContent = ai.defineFlow(
     }
 
     try {
+      const { adminDb } = getAdminInstances();
       const docRef = doc(adminDb, 'siteContent', id);
       await setDoc(docRef, content, { merge: true });
       return { success: true, message: 'Content updated successfully.' };

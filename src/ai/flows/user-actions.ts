@@ -9,7 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { doc, runTransaction } from 'firebase/firestore';
-import { adminAuth, adminDb } from '@/lib/firebase-admin'; // Use centralized admin
+import { getAdminInstances } from '@/lib/firebase-admin';
 
 const ToggleFollowInputSchema = z.object({
   idToken: z.string().describe("The user's Firebase ID token."),
@@ -31,6 +31,7 @@ export const toggleFollow = ai.defineFlow(
     outputSchema: ToggleFollowOutputSchema,
   },
   async ({ idToken, targetUserId }) => {
+    const { adminAuth, adminDb } = getAdminInstances();
     let decodedToken;
     try {
       decodedToken = await adminAuth.verifyIdToken(idToken);
