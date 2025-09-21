@@ -80,7 +80,7 @@ export const toggleFollow = ai.defineFlow(
           transaction.set(followerRef, { timestamp: new Date() });
 
           const currentUserDoc = await transaction.get(currentUserRef);
-          const targetUserDoc = await transaction.get(targetUserDoc);
+          const targetUserDoc = await transaction.get(targetUserRef);
           
           const newFollowingCount = (currentUserDoc.data()?.followingCount || 0) + 1;
           const newFollowerCount = (targetUserDoc.data()?.followerCount || 0) + 1;
