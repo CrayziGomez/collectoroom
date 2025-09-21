@@ -96,7 +96,7 @@ export default function CreateCollectionPage() {
                 const followersSnapshot = await getDocs(followersQuery);
                 
                 followersSnapshot.forEach(followerDoc => {
-                    const notificationRef = doc(collection(db, `notifications`));
+                    const notificationRef = doc(collection(db, 'notifications'));
                     batch.set(notificationRef, {
                         recipientId: followerDoc.id,
                         senderId: user.uid,
