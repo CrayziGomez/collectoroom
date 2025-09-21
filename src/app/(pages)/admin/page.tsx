@@ -46,18 +46,17 @@ export default function AdminPage() {
     const [dataLoading, setDataLoading] = useState(true);
     
     useEffect(() => {
-        if (loading) {
-            return; // Wait for auth state to be determined
-        }
-
-        if (!user) {
-            router.push('/login');
+        // Strictest guard: Do not proceed until auth is resolved, user exists, and is an admin.
+        if (loading || !user) {
+            if (!loading) {
+                router.push('/login');
+            }
             return;
         }
 
         if (!user.isAdmin) {
-            setDataLoading(false);
-            return; // Don't fetch data if user is not an admin
+            setDataLoading(false); // No need to load data if not admin
+            return; 
         }
 
         setDataLoading(true);
