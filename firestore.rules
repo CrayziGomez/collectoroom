@@ -20,11 +20,13 @@ service cloud.firestore {
     
     match /users/{userId}/following/{followingId} {
       allow read: if true;
+      // A user can only modify their own "following" list
       allow write: if request.auth.uid == userId;
     }
 
     match /users/{userId}/followers/{followerId} {
       allow read: if true;
+      // A user can only add/remove themselves from another user's "followers" list
       allow write: if request.auth.uid == followerId;
     }
 
@@ -37,7 +39,13 @@ service cloud.firestore {
 
     match /cards/{cardId} {
       function collectionIsPublic() {
-        let collectionId = get(request.path).data.collectionId;
+        // This function is incorrect as written. It should be based on incoming data for create,
+        // and existing data for read/update/delete.
+        // A simplified and more robust approach is to pass collectionId in the card data.
+        let collectionId = request.resource.data.collectionId; // For create
+        if (request.method != 'create') {
+          collectionId = resource.data.collectionId; // For other operations
+        }
         return get(/databases/$(database)/documents/collections/$(collectionId)).data.isPublic == true;
       }
 
