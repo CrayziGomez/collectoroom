@@ -15,6 +15,25 @@ import type { Collection, User, Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
 
+/*
+  [DEVELOPER NOTE] Firestore Index Required for Gallery Filtering:
+  
+  To fix the "Missing or insufficient permissions" error when filtering the gallery by category,
+  a composite index must be created in your Firestore database. This allows Firestore to
+  efficiently query collections that are both public and belong to a specific category.
+
+  Please create the index by visiting the following URL:
+
+  https://console.firebase.google.com/project/studio-7145415565-66e7d/firestore/indexes/composite/create?collectionId=collections&fields=isPublic,ASCENDING,category,ASCENDING
+
+  This link will pre-fill the index creation form with the correct settings:
+  - Collection: 'collections'
+  - Field 1: 'isPublic' (Ascending)
+  - Field 2: 'category' (Ascending)
+
+  Creating this index will resolve the permission error.
+*/
+
 async function fetchCollectionOwners(collections: Collection[]): Promise<Record<string, User>> {
     const userIds = [...new Set(collections.map(c => c.userId))];
     if (userIds.length === 0) return {};
