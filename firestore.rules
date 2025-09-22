@@ -2,79 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is an admin
-    function isAdmin(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) &&
-             get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true;
+    
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Users: Read-only for authenticated users, write only for self or admin
+    function isParticipant(chatId) {
+      return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId || isAdmin(request.auth.uid);
-
-      // Subcollections for following/followers
-      match /following/{targetId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-      match /followers/{followerId} {
-        allow read: if request.auth.uid == userId;
-        // Followers are written by the 'toggleFollow' server action, not directly by clients
-        allow write: if false;
-      }
-    }
-
-    // Categories: Publicly readable, admin-only writes
-    match /categories/{categoryId} {
+      allow create: if request.auth.uid == userId;
       allow read: if true;
-      allow write: if isAdmin(request.auth.uid);
+      allow update: if request.auth.uid == userId || isAdmin();
+      allow delete: if isAdmin();
     }
     
-    // Collections: Publicly readable if isPublic, otherwise owner-only. Owner-only writes.
-    match /collections/{collectionId} {
-      allow read: if resource.data.isPublic == true || (request.auth != null && request.auth.uid == resource.data.userId);
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+    match /users/{userId}/following/{followingId} {
+      allow read: if true;
+      allow write: if request.auth.uid == userId;
     }
 
-    // Cards: Readable if the parent collection is readable. Writable only by owner.
+    match /users/{userId}/followers/{followerId} {
+      allow read: if true;
+      allow write: if request.auth.uid == followerId;
+    }
+
+    match /collections/{collectionId} {
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow read: if resource.data.isPublic == true || (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow update: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow delete: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+    }
+
     match /cards/{cardId} {
-       // To read a card, the user must have permission to read the parent collection.
-      allow read: if exists(/databases/$(database)/documents/collections/$(resource.data.collectionId)) &&
-                    (get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
-                     (request.auth != null && request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId));
-      
-      // To write a card, user must be authenticated and be the owner.
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+      function collectionIsPublic() {
+        let collectionId = get(request.path).data.collectionId;
+        return get(/databases/$(database)/documents/collections/$(collectionId)).data.isPublic == true;
+      }
+
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow read: if collectionIsPublic() || (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow update: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow delete: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
     }
     
-    // Site Content: Publicly readable, admin-only writes
+    match /categories/{categoryId} {
+        allow read: if true;
+        allow write: if request.auth != null && isAdmin();
+    }
+
+    match /chats/{chatId} {
+      allow read, update: if isParticipant(chatId);
+      allow create: if request.auth.uid in request.resource.data.participantIds;
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+      allow read: if isParticipant(chatId);
+      allow create: if isParticipant(chatId) && request.resource.data.senderId == request.auth.uid;
+    }
+    
+    match /contactSubmissions/{submissionId} {
+      allow create: if true;
+      allow read, write, delete: if request.auth != null && isAdmin();
+    }
+    
     match /siteContent/{pageId} {
       allow read: if true;
-      allow write: if isAdmin(request.auth.uid);
-    }
-
-    // Contact Submissions: Write-only for anyone. Admin-only reads.
-    match /contactSubmissions/{submissionId} {
-      allow read: if request.auth != null && isAdmin(request.auth.uid);
-      allow create: if true;
-      allow update, delete: if false;
+      allow write: if request.auth != null && isAdmin();
     }
     
-    // Chats & Messages: Accessible only to participants.
-    match /chats/{chatId} {
-      allow read, write: if request.auth != null && request.auth.uid in resource.data.participantIds;
-      
-      match /messages/{messageId} {
-        allow read, create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-        allow update, delete: if false; // Messages are immutable
-      }
-    }
-    
-    // Notifications: Readable only by the recipient. Server-side writes only.
     match /notifications/{notificationId} {
-        allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-        allow create, delete: if false; // Created by server actions, can be updated (isRead) or read by user
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
+      allow create: if request.auth != null; // Server-side logic should validate sender
     }
   }
 }
