@@ -58,8 +58,10 @@ service cloud.firestore {
       // This is secure because the document ID is a composite of the two participant UIDs.
       allow read: if request.auth.uid in chatId.split('_');
       
-      // A user can list chats they are a part of. This is for the main messages page.
-      allow list: if request.auth.uid == request.query.where.participantIds;
+      // Allow a user to query for chats they are a participant in.
+      // This is used for the main messages page and the unread count in the header.
+      // Firestore security rules require that query constraints are reflected in the rules.
+      allow list: if request.auth.uid == request.query.get("where").participantIds;
       
       // A user can update a chat (e.g., unread count) if they are a participant.
       allow update: if request.auth.uid in resource.data.participantIds;
@@ -69,12 +71,15 @@ service cloud.firestore {
     }
 
     match /chats/{chatId}/messages/{messageId} {
+      function isParticipant() {
+          return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+      }
+      
       // A user can read messages in a chat they are part of.
-      allow read, list: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+      allow read, list: if isParticipant();
       
       // A user can create a message in a chat they are a part of, and they must be the sender.
-      allow create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds 
-                    && request.resource.data.senderId == request.auth.uid;
+      allow create: if isParticipant() && request.resource.data.senderId == request.auth.uid;
     }
     
     match /contactSubmissions/{submissionId} {
