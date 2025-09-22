@@ -39,60 +39,66 @@ export default function CollectionPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    
     if (!collectionId) return;
+
+    setLoading(true);
 
     const collectionRef = doc(db, 'collections', collectionId);
 
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data() as Collection;
-            
-            const isOwner = user?.uid === data.userId;
-            const isAdmin = user?.isAdmin === true;
+      if (docSnap.exists()) {
+        const data = { ...docSnap.data(), id: docSnap.id } as Collection;
+        const isOwner = user?.uid === data.userId;
+        const isAdmin = user?.isAdmin === true;
 
-            if (!data.isPublic && !isOwner && !isAdmin) {
-                toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
-                router.push('/gallery');
-                return;
-            }
-
-            setCollectionData({ ...data, id: docSnap.id });
-
-            if (data.userId) {
-                const ownerRef = doc(db, 'users', data.userId);
-                const ownerSnap = await getDoc(ownerRef);
-                if (ownerSnap.exists()) {
-                    setCollectionOwner({...(ownerSnap.data() as User), uid: ownerSnap.id});
-                }
-            }
-
-            const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
-            const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
-                const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
-                setCards(cardsData);
-                setLoading(false);
-            }, (error) => {
-                console.error("Error fetching cards:", error);
-                setLoading(false);
-            });
-            
-            return () => unsubscribeCards();
-
-        } else {
-            toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
-            router.push('/gallery');
+        if (!data.isPublic && !isOwner && !isAdmin) {
+          toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
+          router.push('/gallery');
+          return;
         }
-    }, (error) => {
-        console.error("Error fetching collection:", error);
-        setLoading(false);
-        toast({ title: "Error", description: "Could not load the collection.", variant: "destructive" });
+
+        setCollectionData(data);
+
+        if (data.userId) {
+          const ownerRef = doc(db, 'users', data.userId);
+          const ownerSnap = await getDoc(ownerRef);
+          if (ownerSnap.exists()) {
+            setCollectionOwner({ ...(ownerSnap.data() as User), uid: ownerSnap.id });
+          }
+        }
+        
+        // Only fetch cards if the user has permission to view the collection
+        const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
+        const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
+            const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
+            setCards(cardsData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching cards:", error);
+            // This is likely where the permissions error happens.
+            // By now we should have already filtered out unauthorized access.
+            toast({ title: "Could not load cards", description: "There was an error loading this collection's cards.", variant: "destructive"});
+            setLoading(false);
+        });
+
+        // Return the cleanup function for the cards listener
+        return () => unsubscribeCards();
+
+      } else {
+        toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
         router.push('/gallery');
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error("Error fetching collection:", error);
+      toast({ title: "Error", description: "Could not load the collection.", variant: "destructive" });
+      router.push('/gallery');
+      setLoading(false);
     });
 
     return () => unsubscribeCollection();
 
-  }, [collectionId, user, router, toast, authLoading]);
+  }, [collectionId, user, authLoading, router, toast]);
 
    const handleStartChat = async () => {
     if (authLoading || !user || !collectionOwner || user.uid === collectionOwner.uid) return;
@@ -258,3 +264,5 @@ export default function CollectionPage() {
     </div>
   );
 }
+
+    

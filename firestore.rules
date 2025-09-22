@@ -39,19 +39,17 @@ service cloud.firestore {
     }
 
     match /cards/{cardId} {
-      // Helper function to get the parent collection document for a card.
-      // For read operations, we use `resource.data`. For writes, `request.resource.data`.
-      function getParentCollection(cardData) {
-        return get(/databases/$(database)/documents/collections/$(cardData.collectionId));
-      }
+      // For a 'get' request (reading a single card), we can do an additional 'get' to check the parent.
+      allow get: if get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true 
+                  || (request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin()));
 
-      // Rules for reading cards
-      allow read: if getParentCollection(resource.data).data.isPublic == true 
-                  || (request.auth != null && (request.auth.uid == getParentCollection(resource.data).data.userId || isAdmin()));
+      // For a 'list' request (querying cards), we cannot do additional 'get' calls.
+      // The client-side query must be constructed securely first.
+      allow list: if request.auth != null;
 
       // Rules for writing cards
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if request.auth != null && (request.auth.uid == getParentCollection(request.resource.data).data.userId || isAdmin());
+      allow update, delete: if request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin());
     }
     
     match /categories/{categoryId} {
@@ -85,3 +83,4 @@ service cloud.firestore {
     }
   }
 }
+    
