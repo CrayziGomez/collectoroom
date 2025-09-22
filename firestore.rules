@@ -19,7 +19,7 @@ service cloud.firestore {
     match /users/{userId}/following/{followingId} {
       // A user can modify their own 'following' list.
       allow read: if true;
-      allow write: if request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     match /users/{userId}/followers/{followerId} {
@@ -39,9 +39,9 @@ service cloud.firestore {
       allow get: if get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true 
                   || (request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin()));
 
-      // For a 'list' request (querying cards), we cannot do additional 'get' calls.
-      // The client-side query must be constructed securely first.
-      allow list: if request.auth != null;
+      // For a 'list' request (querying cards), we cannot do additional 'get' calls per document.
+      // Instead, we ensure the query itself is for a public collection.
+      allow list: if get(/databases/$(database)/documents/collections/$(request.query.where.collectionId)).data.isPublic == true;
 
       // Rules for writing cards
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
@@ -59,7 +59,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid in chatId.split('_');
       
       // A user can list chats they are a part of. This is for the main messages page.
-      allow list: if request.auth != null && request.query.filters.size() > 0 && 'participantIds' in request.query.filters[0].field && request.query.filters[0].op == 'array-contains';
+      allow list: if request.auth != null && request.auth.uid == request.query.where.participantIds;
       
       // A user can update a chat (e.g., unread count) if they are a participant.
       allow update: if request.auth != null && request.auth.uid in resource.data.participantIds;
@@ -89,7 +89,7 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow list: if request.auth != null && request.query.filters.size() > 0 && 'recipientId' in request.query.filters[0].field && request.query.filters[0].op == '==';
+      allow list: if request.auth != null && request.auth.uid == request.query.where.recipientId;
       allow create: if request.auth != null; // Server-side logic must validate sender
     }
   }
