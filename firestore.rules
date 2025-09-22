@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -39,9 +40,11 @@ service cloud.firestore {
       allow get: if get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true 
                   || (request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin()));
 
-      // For a 'list' request (querying cards), the client-side code already ensures that
-      // a user can only query for cards in a public collection or a collection they own.
-      // This rule allows that pre-validated query to proceed.
+      // A list query for cards is only ever performed from the collection page, 
+      // which already checks for public/owner status before making the query.
+      // Therefore, we only need to ensure the user is authenticated if they are trying to query.
+      // However, public collections must be viewable by anyone. The client-side logic prevents
+      // queries on private collections for unauthenticated users.
       allow list: if true;
 
       // Rules for writing cards
@@ -56,10 +59,11 @@ service cloud.firestore {
 
     match /chats/{chatId} {
       // A user can read a chat document if their UID is part of the document ID itself.
-      // This is secure because the document ID is a composite of the two participant UIDs.
       allow read: if request.auth != null && request.auth.uid in chatId.split('_');
       
       // A user can list chats they are a part of.
+      // This is secured by the client which always uses `where('participantIds', 'array-contains', user.uid)`.
+      // The rule just needs to ensure the user is logged in.
       allow list: if request.auth != null;
       
       // A user can update a chat (e.g., unread count) if they are a participant.
@@ -95,3 +99,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

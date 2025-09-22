@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2, UserPlus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import type { Collection, Card as CardType, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { tierLimits } from '@/lib/constants';
@@ -36,26 +36,32 @@ export default function CollectionPage() {
 
   const { isFollowing, toggleFollow, isLoading: isFollowLoading, isProcessing: isFollowProcessing } = useFollow(collectionOwner?.uid || '');
 
+  const fetchCards = useCallback(async (collectionId: string) => {
+    try {
+        const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
+        const cardsSnapshot = await getDocs(cardsQuery);
+        const cardsData = cardsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
+        setCards(cardsData);
+    } catch (error) {
+        console.error("Error fetching cards:", error);
+        toast({ title: "Could not load cards", description: "There was an error loading this collection's cards.", variant: "destructive"});
+    }
+  }, [toast]);
+
 
   useEffect(() => {
-    if (authLoading || !collectionId) return;
+    if (!collectionId) return;
 
     setLoading(true);
 
     const collectionRef = doc(db, 'collections', collectionId);
 
-    // Unsubscribe will be defined within the onSnapshot call
-    let unsubscribeCards: (() => void) | undefined;
-
-    const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
+    const unsubscribe = onSnapshot(collectionRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = { ...docSnap.data(), id: docSnap.id } as Collection;
         const isOwner = user?.uid === data.userId;
         const isAdmin = user?.isAdmin === true;
 
-        // **CLIENT-SIDE PERMISSION CHECK**
-        // This is the critical security check. If the collection is not public
-        // and the user is neither the owner nor an admin, block access.
         if (!data.isPublic && !isOwner && !isAdmin) {
           toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
           router.push('/gallery');
@@ -64,7 +70,6 @@ export default function CollectionPage() {
 
         setCollectionData(data);
 
-        // Fetch owner details
         if (data.userId) {
           const ownerRef = doc(db, 'users', data.userId);
           const ownerSnap = await getDoc(ownerRef);
@@ -73,46 +78,22 @@ export default function CollectionPage() {
           }
         }
         
-        // **CONDITIONAL CARD FETCHING**
-        // Only proceed to fetch cards if the user has permission.
-        const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
-        
-        // Clean up previous cards listener if it exists
-        if (unsubscribeCards) {
-          unsubscribeCards();
-        }
-        
-        unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
-            const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
-            setCards(cardsData);
-            setLoading(false); // We are done loading
-        }, (error) => {
-            console.error("Error fetching cards:", error);
-            toast({ title: "Could not load cards", description: "There was an error loading this collection's cards.", variant: "destructive"});
-            setLoading(false);
-        });
+        // Fetch cards after confirming access
+        await fetchCards(collectionId);
 
+        setLoading(false);
       } else {
         toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
         router.push('/gallery');
-        setLoading(false);
       }
     }, (error) => {
       console.error("Error fetching collection:", error);
       toast({ title: "Error", description: "Could not load the collection.", variant: "destructive" });
       router.push('/gallery');
-      setLoading(false);
     });
 
-    // Cleanup function
-    return () => {
-        unsubscribeCollection();
-        if (unsubscribeCards) {
-            unsubscribeCards();
-        }
-    };
-
-  }, [collectionId, user, authLoading, router, toast]);
+    return () => unsubscribe();
+  }, [collectionId, user, authLoading, router, toast, fetchCards]);
 
    const handleStartChat = async () => {
     if (authLoading || !user || !collectionOwner || user.uid === collectionOwner.uid) return;
@@ -140,7 +121,6 @@ export default function CollectionPage() {
   }
   
   if (!collectionData) {
-    // This can happen if the user is redirected, so return null to avoid rendering anything.
     return null;
   }
 
@@ -213,9 +193,16 @@ export default function CollectionPage() {
       </div>
 
       {/* Cards Grid */}
-       {cards.length === 0 && !isOwner ? (
+       {cards.length === 0 && !loading ? (
          <div className="text-center py-12 text-muted-foreground">
             <p>This collection is empty.</p>
+            {isOwner && !hasReachedCardLimit && (
+              <Button asChild className="mt-4">
+                <Link href={`/collections/${collectionData.id}/add`}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add your first card
+                </Link>
+              </Button>
+            )}
          </div>
        ) : (
         <TooltipProvider>
@@ -267,7 +254,7 @@ export default function CollectionPage() {
                 </Link>
               </Card>
             ))}
-            {isOwner && !hasReachedCardLimit && (
+            {isOwner && !hasReachedCardLimit && cards.length > 0 && (
               <Link href={`/collections/${collectionData.id}/add`} className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/4]">
                   <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
                   <p className="text-muted-foreground font-semibold text-center">Add New Card</p>
@@ -279,3 +266,5 @@ export default function CollectionPage() {
     </div>
   );
 }
+
+    
