@@ -25,7 +25,7 @@ service cloud.firestore {
     match /users/{userId}/followers/{followerId} {
       // A user can add/remove themselves from another user's 'followers' list.
       allow read: if true;
-      allow write: if request.auth.uid == followerId;
+      allow write: if request.auth != null && request.auth.uid == followerId;
     }
 
     match /collections/{collectionId} {
@@ -56,30 +56,25 @@ service cloud.firestore {
     match /chats/{chatId} {
       // A user can read a chat document if their UID is part of the document ID itself.
       // This is secure because the document ID is a composite of the two participant UIDs.
-      allow read: if request.auth.uid in chatId.split('_');
+      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
       
-      // Allow a user to query for chats they are a participant in.
-      // This is used for the main messages page and the unread count in the header.
-      // Firestore security rules require that query constraints are reflected in the rules.
-      allow list: if request.auth.uid == request.query.get("where").participantIds;
+      // A user can list chats they are a part of. This is for the main messages page.
+      allow list: if request.auth != null && request.query.filters.size() > 0 && 'participantIds' in request.query.filters[0].field && request.query.filters[0].op == 'array-contains';
       
       // A user can update a chat (e.g., unread count) if they are a participant.
-      allow update: if request.auth.uid in resource.data.participantIds;
+      allow update: if request.auth != null && request.auth.uid in resource.data.participantIds;
       
       // A user can create a chat if they are one of the participants.
-      allow create: if request.auth.uid in request.resource.data.participantIds;
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.participantIds;
     }
 
     match /chats/{chatId}/messages/{messageId} {
-      function isParticipant() {
-          return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-      }
-      
       // A user can read messages in a chat they are part of.
-      allow read, list: if isParticipant();
+      allow read, list: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
       
       // A user can create a message in a chat they are a part of, and they must be the sender.
-      allow create: if isParticipant() && request.resource.data.senderId == request.auth.uid;
+      allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds 
+                    && request.resource.data.senderId == request.auth.uid;
     }
     
     match /contactSubmissions/{submissionId} {
@@ -94,7 +89,7 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow list: if request.auth != null && request.auth.uid == request.query.where.recipientId;
+      allow list: if request.auth != null && request.query.filters.size() > 0 && 'recipientId' in request.query.filters[0].field && request.query.filters[0].op == '==';
       allow create: if request.auth != null; // Server-side logic must validate sender
     }
   }
