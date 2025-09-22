@@ -39,9 +39,8 @@ service cloud.firestore {
       allow get: if get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true 
                   || (request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin()));
 
-      // For a 'list' request (querying cards), we cannot do additional 'get' calls per document.
-      // Instead, we ensure the query itself is for a public collection.
-      allow list: if get(/databases/$(database)/documents/collections/$(request.query.where.collectionId)).data.isPublic == true;
+      // For a 'list' request (querying cards), we must handle both public viewers and owners of private collections.
+      allow list: if (request.auth != null && get(/databases/$(database)/documents/collections/$(request.query.where.collectionId)).data.userId == request.auth.uid) || (get(/databases/$(database)/documents/collections/$(request.query.where.collectionId)).data.isPublic == true);
 
       // Rules for writing cards
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
@@ -59,7 +58,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid in chatId.split('_');
       
       // A user can list chats they are a part of. This is for the main messages page.
-      allow list: if request.auth != null && request.auth.uid == request.query.where.participantIds;
+      allow list: if request.auth != null && request.auth.uid in request.query.where.participantIds;
       
       // A user can update a chat (e.g., unread count) if they are a participant.
       allow update: if request.auth != null && request.auth.uid in resource.data.participantIds;
