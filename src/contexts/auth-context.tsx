@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, app } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 
@@ -30,9 +30,6 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   
   useEffect(() => {
-    // This effect only runs once to confirm Firebase client is ready.
-    // The `app` import from `@/lib/firebase` ensures the client is initialized.
-    // We can add a small delay or a more robust check if needed, but for now, this signals it's ready.
     if(app) {
         setFirebaseInitialized(true);
     }
@@ -41,7 +38,6 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!firebaseInitialized) return;
 
-    // onAuthStateChanged returns an unsubscriber
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       let unsubscribeDoc: (() => void) | null = null;
       setLoading(true);
@@ -49,38 +45,16 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
+        unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
             setUser({ ...appUser, firebaseUser });
             setLoading(false);
           } else {
-            // New user scenario
-            const username = firebaseUser.email?.split('@')[0] || 'New User';
-            const tier = sessionStorage.getItem('pendingTier') || 'Hobbyist';
-            const isAdmin = firebaseUser.email === 'admin@collectoroom.com';
-
-            const newUser: AppUser = {
-              uid: firebaseUser.uid,
-              id: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              username: sessionStorage.getItem('pendingUsername') || username,
-              tier: isAdmin ? 'Curator' : (tier as AppUser['tier']),
-              isAdmin: isAdmin,
-              followerCount: 0,
-              followingCount: 0,
-            };
-
-            try {
-              await setDoc(userDocRef, newUser);
-              // The onSnapshot listener will then fire with the new data, setting user and loading state.
-              sessionStorage.removeItem('pendingUsername');
-              sessionStorage.removeItem('pendingTier');
-            } catch (error) {
-              console.error("Error creating user document:", error);
-              setUser(null);
-              setLoading(false);
-            }
+            // Document might not exist yet if the Cloud Function is still running.
+            // We'll keep loading until the document appears.
+            // A timeout could be added here to handle cases where the function fails.
+            console.log('User document not found, waiting for creation...');
           }
         }, (error) => {
           console.error("Error listening to user document:", error);
@@ -88,12 +62,10 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           setLoading(false);
         });
       } else {
-        // User is not logged in
         setUser(null);
         setLoading(false);
       }
       
-      // Return a cleanup function that unsubscribes from the doc listener
       return () => {
         if (unsubscribeDoc) {
           unsubscribeDoc();
@@ -101,7 +73,6 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       };
     });
 
-    // Cleanup the auth listener when the component unmounts
     return () => unsubscribeAuth();
   }, [firebaseInitialized]);
 
