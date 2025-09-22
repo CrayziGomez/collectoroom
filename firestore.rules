@@ -39,16 +39,19 @@ service cloud.firestore {
     }
 
     match /cards/{cardId} {
-      function getCollection() {
-        return get(/databases/$(database)/documents/collections/$(request.resource.data.collectionId));
-      }
-      function isCollectionOwner() {
-        return request.auth.uid == getCollection().data.userId;
+      // Helper function to get the parent collection document for a card.
+      // For read operations, we use `resource.data`. For writes, `request.resource.data`.
+      function getParentCollection(cardData) {
+        return get(/databases/$(database)/documents/collections/$(cardData.collectionId));
       }
 
+      // Rules for reading cards
+      allow read: if getParentCollection(resource.data).data.isPublic == true 
+                  || (request.auth != null && (request.auth.uid == getParentCollection(resource.data).data.userId || isAdmin()));
+
+      // Rules for writing cards
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow read: if getCollection().data.isPublic == true || (request.auth != null && (isCollectionOwner() || isAdmin()));
-      allow update, delete: if request.auth != null && (isCollectionOwner() || isAdmin());
+      allow update, delete: if request.auth != null && (request.auth.uid == getParentCollection(request.resource.data).data.userId || isAdmin());
     }
     
     match /categories/{categoryId} {
