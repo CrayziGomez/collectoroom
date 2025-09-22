@@ -3,7 +3,7 @@
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
-import { getFirestore, Firestore, FieldValue, runTransaction } from 'firebase-admin/firestore';
+import { getFirestore, Firestore, FieldValue } from 'firebase-admin/firestore';
 
 let adminApp: App;
 let adminAuth: Auth;
@@ -50,7 +50,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
     }
 
     try {
-      const newState = await runTransaction(adminDb, async (transaction) => {
+      const newState = await adminDb.runTransaction(async (transaction) => {
         const currentUserRef = adminDb.collection('users').doc(currentUserId);
         const targetUserRef = adminDb.collection('users').doc(targetUserId);
         const followingRef = currentUserRef.collection('following').doc(targetUserId);
