@@ -4,10 +4,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     function isAdmin() {
+      // Check if the user is an admin by reading their document
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     function isParticipant(chatId) {
+      // Check if the user is a participant in a chat
       return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
     }
 
@@ -19,40 +21,34 @@ service cloud.firestore {
     }
     
     match /users/{userId}/following/{followingId} {
+      // A user can modify their own 'following' list.
       allow read: if true;
-      // A user can only modify their own "following" list
       allow write: if request.auth.uid == userId;
     }
 
     match /users/{userId}/followers/{followerId} {
+      // A user can add/remove themselves from another user's 'followers' list.
       allow read: if true;
-      // A user can only add/remove themselves from another user's "followers" list
       allow write: if request.auth.uid == followerId;
     }
 
     match /collections/{collectionId} {
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read: if resource.data.isPublic == true || (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
-      allow update: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
-      allow delete: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if resource.data.isPublic == true || (request.auth != null && (request.auth.uid == resource.data.userId || isAdmin()));
+      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
     match /cards/{cardId} {
-      function collectionIsPublic() {
-        // This function is incorrect as written. It should be based on incoming data for create,
-        // and existing data for read/update/delete.
-        // A simplified and more robust approach is to pass collectionId in the card data.
-        let collectionId = request.resource.data.collectionId; // For create
-        if (request.method != 'create') {
-          collectionId = resource.data.collectionId; // For other operations
-        }
-        return get(/databases/$(database)/documents/collections/$(collectionId)).data.isPublic == true;
+      function getCollection() {
+        return get(/databases/$(database)/documents/collections/$(request.resource.data.collectionId));
+      }
+      function isCollectionOwner() {
+        return request.auth.uid == getCollection().data.userId;
       }
 
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read: if collectionIsPublic() || (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
-      allow update: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
-      allow delete: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if getCollection().data.isPublic == true || (request.auth != null && (isCollectionOwner() || isAdmin()));
+      allow update, delete: if request.auth != null && (isCollectionOwner() || isAdmin());
     }
     
     match /categories/{categoryId} {
@@ -82,7 +78,7 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow create: if request.auth != null; // Server-side logic should validate sender
+      allow create: if request.auth != null; // Server-side logic must validate sender
     }
   }
 }
