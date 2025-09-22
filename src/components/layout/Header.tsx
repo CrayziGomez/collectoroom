@@ -18,10 +18,9 @@ import { Bell } from 'lucide-react';
 /*
   [DEVELOPER NOTE] Firestore Index Required for Unread Chat Count:
   
-  To fix the "Missing or insufficient permissions" error for logged-in users,
-  which is caused by the query for unread chats, a composite index must be created 
-  in your Firestore database. This allows Firestore to efficiently query for chats that
-  both contain the user and have an unread count greater than zero.
+  To fix the "Missing or insufficient permissions" or "The query requires an index"
+  error for logged-in users, which is caused by the query for unread chats, a 
+  composite index must be created in your Firestore database.
 
   Please create the index by visiting the following URL in your browser. It will
   pre-fill the index creation form with the correct settings.
@@ -29,7 +28,8 @@ import { Bell } from 'lucide-react';
   https://console.firebase.google.com/v1/r/project/studio-7145415565-66e7d/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARosCih1bnJlYWRDb3VudC5JeWlVbWNXWUpzUXB1b1g5VFFFU1Ruam1JQnIxEAEaDAoIX19uYW1lX18QAQ
 
   After creating the index, it may take a few minutes to build. Once it's enabled, 
-  the error will be resolved.
+  the error will be resolved. The user-specific ID in the index path (`unreadCount.IyiUm...`)
+  is just a placeholder; Firestore will correctly apply the index to all users.
 */
 
 

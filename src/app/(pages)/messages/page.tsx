@@ -17,10 +17,10 @@ import { cn } from '@/lib/utils';
 /*
   [DEVELOPER NOTE] Firestore Index Required for Chat Sorting:
 
-  To fix the "Missing or insufficient permissions" error for logged-in users
-  viewing the messages page, a composite index must be created. This index allows
-  Firestore to both filter chats by the current user and sort them by the most
-  recent message timestamp.
+  To fix the "Missing or insufficient permissions" or "The query requires an index" 
+  error for logged-in users viewing the messages page, a composite index must be 
+  created. This index allows Firestore to both filter chats by the current user 
+  and sort them by the most recent message timestamp.
 
   Please create the index by visiting the following URL in your browser. It will
   pre-fill the index creation form with the correct settings.
