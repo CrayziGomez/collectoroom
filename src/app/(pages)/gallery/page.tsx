@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Layers, User as UserIcon } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Query, DocumentData } from 'firebase/firestore';
+import { collection, query, where, getDocs, Query, DocumentData, doc, getDoc } from 'firebase/firestore';
 import type { Collection, User, Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -20,14 +20,23 @@ async function fetchCollectionOwners(collections: Collection[]): Promise<Record<
     if (userIds.length === 0) return {};
     
     const owners: Record<string, User> = {};
-    for (let i = 0; i < userIds.length; i += 10) {
-        const chunk = userIds.slice(i, i + 10);
-        const usersQuery = query(collection(db, 'users'), where('uid', 'in', chunk));
-        const querySnapshot = await getDocs(usersQuery);
-        querySnapshot.forEach(doc => {
-            owners[doc.id] = doc.data() as User;
-        });
-    }
+    const userPromises = userIds.map(async (userId) => {
+        const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            return { id: userSnap.id, data: userSnap.data() as User };
+        }
+        return null;
+    });
+
+    const results = await Promise.all(userPromises);
+    
+    results.forEach(result => {
+        if (result) {
+            owners[result.id] = result.data;
+        }
+    });
+
     return owners;
 }
 
