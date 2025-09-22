@@ -38,12 +38,14 @@ export default function CollectionPage() {
 
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!collectionId) return;
+    if (authLoading || !collectionId) return;
 
     setLoading(true);
 
     const collectionRef = doc(db, 'collections', collectionId);
+
+    // Unsubscribe will be defined within the onSnapshot call
+    let unsubscribeCards: (() => void) | undefined;
 
     const unsubscribeCollection = onSnapshot(collectionRef, async (docSnap) => {
       if (docSnap.exists()) {
@@ -51,6 +53,9 @@ export default function CollectionPage() {
         const isOwner = user?.uid === data.userId;
         const isAdmin = user?.isAdmin === true;
 
+        // **CLIENT-SIDE PERMISSION CHECK**
+        // This is the critical security check. If the collection is not public
+        // and the user is neither the owner nor an admin, block access.
         if (!data.isPublic && !isOwner && !isAdmin) {
           toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
           router.push('/gallery');
@@ -59,6 +64,7 @@ export default function CollectionPage() {
 
         setCollectionData(data);
 
+        // Fetch owner details
         if (data.userId) {
           const ownerRef = doc(db, 'users', data.userId);
           const ownerSnap = await getDoc(ownerRef);
@@ -67,22 +73,24 @@ export default function CollectionPage() {
           }
         }
         
-        // Only fetch cards if the user has permission to view the collection
+        // **CONDITIONAL CARD FETCHING**
+        // Only proceed to fetch cards if the user has permission.
         const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
-        const unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
+        
+        // Clean up previous cards listener if it exists
+        if (unsubscribeCards) {
+          unsubscribeCards();
+        }
+        
+        unsubscribeCards = onSnapshot(cardsQuery, (querySnapshot) => {
             const cardsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
             setCards(cardsData);
-            setLoading(false);
+            setLoading(false); // We are done loading
         }, (error) => {
             console.error("Error fetching cards:", error);
-            // This is likely where the permissions error happens.
-            // By now we should have already filtered out unauthorized access.
             toast({ title: "Could not load cards", description: "There was an error loading this collection's cards.", variant: "destructive"});
             setLoading(false);
         });
-
-        // Return the cleanup function for the cards listener
-        return () => unsubscribeCards();
 
       } else {
         toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
@@ -96,7 +104,13 @@ export default function CollectionPage() {
       setLoading(false);
     });
 
-    return () => unsubscribeCollection();
+    // Cleanup function
+    return () => {
+        unsubscribeCollection();
+        if (unsubscribeCards) {
+            unsubscribeCards();
+        }
+    };
 
   }, [collectionId, user, authLoading, router, toast]);
 
@@ -126,12 +140,13 @@ export default function CollectionPage() {
   }
   
   if (!collectionData) {
+    // This can happen if the user is redirected, so return null to avoid rendering anything.
     return null;
   }
 
   const isOwner = user?.uid === collectionData.userId;
   const cardLimit = user ? tierLimits[user.tier].cards : 0;
-  const hasReachedCardLimit = user ? collectionData.cardCount >= cardLimit : true;
+  const hasReachedCardLimit = user ? (collectionData.cardCount || 0) >= cardLimit : true;
 
   const FollowButtonIcon = isFollowing ? UserCheck : UserPlus;
 
@@ -264,5 +279,3 @@ export default function CollectionPage() {
     </div>
   );
 }
-
-    
