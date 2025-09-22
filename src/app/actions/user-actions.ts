@@ -1,13 +1,49 @@
 
 'use server';
 
-import { getAdminInstances } from '@/lib/firebase-admin';
-import { runTransaction } from 'firebase-admin/firestore';
-import { FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getAuth, Auth } from 'firebase-admin/auth';
+import { getFirestore, Firestore, FieldValue, runTransaction } from 'firebase-admin/firestore';
+
+let adminApp: App;
+let adminAuth: Auth;
+let adminDb: Firestore;
+
+function initializeAdmin() {
+  if (getApps().length > 0) {
+    adminApp = getApps()[0];
+  } else {
+     try {
+      const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (!serviceAccountString) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+      }
+      
+      const serviceAccount = JSON.parse(serviceAccountString);
+
+      // The private_key in the service account JSON often has its newlines
+      // escaped when stored in an environment variable (e.g., `\n` becomes `\\n`).
+      // We need to replace these escaped newlines with actual newline characters.
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+      });
+
+    } catch (e: any) {
+      console.error('Firebase Admin SDK initialization failed.', e);
+      throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
+    }
+  }
+
+  adminAuth = getAuth(adminApp);
+  adminDb = getFirestore(adminApp);
+}
+
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
     const { targetUserId, currentUserId } = input;
-    const { adminDb } = getAdminInstances();
+    if (!adminApp) initializeAdmin();
 
     if (currentUserId === targetUserId) {
       throw new Error('Users cannot follow themselves.');
@@ -19,14 +55,17 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
         const targetUserRef = adminDb.collection('users').doc(targetUserId);
         const followingRef = currentUserRef.collection('following').doc(targetUserId);
         const followerRef = targetUserRef.collection('followers').doc(currentUserId);
-        const targetUserSnap = await transaction.get(targetUserRef);
-        const targetUserData = targetUserSnap.data();
+        
+        const [currentUserSnap, followingSnap] = await Promise.all([
+            transaction.get(currentUserRef),
+            transaction.get(followingRef)
+        ]);
 
-        if (!targetUserData) {
-          throw new Error('Target user does not exist.');
+        if (!currentUserSnap.exists) {
+            throw new Error('Current user does not exist.');
         }
-
-        const followingSnap = await transaction.get(followingRef);
+        
+        const currentUserData = currentUserSnap.data();
         const isCurrentlyFollowing = followingSnap.exists;
         
         let finalState: 'followed' | 'unfollowed';
@@ -53,9 +92,9 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
           transaction.set(notificationRef, {
             recipientId: targetUserId,
             senderId: currentUserId,
-            senderName: (await transaction.get(currentUserRef)).data()?.username || 'Someone',
+            senderName: currentUserData?.username || 'Someone',
             type: 'NEW_FOLLOWER',
-            message: `${(await transaction.get(currentUserRef)).data()?.username || 'Someone'} started following you.`,
+            message: `${currentUserData?.username || 'Someone'} started following you.`,
             link: `/my-collectoroom/connections`,
             isRead: false,
             timestamp: FieldValue.serverTimestamp(),

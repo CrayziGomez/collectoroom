@@ -1,13 +1,42 @@
 
 'use server';
 
-import { getAdminInstances } from '@/lib/firebase-admin';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import type { SiteContent } from '@/lib/types';
+
+let adminApp: App;
+let adminDb: Firestore;
+
+function initializeAdmin() {
+  if (getApps().length > 0) {
+    adminApp = getApps()[0];
+  } else {
+     try {
+      const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (!serviceAccountString) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+      }
+      
+      const serviceAccount = JSON.parse(serviceAccountString);
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+      });
+
+    } catch (e: any) {
+      console.error('Firebase Admin SDK initialization failed.', e);
+      throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
+    }
+  }
+  adminDb = getFirestore(adminApp);
+}
 
 
 export async function updateSiteContent(input: any) {
+  if (!adminApp) initializeAdmin();
   try {
-    const { adminDb } = getAdminInstances();
     const docRef = adminDb.collection('siteContent').doc(input.id);
     const { id, ...content } = input;
     await docRef.set(content, { merge: true });
@@ -19,8 +48,8 @@ export async function updateSiteContent(input: any) {
 }
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent | null> {
+    if (!adminApp) initializeAdmin();
     try {
-        const { adminDb } = getAdminInstances();
         const docRef = adminDb.collection('siteContent').doc(input.pageId);
         const docSnap = await docRef.get();
 

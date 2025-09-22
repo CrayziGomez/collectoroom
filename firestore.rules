@@ -4,12 +4,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     function isAdmin() {
-      // Check if the user is an admin by reading their document
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     function isParticipant(chatId) {
-      // Check if the user is a participant in a chat
       return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
     }
 
@@ -21,13 +19,11 @@ service cloud.firestore {
     }
     
     match /users/{userId}/following/{followingId} {
-      // A user can modify their own 'following' list.
       allow read: if true;
       allow write: if request.auth.uid == userId;
     }
 
     match /users/{userId}/followers/{followerId} {
-      // A user can add/remove themselves from another user's 'followers' list.
       allow read: if true;
       allow write: if request.auth.uid == followerId;
     }
@@ -39,15 +35,9 @@ service cloud.firestore {
     }
 
     match /cards/{cardId} {
-      // For a 'get' request (reading a single card), we can do an additional 'get' to check the parent.
       allow get: if get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true 
                   || (request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin()));
-
-      // For a 'list' request (querying cards), we cannot do additional 'get' calls.
-      // The client-side query must be constructed securely first.
       allow list: if request.auth != null;
-
-      // Rules for writing cards
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow update, delete: if request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId || isAdmin());
     }
@@ -58,10 +48,10 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow get, update: if isParticipant(chatId);
+      allow get: if isParticipant(chatId);
+      allow list: if request.auth.uid in request.query.where.participantIds;
+      allow update: if isParticipant(chatId);
       allow create: if request.auth.uid in request.resource.data.participantIds;
-      // Allow a user to query for their own chats
-      allow list: if request.auth != null && request.auth.uid == request.query.where.participantIds[2];
     }
 
     match /chats/{chatId}/messages/{messageId} {
@@ -81,9 +71,8 @@ service cloud.firestore {
     
     match /notifications/{notificationId} {
       allow get, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow create: if request.auth != null; // Server-side logic must validate sender
-      // Allow a user to query for their own notifications
-      allow list: if request.auth != null && request.auth.uid == request.query.where.recipientId;
+      allow list: if request.auth.uid == request.query.where.recipientId;
+      allow create: if request.auth != null;
     }
   }
 }
