@@ -89,15 +89,12 @@ export async function updateAvatar(formData: FormData) {
         return { success: false, message: 'Missing userId or file.' };
     }
 
+    if (!adminStorage || !adminDb) {
+      throw new Error('Firebase Admin SDK not initialized correctly.');
+    }
+        
     try {
-        if (!adminStorage || !adminDb) {
-          throw new Error('Firebase Admin SDK not initialized correctly.');
-        }
-        
-        // Explicitly define the correct bucket name from the user-provided config.
-        const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-        const bucket = adminStorage.bucket(bucketName);
-        
+        const bucket = adminStorage.bucket();
         const userDocRef = adminDb.collection('users').doc(userId);
 
         // Delete old avatar if it exists
@@ -106,9 +103,9 @@ export async function updateAvatar(formData: FormData) {
         if (userData?.avatarUrl) {
             try {
                  if (userData.avatarUrl.includes('storage.googleapis.com')) {
+                    // Extract path from a full https URL
                     const oldUrl = new URL(userData.avatarUrl);
-                    // Extract path after the bucket name
-                    const oldPath = decodeURIComponent(oldUrl.pathname.split('/').slice(2).join('/'));
+                    const oldPath = decodeURIComponent(oldUrl.pathname.split(`/b/${bucket.name}/o/`)[1] || '');
                     if (oldPath) {
                         await bucket.file(oldPath).delete({ ignoreNotFound: true });
                     }
@@ -127,7 +124,7 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        // Generate a long-lived signed URL
+        // Generate a long-lived signed URL for reliable access
         const [signedUrl] = await fileRef.getSignedUrl({
           action: 'read',
           expires: '01-01-2100', // Set a very distant expiration date
@@ -141,10 +138,9 @@ export async function updateAvatar(formData: FormData) {
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
+        return { success: true, avatarUrl: signedUrl, message: `Avatar updated successfully (URL: ${signedUrl})` };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
-        // Stringify the error to get more details on the client side
-        return { success: false, message: JSON.stringify(error), avatarUrl: null };
+        return { success: false, message: `Upload Failed: ${JSON.stringify(error)}`, avatarUrl: null };
     }
 }

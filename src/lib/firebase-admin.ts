@@ -37,6 +37,7 @@ function initializeAdminApp(): FirebaseAdminSingleton {
       Buffer.from(serviceAccountString, 'base64').toString('utf8')
     );
 
+    // Use the reliable client-side environment variable for the bucket name.
     const bucketNameFromEnv = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucketNameFromEnv) {
         throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');

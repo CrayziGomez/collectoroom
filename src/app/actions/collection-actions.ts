@@ -32,6 +32,7 @@ export async function createCollection(formData: FormData) {
         const imageFileName = `${uuidv4()}-${coverImageFile.name}`;
         const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
         
+        // Use the correctly initialized adminStorage
         const bucket = adminStorage.bucket();
         const fileRef = bucket.file(imagePath);
         
