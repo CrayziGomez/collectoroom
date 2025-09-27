@@ -30,10 +30,10 @@ export async function createCollection(formData: FormData) {
         // 1. Upload Image to Storage
         const collectionId = adminDb.collection('collections').doc().id; // Generate ID beforehand
         const imageFileName = `${uuidv4()}-${coverImageFile.name}`;
-        const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
         
         // Use the correctly initialized adminStorage
         const bucket = adminStorage.bucket();
+        const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
         const fileRef = bucket.file(imagePath);
         
         const fileBuffer = Buffer.from(await coverImageFile.arrayBuffer());

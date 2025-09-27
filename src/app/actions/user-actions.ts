@@ -90,7 +90,7 @@ export async function updateAvatar(formData: FormData) {
     }
 
     if (!adminStorage || !adminDb) {
-      throw new Error('Firebase Admin SDK not initialized correctly.');
+      return { success: false, message: 'Firebase Admin SDK not initialized correctly.' };
     }
         
     try {
@@ -102,16 +102,16 @@ export async function updateAvatar(formData: FormData) {
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
-                 if (userData.avatarUrl.includes('storage.googleapis.com')) {
-                    // Extract path from a full https URL
+                 if (userData.avatarUrl.includes(bucket.name)) {
                     const oldUrl = new URL(userData.avatarUrl);
-                    const oldPath = decodeURIComponent(oldUrl.pathname.split(`/b/${bucket.name}/o/`)[1] || '');
+                    // Extract path from a URL like: https://storage.googleapis.com/BUCKET_NAME/path/to/file.jpg
+                    const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf(bucket.name) + bucket.name.length + 1));
                     if (oldPath) {
                         await bucket.file(oldPath).delete({ ignoreNotFound: true });
                     }
                  }
             } catch (deleteError) {
-                console.error("Failed to delete old avatar, continuing...", deleteError);
+                console.warn("Failed to delete old avatar, continuing...", deleteError);
             }
         }
 

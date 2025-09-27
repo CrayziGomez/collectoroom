@@ -7,7 +7,6 @@ import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getStorage, Storage } from 'firebase-admin/storage';
 
-// Define a type for our singleton object
 interface FirebaseAdminSingleton {
   app: App;
   auth: Auth;
@@ -17,6 +16,7 @@ interface FirebaseAdminSingleton {
 
 // This function ensures we initialize the app only once
 function initializeAdminApp(): FirebaseAdminSingleton {
+  // If an app is already initialized, return the existing services
   if (getApps().length > 0) {
     const existingApp = getApps()[0];
     return {
@@ -27,6 +27,7 @@ function initializeAdminApp(): FirebaseAdminSingleton {
     };
   }
 
+  // If no app is initialized, create a new one with the correct configuration
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
@@ -56,10 +57,14 @@ function initializeAdminApp(): FirebaseAdminSingleton {
     };
   } catch (error: any) {
     console.error('Firebase Admin SDK initialization failed.', error);
+    // In case of error, we can't provide functional services.
+    // Throwing an error is appropriate as the server actions will not work.
     throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
   }
 }
 
+// Initialize and export the Firebase Admin services.
+// This will either create a new app or get the existing one.
 const { app: adminApp, auth: adminAuth, db: adminDb, storage: adminStorage } = initializeAdminApp();
 
 export { adminApp, adminAuth, adminDb, adminStorage };
