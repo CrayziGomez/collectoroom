@@ -3,16 +3,62 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Profile pictures are publicly readable, but only the user can write to their own.
-    match /users/{userId}/profile/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is the owner of the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Default rule: All other files are private and require authentication.
-    // This rule is less specific, so the profile picture rule above will be checked first.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+    // --- Admin SDK Rule ---
+    // This rule allows any request from the Firebase Admin SDK (where auth is null) to succeed.
+    // It is crucial for server-side operations.
+    allow read, write: if request.auth == null;
+
+    // --- Client-Side Rules Start Here ---
+
+    // PUBLIC READ RULE for non-user-specific content like site assets
+    // The paths below will have more specific rules.
+    match /site-content/{allPaths=**} {
+      allow read;
+      // Allow admins to write site content
+      allow write: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // USER PROFILE IMAGES
+    // Anyone can read profile images.
+    // A user can only write to their own profile folder.
+    // The uploaded file must be an image and under 2MB.
+    match /users/{userId}/profile/{fileName} {
+      allow read;
+      allow write: if isOwner(userId) 
+                    && request.resource.size < 2 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+    }
+    
+    // COLLECTION COVER IMAGES
+    // Anyone can read collection cover images.
+    // A user can only write to a collection folder under their own user ID.
+    // The file must be an image and under 5MB.
+    match /users/{userId}/collections/{collectionId}/{fileName} {
+       allow read;
+       allow write: if isOwner(userId)
+                     && request.resource.size < 5 * 1024 * 1024
+                     && request.resource.contentType.matches('image/.*');
+    }
+    
+    // CARD IMAGES
+    // Anyone can read card images.
+    // A user can only write to a card folder under their own user ID.
+    // The file must be an image and under 5MB.
+     match /users/{userId}/cards/{cardId}/{fileName} {
+       allow read;
+       allow write: if isOwner(userId)
+                     && request.resource.size < 5 * 1024 * 1024
+                     && request.resource.contentType.matches('image/.*');
     }
   }
 }
