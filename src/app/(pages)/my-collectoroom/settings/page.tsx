@@ -61,11 +61,12 @@ export default function SettingsPage() {
             await updateDoc(userDocRef, {
                 username: username,
             });
+            // Update client-side state
+            updateUser({ username });
             toast({
                 title: "Success!",
                 description: "Your profile has been updated.",
             });
-            // No need to push, stay on page
         } catch (error: any) {
             console.error("Error updating profile:", error);
             toast({
@@ -81,6 +82,11 @@ export default function SettingsPage() {
     const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            const fiveMB = 5 * 1024 * 1024;
+            if (file.size > fiveMB) {
+                 toast({ title: "File too large", description: "Avatar image must be less than 5MB.", variant: "destructive" });
+                 return;
+            }
             setAvatarFile(file);
             const previewUrl = URL.createObjectURL(file);
             setAvatarPreview(previewUrl);
@@ -92,7 +98,11 @@ export default function SettingsPage() {
 
         setIsUploading(true);
         try {
-            const result = await updateAvatarAction({ userId: user.uid, file: avatarFile });
+            const formData = new FormData();
+            formData.append('userId', user.uid);
+            formData.append('file', avatarFile);
+
+            const result = await updateAvatarAction(formData);
 
             if (result.success && result.avatarUrl) {
                 toast({ title: "Avatar Updated!", description: "Your new profile picture has been saved." });

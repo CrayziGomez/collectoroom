@@ -83,12 +83,17 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 }
 
 
-export async function updateAvatar(input: { userId: string; file: File; }) {
-    const { userId, file } = input;
-    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-
+export async function updateAvatar(formData: FormData) {
     if (!adminDb) {
         return { success: false, message: 'Firebase Admin SDK not initialized.' };
+    }
+    
+    const userId = formData.get('userId') as string;
+    const file = formData.get('file') as File;
+    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
+
+    if (!userId || !file) {
+        return { success: false, message: 'Missing userId or file.' };
     }
     
     try {
@@ -119,12 +124,14 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
         
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
         
-        // 3. Delete old file if it exists
-        if (oldAvatarUrl) {
+        // 3. Delete old file if it exists and is a GCS URL
+        if (oldAvatarUrl && oldAvatarUrl.startsWith('https://storage.googleapis.com/')) {
              try {
-                const oldFileName = oldAvatarUrl.split('/').pop()?.split('?')[0];
-                if (oldFileName) {
-                     const oldFilePath = `users/${userId}/profile/${oldFileName}`;
+                // Extract the path from the URL
+                const urlParts = oldAvatarUrl.split('/');
+                const oldFilePath = urlParts.slice(4).join('/');
+                
+                if (oldFilePath) {
                      await bucket.file(oldFilePath).delete();
                 }
              } catch(deleteError) {
