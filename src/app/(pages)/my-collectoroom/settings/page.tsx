@@ -200,32 +200,6 @@ export default function SettingsPage() {
                         </Button>
                     </CardContent>
                 </Card>
-
-                {/* --- TEMPORARY DIAGNOSTIC CARD --- */}
-                <Card className="mt-8 border-yellow-500 border-2">
-                    <CardHeader>
-                        <CardTitle className="text-yellow-500">Diagnostic Info</CardTitle>
-                        <CardDescription>This is a temporary test panel to debug the avatar display issue.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-4">
-                        <div>
-                            <Label>Avatar URL from Auth Context</Label>
-                            <p className="text-xs font-mono bg-muted p-2 rounded-md break-all">{user?.avatarUrl || 'No URL in context'}</p>
-                        </div>
-                        <div>
-                             <Label>Direct &lt;img&gt; Render</Label>
-                             <div className="mt-2 p-2 border rounded-md min-h-[100px] flex items-center justify-center">
-                                {user.avatarUrl ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={user.avatarUrl} alt="Direct render test" className="h-24 w-24 rounded-full object-cover" />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No URL to render</p>
-                                )}
-                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
             </div>
         </div>
         

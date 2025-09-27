@@ -108,7 +108,7 @@ export async function updateAvatar(formData: FormData) {
         if (oldAvatarUrl && oldAvatarUrl.includes('storage.googleapis.com')) {
              try {
                 const decodedUrl = decodeURIComponent(oldAvatarUrl);
-                const pathStartIndex = decodedUrl.indexOf(bucketName) + bucketName.length + 1; // Path starts after bucket name
+                const pathStartIndex = decodedUrl.indexOf(bucketName) + bucketName.length + 1;
                 const pathEndIndex = decodedUrl.indexOf('?');
                 const oldFilePath = decodedUrl.substring(pathStartIndex, pathEndIndex > -1 ? pathEndIndex : undefined);
 
@@ -128,7 +128,6 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        // Construct the public URL
         const publicUrl = `https://storage.googleapis.com/${bucketName}/${filePath}`;
         
         await userDocRef.update({
@@ -144,4 +143,3 @@ export async function updateAvatar(formData: FormData) {
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
     }
 }
-
