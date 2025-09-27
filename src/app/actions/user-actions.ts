@@ -94,8 +94,9 @@ export async function updateAvatar(formData: FormData) {
     }
         
     try {
-        // The adminStorage object is now correctly initialized via the singleton
-        const bucket = adminStorage.bucket();
+        const correctBucketName = 'studio-7145415565-66e7d.firebasestorage.app';
+        const bucket = adminStorage.bucket(correctBucketName);
+
         const userDocRef = adminDb.collection('users').doc(userId);
 
         // Delete old avatar if it exists
