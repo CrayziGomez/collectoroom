@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
 import { db, app } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -20,9 +20,14 @@ interface AppUserWithFirebase extends AppUser {
 interface AuthContextType {
   user: AppUserWithFirebase | null;
   loading: boolean;
+  updateUser: (data: Partial<AppUser>) => void;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ 
+    user: null, 
+    loading: true,
+    updateUser: () => {}
+});
 
 async function createUserDocument(user: FirebaseUser) {
     const userDocRef = doc(db, 'users', user.uid);
@@ -80,6 +85,16 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  const updateUser = useCallback((data: Partial<AppUser>) => {
+    setUser(currentUser => {
+        if (!currentUser) return null;
+        return {
+            ...currentUser,
+            ...data
+        };
+    });
+  }, []);
+
   useEffect(() => {
     if (!firebaseInitialized) return;
 
@@ -123,7 +138,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
     return () => unsubscribeAuth();
   }, [firebaseInitialized]);
 
-  const contextValue = { user, loading };
+  const contextValue = { user, loading, updateUser };
 
   return (
     <AuthContext.Provider value={contextValue}>

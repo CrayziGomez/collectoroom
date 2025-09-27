@@ -21,7 +21,7 @@ import Image from "next/image";
 import { updateAvatar as updateAvatarAction } from "@/app/actions/user-actions";
 
 export default function SettingsPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, updateUser } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
 
@@ -96,8 +96,10 @@ export default function SettingsPage() {
 
             if (result.success && result.avatarUrl) {
                 toast({ title: "Avatar Updated!", description: "Your new profile picture has been saved." });
-                setAvatarPreview(result.avatarUrl); // Update preview to final URL
+                updateUser({ avatarUrl: result.avatarUrl }); // Immediately update client-side user state
                 setIsAvatarDialogOpen(false);
+                setAvatarFile(null);
+                setAvatarPreview(null);
             } else {
                 throw new Error(result.message || 'Upload failed');
             }
@@ -138,7 +140,7 @@ export default function SettingsPage() {
                         <div className="grid gap-4 grid-cols-[auto,1fr] items-center">
                             <div className="relative">
                                 <Avatar className="h-20 w-20">
-                                    <AvatarImage src={user.avatarUrl || ''} alt={user.username} />
+                                    <AvatarImage src={user.avatarUrl || ''} alt={user.username} key={user.avatarUrl} />
                                     <AvatarFallback className="text-3xl">{user.username?.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <Button size="icon" variant="secondary" className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full" onClick={() => setIsAvatarDialogOpen(true)}>

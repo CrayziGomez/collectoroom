@@ -85,26 +85,32 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 export async function updateAvatar(input: { userId: string; file: File; }) {
     const { userId, file } = input;
-    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app'; // Explicitly use the correct bucket name
+    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
 
     if (!adminDb) {
         return { success: false, message: 'Firebase Admin SDK not initialized.' };
     }
     
     try {
-        const storage = getStorage(); // Get a fresh storage instance
-        const bucket = storage.bucket(bucketName); // Explicitly get the bucket
+        const storage = getStorage();
+        const bucket = storage.bucket(bucketName);
         
+        // 1. Get user doc to find old avatarUrl
+        const userDocRef = adminDb.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        const userData = userDoc.data();
+        const oldAvatarUrl = userData?.avatarUrl;
+
+        // 2. Upload new file
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
-
         const fileBuffer = Buffer.from(await file.arrayBuffer());
 
         await new Promise((resolve, reject) => {
             const stream = fileRef.createWriteStream({
-                metadata: { contentType: file.type },
+                metadata: { contentType: file.type, cacheControl: 'public, max-age=31536000' },
             });
             stream.on('finish', resolve);
             stream.on('error', reject);
@@ -113,7 +119,23 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
         
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
         
-        await adminDb.collection('users').doc(userId).update({
+        // 3. Delete old file if it exists
+        if (oldAvatarUrl) {
+             try {
+                const oldFileName = oldAvatarUrl.split('/').pop()?.split('?')[0];
+                if (oldFileName) {
+                     const oldFilePath = `users/${userId}/profile/${oldFileName}`;
+                     await bucket.file(oldFilePath).delete();
+                }
+             } catch(deleteError) {
+                // Log the error but don't fail the whole operation
+                // if the old file can't be deleted for some reason.
+                console.error("Failed to delete old avatar:", deleteError);
+             }
+        }
+        
+        // 4. Update Firestore with new URL
+        await userDocRef.update({
             avatarUrl: publicUrl,
         });
 
@@ -124,23 +146,5 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
-    }
-}
-
-export async function testAdminSdkWrite(input: { userId: string; }) {
-    if (!adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized.' };
-    }
-    const { userId } = input;
-
-    try {
-        const userDocRef = adminDb.collection('users').doc(userId);
-        await userDocRef.update({
-            lastSdkTest: FieldValue.serverTimestamp()
-        });
-        return { success: true, message: 'Admin SDK write test successful!' };
-    } catch (error: any) {
-        console.error('Admin SDK write test failed:', error);
-        return { success: false, message: `Admin SDK write test failed: ${error.message}` };
     }
 }
