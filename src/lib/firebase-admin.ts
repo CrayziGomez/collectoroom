@@ -1,3 +1,6 @@
+// This file is NOT a 'use server' file. It is a server-side utility module.
+// It is safe to run on the server because it is only imported by server actions.
+require('dotenv').config();
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
@@ -20,14 +23,14 @@ try {
   );
 
   const storageBucketUri = process.env.FIREBASE_STORAGE_BUCKET_GS_URI;
-  if (!storageBucketUri) {
+   if (!storageBucketUri) {
     throw new Error('FIREBASE_STORAGE_BUCKET_GS_URI environment variable is not set.');
   }
 
   if (!getApps().length) {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: storageBucketUri,
+      storageBucket: storageBucketUri.replace('gs://', ''), // Use the correct bucket name, removing gs://
     });
   } else {
     adminApp = getApps()[0];
@@ -41,7 +44,7 @@ try {
 
 } catch (e: any) {
   console.error('Firebase Admin SDK initialization failed.', e);
-  // Errors will be thrown by actions if the SDK is not initialized.
+  // This will cause actions to fail with the "not initialized" error if caught.
 }
 
 export { adminApp, adminAuth, adminDb, adminStorage };
