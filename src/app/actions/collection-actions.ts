@@ -66,10 +66,8 @@ export async function createCollection(formData: FormData) {
         const fileBuffer = Buffer.from(await coverImageFile.arrayBuffer());
         await fileRef.save(fileBuffer, { metadata: { contentType: coverImageFile.type } });
 
-        const [publicUrl] = await fileRef.getSignedUrl({
-            action: 'read',
-            expires: '03-09-2491', // A date far in the future
-        });
+        // Get public URL (you can also use signed URLs for more control)
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${imagePath}`;
 
         // 2. Create Collection Document in Firestore
         await adminDb.collection('collections').doc(collectionId).set({
