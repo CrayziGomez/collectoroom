@@ -96,8 +96,7 @@ export async function updateAvatar(formData: FormData) {
     }
     
     try {
-        const bucketName = 'studio-7145415565-66e7d.appspot.com';
-        const bucket = getStorage().bucket(bucketName);
+        const bucket = getStorage().bucket(); // Get default bucket
         
         const userDocRef = adminDb.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
@@ -105,18 +104,21 @@ export async function updateAvatar(formData: FormData) {
         const oldAvatarUrl = userData?.avatarUrl;
 
         // Delete old file if it exists and is a GCS URL
-        if (oldAvatarUrl && oldAvatarUrl.includes('storage.googleapis.com')) {
+        if (oldAvatarUrl && (oldAvatarUrl.includes('storage.googleapis.com') || oldAvatarUrl.includes('firebasestorage.googleapis.com')) ) {
              try {
-                const decodedUrl = decodeURIComponent(oldAvatarUrl);
-                const pathStartIndex = decodedUrl.indexOf(bucketName) + bucketName.length + 1;
-                const pathEndIndex = decodedUrl.indexOf('?');
-                const oldFilePath = decodedUrl.substring(pathStartIndex, pathEndIndex > -1 ? pathEndIndex : undefined);
-
-                if (oldFilePath) {
-                     await bucket.file(oldFilePath).delete();
+                // Extract the file path from the URL
+                const url = new URL(oldAvatarUrl);
+                // The pathname will be something like /v0/b/bucket-name/o/path%2Fto%2Ffile.jpg
+                const decodedPath = decodeURIComponent(url.pathname);
+                // We need to extract the actual file path after the /o/
+                const filePath = decodedPath.substring(decodedPath.indexOf('/o/') + 3);
+                
+                if (filePath) {
+                     await bucket.file(filePath).delete();
                 }
              } catch(deleteError) {
                 console.error("Failed to delete old avatar:", deleteError);
+                // Don't block the upload if deletion fails
              }
         }
 
@@ -128,16 +130,20 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        const publicUrl = `https://storage.googleapis.com/${bucketName}/${filePath}`;
+        // Generate a long-lived signed URL
+        const [signedUrl] = await fileRef.getSignedUrl({
+            action: 'read',
+            expires: '01-01-2100', // Set a very distant expiry date
+        });
         
         await userDocRef.update({
-            avatarUrl: publicUrl,
+            avatarUrl: signedUrl,
         });
 
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
+        return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
