@@ -115,7 +115,7 @@ export default function SettingsPage() {
             const result = await updateAvatarAction(formData);
 
             if (result.success && result.avatarUrl) {
-                const successMsg = "Upload successful! Updating client state.";
+                const successMsg = result.message || "Upload successful! Updating client state.";
                 toast({ title: "Avatar Updated!", description: successMsg });
                 updateUser({ avatarUrl: result.avatarUrl }); // Immediately update client-side user state
                 
@@ -291,3 +291,5 @@ export default function SettingsPage() {
         </>
     );
 }
+
+    
