@@ -122,8 +122,8 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     if (!adminApp) initializeAdmin();
     
     try {
-        const filePath = `users/${userId}/profile/${Date.now()}-${file.name}`;
         const bucket = adminStorage.bucket();
+        const filePath = `users/${userId}/profile/${Date.now()}-${file.name}`;
         const fileRef = bucket.file(filePath);
         
         const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -149,5 +149,21 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: 'Failed to update avatar.', avatarUrl: null };
+    }
+}
+
+export async function testAdminSdkWrite(input: { userId: string; }) {
+    const { userId } = input;
+    if (!adminApp) initializeAdmin();
+
+    try {
+        const userDocRef = adminDb.collection('users').doc(userId);
+        await userDocRef.update({
+            lastSdkTest: FieldValue.serverTimestamp()
+        });
+        return { success: true, message: 'Admin SDK write test successful!' };
+    } catch (error: any) {
+        console.error('Admin SDK write test failed:', error);
+        return { success: false, message: `Admin SDK write test failed: ${error.message}` };
     }
 }
