@@ -98,31 +98,24 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
         const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
 
-        // Use a streaming upload which is more reliable in serverless environments
-        const stream = fileRef.createWriteStream({
-            metadata: {
-                contentType: file.type,
-            },
+        // Correctly handle the upload stream with a Promise
+        await new Promise<void>((resolve, reject) => {
+            const stream = fileRef.createWriteStream({
+                metadata: {
+                    contentType: file.type,
+                },
+            });
+            stream.on('error', (err) => {
+                reject(err);
+            });
+            stream.on('finish', () => {
+                resolve();
+            });
+            file.arrayBuffer().then(ab => stream.end(Buffer.from(ab)));
         });
 
-        stream.on('error', (err) => {
-            throw err;
-        });
-
-        stream.on('finish', () => {
-            // This is called when the upload is complete.
-        });
-        
-        // Pipe the file data into the stream
-        const buffer = Buffer.from(await file.arrayBuffer());
-        stream.end(buffer);
-
-        // Construct the public URL manually
+        // Get public URL using the public-facing format
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
-
-        // Wait for a short moment to allow the 'finish' event to propagate, though not ideal.
-        // A more robust solution might involve Promises around the stream events.
-        // For now, we optimistically update the DB.
         
         await adminDb.collection('users').doc(userId).update({
             avatarUrl: publicUrl,
