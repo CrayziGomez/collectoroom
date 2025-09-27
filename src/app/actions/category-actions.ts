@@ -14,11 +14,9 @@ function getAdminInstances() {
     if (!serviceAccountString) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
     }
-    const serviceAccount = JSON.parse(serviceAccountString);
-    // The private_key in the service account JSON often has its newlines
-    // escaped when stored in an environment variable (e.g., `\n` becomes `\\n`).
-    // We need to replace these escaped newlines with actual newline characters.
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+     const serviceAccount = JSON.parse(
+        Buffer.from(serviceAccountString, 'base64').toString('utf8')
+      );
 
     adminApp = initializeApp({
       credential: cert(serviceAccount),
