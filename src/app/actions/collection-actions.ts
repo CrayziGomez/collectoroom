@@ -1,9 +1,10 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
+import { FieldValue } from 'firebase-admin/firestore';
 
 
 // --- Server Action to Create a Collection ---
@@ -51,7 +52,7 @@ export async function createCollection(formData: FormData) {
             coverImage: publicUrl,
             coverImageHint,
             cardCount: 0,
-            createdAt: new Date(),
+            createdAt: FieldValue.serverTimestamp(),
         });
         
         // 3. Revalidate paths

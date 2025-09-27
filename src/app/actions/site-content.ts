@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb } from '../../lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
 import type { SiteContent } from '@/lib/types';
 
 
