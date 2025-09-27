@@ -84,10 +84,6 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    if (!adminDb) {
-        return { success: false, message: 'Firebase Admin SDK not initialized.' };
-    }
-    
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
     const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
@@ -100,56 +96,51 @@ export async function updateAvatar(formData: FormData) {
         const storage = getStorage();
         const bucket = storage.bucket(bucketName);
         
-        // 1. Get user doc to find old avatarUrl
         const userDocRef = adminDb.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         const userData = userDoc.data();
         const oldAvatarUrl = userData?.avatarUrl;
 
-        // 2. Upload new file
+        // Delete old file if it exists and is a GCS URL
+        if (oldAvatarUrl && oldAvatarUrl.includes('storage.googleapis.com')) {
+             try {
+                // Extract the path from the URL by decoding it and finding the object path
+                const decodedUrl = decodeURIComponent(oldAvatarUrl);
+                const pathStartIndex = decodedUrl.indexOf(bucketName) + bucketName.length + 1;
+                const pathEndIndex = decodedUrl.indexOf('?');
+                const oldFilePath = decodedUrl.substring(pathStartIndex, pathEndIndex > -1 ? pathEndIndex : undefined);
+
+                if (oldFilePath) {
+                     await bucket.file(oldFilePath).delete();
+                }
+             } catch(deleteError) {
+                console.error("Failed to delete old avatar:", deleteError);
+             }
+        }
+
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
         const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-        await new Promise((resolve, reject) => {
-            const stream = fileRef.createWriteStream({
-                metadata: { contentType: file.type, cacheControl: 'public, max-age=31536000' },
-            });
-            stream.on('finish', resolve);
-            stream.on('error', reject);
-            stream.end(fileBuffer);
+        await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
+
+        // Generate a long-lived signed URL
+        const expires = new Date('2100-01-01'); // Set a very distant expiration date
+        const [signedUrl] = await fileRef.getSignedUrl({
+            action: 'read',
+            expires: expires,
         });
         
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
-        
-        // 3. Delete old file if it exists and is a GCS URL
-        if (oldAvatarUrl && oldAvatarUrl.startsWith('https://storage.googleapis.com/')) {
-             try {
-                // Extract the path from the URL
-                const urlParts = oldAvatarUrl.split('/');
-                const oldFilePath = urlParts.slice(4).join('/');
-                
-                if (oldFilePath) {
-                     await bucket.file(oldFilePath).delete();
-                }
-             } catch(deleteError) {
-                // Log the error but don't fail the whole operation
-                // if the old file can't be deleted for some reason.
-                console.error("Failed to delete old avatar:", deleteError);
-             }
-        }
-        
-        // 4. Update Firestore with new URL
         await userDocRef.update({
-            avatarUrl: publicUrl,
+            avatarUrl: signedUrl,
         });
 
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
+        return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
