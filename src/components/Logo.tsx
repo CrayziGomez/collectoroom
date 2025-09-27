@@ -6,7 +6,7 @@ export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2" aria-label="CollectoRoom Home">
       <Image 
-        src="/images/logo.svg" 
+        src="/CR_Logo_Gry.png" 
         alt="CollectoRoom Logo" 
         width={32} 
         height={32} 
