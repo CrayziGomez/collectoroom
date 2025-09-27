@@ -22,15 +22,9 @@ try {
     Buffer.from(serviceAccountString, 'base64').toString('utf8')
   );
 
-  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-  if (!bucketName) {
-      throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
-  }
-
   if (!getApps().length) {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: bucketName,
     });
   } else {
     adminApp = getApps()[0];
