@@ -7,30 +7,37 @@ import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getStorage, Storage } from 'firebase-admin/storage';
 
-interface FirebaseAdminSingleton {
+// Define a type for our singleton object
+interface FirebaseAdminServices {
   app: App;
   auth: Auth;
   db: Firestore;
   storage: Storage;
 }
 
-// This function ensures we initialize the app only once
-function initializeAdminApp(): FirebaseAdminSingleton {
-  // If an app is already initialized, return the existing services
-  if (getApps().length > 0) {
-    const existingApp = getApps()[0];
-    return {
-      app: existingApp,
-      auth: getAuth(existingApp),
-      db: getFirestore(existingApp),
-      storage: getStorage(existingApp),
-    };
+// Use a global symbol to store the singleton instance to ensure it's unique
+const ADMIN_APP_SYMBOL = Symbol.for('firebase.admin.app');
+
+// Extend the NodeJS.Global interface to declare our global variable
+declare global {
+  var __firebase_admin_app__: FirebaseAdminServices | undefined;
+}
+
+function initializeAdminApp(): FirebaseAdminServices {
+  // If the singleton instance is already on the global object, return it
+  if (global.__firebase_admin_app__) {
+    return global.__firebase_admin_app__;
   }
 
-  // If no app is initialized, create a new one with the correct configuration
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+
+  // Use the reliable client-side environment variable for the bucket name.
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!storageBucket) {
+    throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env file');
   }
 
   try {
@@ -38,33 +45,34 @@ function initializeAdminApp(): FirebaseAdminSingleton {
       Buffer.from(serviceAccountString, 'base64').toString('utf8')
     );
 
-    // Use the reliable client-side environment variable for the bucket name.
-    const bucketNameFromEnv = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-    if (!bucketNameFromEnv) {
-        throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
-    }
-
     const newApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: bucketNameFromEnv,
-    });
+      storageBucket: storageBucket, // Explicitly set the bucket name here
+    }, 'firebase-admin-app'); // Give the app a unique name
 
-    return {
+    const services: FirebaseAdminServices = {
       app: newApp,
       auth: getAuth(newApp),
       db: getFirestore(newApp),
       storage: getStorage(newApp),
     };
+    
+    // Store the initialized services on the global object
+    global.__firebase_admin_app__ = services;
+    
+    return services;
+
   } catch (error: any) {
+    if (error.code === 'app/duplicate-app') {
+      console.warn("Firebase admin app already initialized, returning existing instance.");
+      return global.__firebase_admin_app__!;
+    }
     console.error('Firebase Admin SDK initialization failed.', error);
-    // In case of error, we can't provide functional services.
-    // Throwing an error is appropriate as the server actions will not work.
     throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
   }
 }
 
-// Initialize and export the Firebase Admin services.
-// This will either create a new app or get the existing one.
+// Initialize and export the services. This will be a singleton.
 const { app: adminApp, auth: adminAuth, db: adminDb, storage: adminStorage } = initializeAdminApp();
 
 export { adminApp, adminAuth, adminDb, adminStorage };

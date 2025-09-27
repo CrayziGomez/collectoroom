@@ -94,6 +94,7 @@ export async function updateAvatar(formData: FormData) {
     }
         
     try {
+        // The adminStorage object is now correctly initialized via the singleton
         const bucket = adminStorage.bucket();
         const userDocRef = adminDb.collection('users').doc(userId);
 
@@ -141,6 +142,9 @@ export async function updateAvatar(formData: FormData) {
         return { success: true, avatarUrl: signedUrl, message: `Avatar updated successfully (URL: ${signedUrl})` };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
-        return { success: false, message: `Upload Failed: ${JSON.stringify(error)}`, avatarUrl: null };
+        // Provide a more structured error response
+        const errorMessage = error.message || 'An unknown error occurred during avatar upload.';
+        const errorCode = error.code || 'UNKNOWN';
+        return { success: false, message: `Upload Failed: {"code":"${errorCode}","message":"${errorMessage}"}`, avatarUrl: null };
     }
 }

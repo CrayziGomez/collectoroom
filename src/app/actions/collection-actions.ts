@@ -31,7 +31,7 @@ export async function createCollection(formData: FormData) {
         const collectionId = adminDb.collection('collections').doc().id; // Generate ID beforehand
         const imageFileName = `${uuidv4()}-${coverImageFile.name}`;
         
-        // Use the correctly initialized adminStorage
+        // Use the correctly initialized adminStorage singleton
         const bucket = adminStorage.bucket();
         const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
         const fileRef = bucket.file(imagePath);
@@ -39,8 +39,11 @@ export async function createCollection(formData: FormData) {
         const fileBuffer = Buffer.from(await coverImageFile.arrayBuffer());
         await fileRef.save(fileBuffer, { metadata: { contentType: coverImageFile.type } });
 
-        // Get public URL using the public-facing format
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${imagePath}`;
+        // Get public URL using a long-lived signed URL
+        const [signedUrl] = await fileRef.getSignedUrl({
+          action: 'read',
+          expires: '01-01-2100',
+        });
 
         // 2. Create Collection Document in Firestore
         await adminDb.collection('collections').doc(collectionId).set({
@@ -50,7 +53,7 @@ export async function createCollection(formData: FormData) {
             keywords,
             category,
             isPublic,
-            coverImage: publicUrl,
+            coverImage: signedUrl,
             coverImageHint,
             cardCount: 0,
             createdAt: FieldValue.serverTimestamp(),
