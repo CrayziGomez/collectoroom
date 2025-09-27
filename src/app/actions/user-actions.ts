@@ -94,29 +94,21 @@ export async function updateAvatar(formData: FormData) {
     }
     
     try {
-        const bucket = adminStorage.bucket(); // Get default bucket from initialized admin
-        
+        const bucket = adminStorage.bucket();
         const userDocRef = adminDb.collection('users').doc(userId);
+
         const userDoc = await userDocRef.get();
         const userData = userDoc.data();
-        const oldAvatarUrl = userData?.avatarUrl;
-
-        // Delete old file if it exists and is a GCS URL
-        if (oldAvatarUrl && (oldAvatarUrl.includes('storage.googleapis.com') || oldAvatarUrl.includes('firebasestorage.googleapis.com')) ) {
-             try {
-                const url = new URL(oldAvatarUrl);
-                const decodedPath = decodeURIComponent(url.pathname);
-                const pathParts = decodedPath.split('/o/');
-                
-                if (pathParts.length > 1) {
-                     const filePath = pathParts[1];
-                     if (filePath) {
-                        await bucket.file(filePath).delete();
-                     }
+        if (userData?.avatarUrl) {
+            try {
+                const oldUrl = new URL(userData.avatarUrl);
+                const oldPath = decodeURIComponent(oldUrl.pathname.split('/o/')[1].split('?')[0]);
+                if (oldPath) {
+                    await bucket.file(oldPath).delete();
                 }
-             } catch(deleteError) {
-                console.error("Failed to delete old avatar:", deleteError);
-             }
+            } catch (deleteError) {
+                console.error("Failed to delete old avatar, continuing...", deleteError);
+            }
         }
 
         const fileExtension = file.name.split('.').pop();
@@ -127,10 +119,9 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        // Generate a long-lived signed URL
         const [signedUrl] = await fileRef.getSignedUrl({
             action: 'read',
-            expires: '01-01-2100', // Set a very distant expiry date
+            expires: '01-01-2100',
         });
         
         await userDocRef.update({

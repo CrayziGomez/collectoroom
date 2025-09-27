@@ -30,22 +30,17 @@ try {
       storageBucket: bucketName,
     });
   } else {
-    // This is the crucial change: ensure we get the app that might have been
-    // initialized without the storageBucket config, but then we initialize
-    // the storage service with the bucket name.
     adminApp = getApps()[0];
   }
 
   if (adminApp) {
     adminAuth = getAuth(adminApp);
     adminDb = getFirestore(adminApp);
-    // Explicitly pass the app instance to getStorage
     adminStorage = getStorage(adminApp);
   }
 
 } catch (e: any) {
   console.error('Firebase Admin SDK initialization failed.', e);
-  // This will cause actions to fail with the "not initialized" error if caught.
 }
 
 export { adminApp, adminAuth, adminDb, adminStorage };
