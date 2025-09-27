@@ -85,25 +85,21 @@ export async function updateAvatar(formData: FormData) {
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
 
-    if (!adminStorage || !adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized correctly.' };
-    }
-
     if (!userId || !file) {
         return { success: false, message: 'Missing userId or file.' };
     }
-    
-    try {
-        // --- Explicitly define bucket name ---
-        const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-        if (!serviceAccountString) {
-          throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-        }
-        const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
-        const bucketName = `${serviceAccount.project_id}.appspot.com`;
-        const bucket = adminStorage.bucket(bucketName);
-        // --- End explicit bucket definition ---
 
+    try {
+        if (!adminStorage || !adminDb) {
+          throw new Error('Firebase Admin SDK not initialized correctly.');
+        }
+        
+        const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+        if (!bucketName) {
+            throw new Error('Firebase Storage bucket name is not configured in environment variables.');
+        }
+        
+        const bucket = adminStorage.bucket(bucketName);
         const userDocRef = adminDb.collection('users').doc(userId);
 
         // Delete old avatar if it exists
@@ -111,10 +107,10 @@ export async function updateAvatar(formData: FormData) {
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
-                 // Do not try to delete if it's a default picsum URL
                  if (userData.avatarUrl.includes('storage.googleapis.com')) {
                     const oldUrl = new URL(userData.avatarUrl);
-                    const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
+                    // Extract path after the bucket name
+                    const oldPath = decodeURIComponent(oldUrl.pathname.split('/').slice(2).join('/'));
                     if (oldPath) {
                         await bucket.file(oldPath).delete({ ignoreNotFound: true });
                     }
@@ -150,6 +146,7 @@ export async function updateAvatar(formData: FormData) {
         return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
-        return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
+        // Stringify the error to get more details on the client side
+        return { success: false, message: JSON.stringify(error), avatarUrl: null };
     }
 }
