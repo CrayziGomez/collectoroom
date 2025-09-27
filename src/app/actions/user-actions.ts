@@ -94,7 +94,16 @@ export async function updateAvatar(formData: FormData) {
     }
     
     try {
-        const bucket = adminStorage.bucket();
+        // --- Explicitly define bucket name ---
+        const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+        if (!serviceAccountString) {
+          throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+        }
+        const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+        const bucketName = `${serviceAccount.project_id}.appspot.com`;
+        const bucket = adminStorage.bucket(bucketName);
+        // --- End explicit bucket definition ---
+
         const userDocRef = adminDb.collection('users').doc(userId);
 
         // Delete old avatar if it exists
@@ -102,11 +111,13 @@ export async function updateAvatar(formData: FormData) {
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
-                 const oldUrl = new URL(userData.avatarUrl);
-                 // Extract path after the bucket name
-                 const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
-                 if (oldPath) {
-                     await bucket.file(oldPath).delete();
+                 // Do not try to delete if it's a default picsum URL
+                 if (userData.avatarUrl.includes('storage.googleapis.com')) {
+                    const oldUrl = new URL(userData.avatarUrl);
+                    const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
+                    if (oldPath) {
+                        await bucket.file(oldPath).delete({ ignoreNotFound: true });
+                    }
                  }
             } catch (deleteError) {
                 console.error("Failed to delete old avatar, continuing...", deleteError);
