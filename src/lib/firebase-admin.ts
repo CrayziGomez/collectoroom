@@ -22,9 +22,12 @@ try {
     Buffer.from(serviceAccountString, 'base64').toString('utf8')
   );
 
+  const bucketName = `${serviceAccount.project_id}.appspot.com`;
+
   if (!getApps().length) {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
+      storageBucket: bucketName,
     });
   } else {
     adminApp = getApps()[0];
