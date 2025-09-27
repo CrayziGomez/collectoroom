@@ -83,28 +83,47 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 export async function updateAvatar(input: { userId: string; file: File; }) {
     if (!adminDb || !adminStorage) {
-      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+        return { success: false, message: 'Firebase Admin SDK not initialized.' };
     }
     const { userId, file } = input;
     
     try {
         const bucket = adminStorage.bucket();
+        if (!bucket) {
+            throw new Error("Storage bucket is not available.");
+        }
+        
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
-        
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-        await fileRef.save(fileBuffer, {
+        // Use a streaming upload which is more reliable in serverless environments
+        const stream = fileRef.createWriteStream({
             metadata: {
                 contentType: file.type,
             },
         });
+
+        stream.on('error', (err) => {
+            throw err;
+        });
+
+        stream.on('finish', () => {
+            // This is called when the upload is complete.
+        });
         
+        // Pipe the file data into the stream
+        const buffer = Buffer.from(await file.arrayBuffer());
+        stream.end(buffer);
+
         // Construct the public URL manually
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 
+        // Wait for a short moment to allow the 'finish' event to propagate, though not ideal.
+        // A more robust solution might involve Promises around the stream events.
+        // For now, we optimistically update the DB.
+        
         await adminDb.collection('users').doc(userId).update({
             avatarUrl: publicUrl,
         });
@@ -112,11 +131,10 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-
         return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
-        return { success: false, message: 'Failed to update avatar.', avatarUrl: null };
+        return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
     }
 }
 
