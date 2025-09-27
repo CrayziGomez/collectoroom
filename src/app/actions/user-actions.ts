@@ -88,7 +88,7 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     const { userId, file } = input;
     
     try {
-        const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
+        const bucketName = 'studio-7145415565-66e7d.appspot.com';
         const bucket = adminStorage.bucket(bucketName);
         
         const fileExtension = file.name.split('.').pop();
@@ -96,20 +96,10 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
         const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
 
-        // Correctly handle the upload stream with a Promise
-        await new Promise<void>((resolve, reject) => {
-            const stream = fileRef.createWriteStream({
-                metadata: {
-                    contentType: file.type,
-                },
-            });
-            stream.on('error', (err) => {
-                reject(err);
-            });
-            stream.on('finish', () => {
-                resolve();
-            });
-            file.arrayBuffer().then(ab => stream.end(Buffer.from(ab)));
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+        await fileRef.save(fileBuffer, {
+            metadata: { contentType: file.type },
         });
 
         // Get public URL using the public-facing format
@@ -145,38 +135,4 @@ export async function testAdminSdkWrite(input: { userId: string; }) {
         console.error('Admin SDK write test failed:', error);
         return { success: false, message: `Admin SDK write test failed: ${error.message}` };
     }
-}
-
-export async function testUpload(formData: FormData) {
-  if (!adminStorage) {
-    return { success: false, message: 'Firebase Admin SDK not initialized.' };
-  }
-  const file = formData.get('file') as File;
-  if (!file) {
-    return { success: false, message: 'No file provided for upload test.' };
-  }
-
-  try {
-    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-    const bucket = adminStorage.bucket(bucketName);
-    const filePath = `test-uploads/test-image-${Date.now()}.${file.name.split('.').pop()}`;
-    const fileRef = bucket.file(filePath);
-
-    await new Promise<void>((resolve, reject) => {
-      const stream = fileRef.createWriteStream({
-        metadata: {
-          contentType: file.type,
-        },
-      });
-      stream.on('error', (err) => reject(err));
-      stream.on('finish', () => resolve());
-      file.arrayBuffer().then((ab) => stream.end(Buffer.from(ab)));
-    });
-
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
-    return { success: true, message: `Test upload successful! File is at: ${publicUrl}` };
-  } catch (error: any) {
-    console.error('Test upload failed:', error);
-    return { success: false, message: `Test upload failed: ${error.message || 'Unknown error'}` };
-  }
 }

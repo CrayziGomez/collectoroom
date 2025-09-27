@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import Image from "next/image";
-import { updateAvatar as updateAvatarAction, testAdminSdkWrite, testUpload } from "@/app/actions/user-actions";
+import { updateAvatar as updateAvatarAction } from "@/app/actions/user-actions";
 
 export default function SettingsPage() {
     const { user, loading: authLoading } = useAuth();
@@ -34,12 +34,6 @@ export default function SettingsPage() {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
-    // Test state
-    const [isTesting, setIsTesting] = useState(false);
-    const [isUploadTesting, setIsUploadTesting] = useState(false);
-    const [testFile, setTestFile] = useState<File | null>(null);
-
 
     useEffect(() => {
         if (authLoading) return;
@@ -98,10 +92,6 @@ export default function SettingsPage() {
 
         setIsUploading(true);
         try {
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('file', avatarFile);
-            
             const result = await updateAvatarAction({ userId: user.uid, file: avatarFile });
 
             if (result.success && result.avatarUrl) {
@@ -115,45 +105,6 @@ export default function SettingsPage() {
             toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
         } finally {
             setIsUploading(false);
-        }
-    };
-
-    const handleTestWrite = async () => {
-        if (!user) return;
-        setIsTesting(true);
-        try {
-            const result = await testAdminSdkWrite({ userId: user.uid });
-            if (result.success) {
-                toast({ title: "Test Success", description: result.message });
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error: any) {
-             toast({ title: "Test Failed", description: error.message, variant: "destructive" });
-        } finally {
-            setIsTesting(false);
-        }
-    };
-
-    const handleTestUpload = async () => {
-        if (!testFile) {
-            toast({ title: 'No File', description: 'Please select a file to upload for the test.', variant: 'destructive' });
-            return;
-        }
-        setIsUploadTesting(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', testFile);
-            const result = await testUpload(formData);
-            if (result.success) {
-                toast({ title: "Test Upload Success", description: result.message, duration: 9000 });
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error: any) {
-             toast({ title: "Test Upload Failed", description: error.message, variant: "destructive", duration: 9000 });
-        } finally {
-            setIsUploadTesting(false);
         }
     };
 
@@ -234,35 +185,6 @@ export default function SettingsPage() {
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </Button>
-                    </CardContent>
-                </Card>
-
-                 {/* Diagnostic Card */}
-                <Card className="mt-6 border-destructive/50">
-                    <CardHeader>
-                        <CardTitle className="text-destructive">Diagnostic Tools</CardTitle>
-                        <CardDescription>Use these tools to help debug issues.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <Button variant="destructive" onClick={handleTestWrite} disabled={isTesting}>
-                                {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Test Admin SDK Write
-                            </Button>
-                            <p className="text-sm text-muted-foreground">Tests Firestore connectivity.</p>
-                        </div>
-                         <div className="flex items-center gap-4">
-                             <Input 
-                                id="test-upload-file"
-                                type="file"
-                                onChange={(e) => e.target.files && setTestFile(e.target.files[0])}
-                                className="max-w-xs"
-                            />
-                            <Button variant="destructive" onClick={handleTestUpload} disabled={isUploadTesting || !testFile}>
-                                {isUploadTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Run Storage Upload Test
-                            </Button>
-                         </div>
                     </CardContent>
                 </Card>
             </div>
