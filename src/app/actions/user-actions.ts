@@ -85,7 +85,7 @@ export async function updateAvatar(formData: FormData) {
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
 
-    if (!adminDb || !adminStorage) {
+    if (!adminStorage || !adminDb) {
       return { success: false, message: 'Firebase Admin SDK not initialized correctly.' };
     }
 
@@ -102,7 +102,6 @@ export async function updateAvatar(formData: FormData) {
         if (userData?.avatarUrl) {
             try {
                  const oldUrl = new URL(userData.avatarUrl);
-                 // Extract path from a URL like https://storage.googleapis.com/BUCKET_NAME/PATH_TO_OBJECT
                  const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
                  if (oldPath) {
                      await bucket.file(oldPath).delete();
@@ -120,7 +119,6 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        // Make the file public and construct the public URL
         await fileRef.makePublic();
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
         
