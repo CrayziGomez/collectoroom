@@ -26,7 +26,7 @@ function initializeAdmin() {
 
             adminApp = initializeApp({
                 credential: cert(serviceAccount),
-                storageBucket: `${serviceAccount.project_id}.appspot.com`,
+                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
             });
         } catch (e: any) {
             throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
@@ -66,7 +66,7 @@ export async function createCollection(formData: FormData) {
         const fileBuffer = Buffer.from(await coverImageFile.arrayBuffer());
         await fileRef.save(fileBuffer, { metadata: { contentType: coverImageFile.type } });
 
-        // Get public URL (you can also use signed URLs for more control)
+        // Get public URL using the public-facing format
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${imagePath}`;
 
         // 2. Create Collection Document in Firestore
@@ -80,7 +80,7 @@ export async function createCollection(formData: FormData) {
             coverImage: publicUrl,
             coverImageHint,
             cardCount: 0,
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(),
         });
         
         // 3. Revalidate paths
