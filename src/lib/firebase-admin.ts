@@ -1,7 +1,6 @@
 
 // This file is NOT a 'use server' file. It is a server-side utility module.
 // It is safe to run on the server because it is only imported by server actions.
-require('dotenv').config();
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
@@ -23,9 +22,9 @@ try {
     Buffer.from(serviceAccountString, 'base64').toString('utf8')
   );
 
-  const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!bucketName) {
-      throw new Error('FIREBASE_STORAGE_BUCKET environment variable is not set.');
+      throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
   }
 
   if (!getApps().length) {
