@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, app } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 
@@ -42,6 +42,7 @@ async function createUserDocument(user: FirebaseUser) {
             isAdmin: isAdmin,
             followerCount: 0,
             followingCount: 0,
+            avatarUrl: user.photoURL || '',
         };
 
         try {
@@ -52,6 +53,17 @@ async function createUserDocument(user: FirebaseUser) {
             // Clean up session storage
             sessionStorage.removeItem('pendingUsername');
             sessionStorage.removeItem('pendingTier');
+        }
+    } else {
+        // If user exists, ensure avatarUrl is synced from Firebase Auth
+        // This handles Google/other provider sign-ins where photoURL might be available
+        const existingData = docSnap.data();
+        if (user.photoURL && existingData.avatarUrl !== user.photoURL) {
+            try {
+                await updateDoc(userDocRef, { avatarUrl: user.photoURL });
+            } catch (error) {
+                console.error("Error syncing avatar on login:", error);
+            }
         }
     }
 }
@@ -76,7 +88,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       setLoading(true);
 
       if (firebaseUser) {
-        // Create user document if it doesn't exist. This is idempotent.
+        // Create or update user document. This is idempotent.
         await createUserDocument(firebaseUser);
         
         const userDocRef = doc(db, 'users', firebaseUser.uid);

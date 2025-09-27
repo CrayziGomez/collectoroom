@@ -4,10 +4,14 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore, FieldValue } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
+import { revalidatePath } from 'next/cache';
+
 
 let adminApp: App;
 let adminAuth: Auth;
 let adminDb: Firestore;
+let adminStorage: Storage;
 
 function initializeAdmin() {
   if (getApps().length > 0) {
@@ -28,6 +32,7 @@ function initializeAdmin() {
 
       adminApp = initializeApp({
         credential: cert(serviceAccount),
+        storageBucket: `${serviceAccount.project_id}.appspot.com`,
       });
 
     } catch (e: any) {
@@ -38,6 +43,7 @@ function initializeAdmin() {
 
   adminAuth = getAuth(adminApp);
   adminDb = getFirestore(adminApp);
+  adminStorage = getStorage(adminApp);
 }
 
 
@@ -110,5 +116,43 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
     } catch (error: any) {
       console.error('Transaction failed:', error);
       throw new Error(`Failed to toggle follow state: ${error.message}`);
+    }
+}
+
+
+export async function updateAvatar(input: { userId: string; file: File; }) {
+    const { userId, file } = input;
+    if (!adminApp) initializeAdmin();
+    
+    try {
+        const filePath = `users/${userId}/profile/${Date.now()}-${file.name}`;
+        const bucket = adminStorage.bucket();
+        const fileRef = bucket.file(filePath);
+        
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+        await fileRef.save(fileBuffer, {
+            metadata: {
+                contentType: file.type,
+            },
+        });
+
+        const [publicUrl] = await fileRef.getSignedUrl({
+            action: 'read',
+            expires: '03-09-2491', // Far-future expiration date
+        });
+
+        await adminDb.collection('users').doc(userId).update({
+            avatarUrl: publicUrl,
+        });
+
+        // Revalidate user-related paths if needed
+        revalidatePath('/my-collectoroom');
+        revalidatePath('/my-collectoroom/settings');
+
+        return { success: true, avatarUrl: publicUrl };
+    } catch (error: any) {
+        console.error('Error updating avatar:', error);
+        return { success: false, message: 'Failed to update avatar.', avatarUrl: null };
     }
 }

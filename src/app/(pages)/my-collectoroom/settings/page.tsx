@@ -7,13 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import Image from "next/image";
+import { updateAvatar as updateAvatarAction } from "@/app/actions/user-actions";
 
 export default function SettingsPage() {
     const { user, loading: authLoading } = useAuth();
@@ -22,6 +27,14 @@ export default function SettingsPage() {
 
     const [username, setUsername] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Avatar Upload State
+    const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
 
     useEffect(() => {
         if (authLoading) return;
@@ -53,7 +66,7 @@ export default function SettingsPage() {
                 title: "Success!",
                 description: "Your profile has been updated.",
             });
-            router.push('/my-collectoroom');
+            // No need to push, stay on page
         } catch (error: any) {
             console.error("Error updating profile:", error);
             toast({
@@ -65,6 +78,37 @@ export default function SettingsPage() {
             setIsSaving(false);
         }
     };
+    
+    const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAvatarFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setAvatarPreview(previewUrl);
+        }
+    };
+
+    const handleAvatarUpload = async () => {
+        if (!user || !avatarFile) return;
+
+        setIsUploading(true);
+        try {
+            const result = await updateAvatarAction({ userId: user.uid, file: avatarFile });
+
+            if (result.success && result.avatarUrl) {
+                toast({ title: "Avatar Updated!", description: "Your new profile picture has been saved." });
+                setAvatarPreview(result.avatarUrl); // Update preview to final URL
+                setIsAvatarDialogOpen(false);
+            } else {
+                throw new Error(result.message || 'Upload failed');
+            }
+        } catch (error: any) {
+            toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
 
     if (authLoading || !user) {
         return (
@@ -75,6 +119,7 @@ export default function SettingsPage() {
     }
 
     return (
+        <>
         <div className="container py-8">
             <div className="max-w-2xl mx-auto">
                 <div className="mb-4">
@@ -91,20 +136,33 @@ export default function SettingsPage() {
                         <CardDescription>Update your username and view your profile details here.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
-                        <div className="grid gap-2">
+                        <div className="grid gap-4 grid-cols-[auto,1fr] items-center">
+                            <div className="relative">
+                                <Avatar className="h-20 w-20">
+                                    <AvatarImage src={user.avatarUrl || ''} alt={user.username} />
+                                    <AvatarFallback className="text-3xl">{user.username?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <Button size="icon" variant="secondary" className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full" onClick={() => setIsAvatarDialogOpen(true)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="username">Username</Label>
+                                <Input
+                                    id="username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    disabled={isSaving}
+                                />
+                            </div>
+                        </div>
+
+                         <div className="grid gap-2">
                             <Label htmlFor="email">Email</Label>
                             <Input id="email" type="email" value={user.email} disabled />
                             <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="username">Username</Label>
-                            <Input
-                                id="username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                disabled={isSaving}
-                            />
-                        </div>
+                       
                          <div className="flex gap-4 text-sm">
                             <Link href="/my-collectoroom/connections" className="hover:underline">
                                 <span className="font-bold text-foreground">{user.followerCount || 0}</span>
@@ -132,5 +190,46 @@ export default function SettingsPage() {
                 </Card>
             </div>
         </div>
+        
+        {/* Avatar Upload Dialog */}
+        <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Change Profile Picture</DialogTitle>
+                    <DialogDescription>
+                        Upload a new image to use as your avatar. Square images work best.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                     <div 
+                        className="relative mx-auto w-48 h-48 border-2 border-dashed border-muted-foreground rounded-full flex items-center justify-center text-center cursor-pointer hover:bg-muted"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        {avatarPreview ? (
+                            <Image src={avatarPreview} alt="Avatar preview" layout="fill" className="rounded-full object-cover" />
+                        ) : user.avatarUrl ? (
+                             <Image src={user.avatarUrl} alt="Current avatar" layout="fill" className="rounded-full object-cover" />
+                        ) : (
+                            <span className="text-sm text-muted-foreground">Click to upload</span>
+                        )}
+                    </div>
+                    <Input 
+                        ref={fileInputRef}
+                        type="file" 
+                        className="hidden" 
+                        accept="image/png, image/jpeg, image/webp" 
+                        onChange={handleAvatarSelect}
+                    />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleAvatarUpload} disabled={isUploading || !avatarFile}>
+                    {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Upload & Save
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }
