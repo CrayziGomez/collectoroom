@@ -1,46 +1,13 @@
 
 'use server';
 
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { getStorage, Storage } from 'firebase-admin/storage';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
-
-// --- Initialize Firebase Admin ---
-let adminApp: App;
-let adminDb: Firestore;
-let adminStorage: Storage;
-
-function initializeAdmin() {
-    if (getApps().length > 0) {
-        adminApp = getApps()[0];
-    } else {
-        try {
-            const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-            if (!serviceAccountString) {
-                throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-            }
-             const serviceAccount = JSON.parse(
-                Buffer.from(serviceAccountString, 'base64').toString('utf8')
-            );
-
-            adminApp = initializeApp({
-                credential: cert(serviceAccount),
-                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-            });
-        } catch (e: any) {
-            throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
-        }
-    }
-    adminDb = getFirestore(adminApp);
-    adminStorage = getStorage(adminApp);
-}
 
 
 // --- Server Action to Create a Collection ---
 export async function createCollection(formData: FormData) {
-    if (!adminApp) initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;

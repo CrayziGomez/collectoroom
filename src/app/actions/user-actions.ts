@@ -1,52 +1,12 @@
 
 'use server';
 
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getAuth, Auth } from 'firebase-admin/auth';
-import { getFirestore, Firestore, FieldValue } from 'firebase-admin/firestore';
-import { getStorage, Storage } from 'firebase-admin/storage';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
-
-
-let adminApp: App;
-let adminAuth: Auth;
-let adminDb: Firestore;
-let adminStorage: Storage;
-
-function initializeAdmin() {
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-  } else {
-     try {
-      const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-      if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
-      }
-      
-      const serviceAccount = JSON.parse(
-        Buffer.from(serviceAccountString, 'base64').toString('utf8')
-      );
-
-      adminApp = initializeApp({
-        credential: cert(serviceAccount),
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      });
-
-    } catch (e: any) {
-      console.error('Firebase Admin SDK initialization failed.', e);
-      throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
-    }
-  }
-
-  adminAuth = getAuth(adminApp);
-  adminDb = getFirestore(adminApp);
-  adminStorage = getStorage(adminApp);
-}
-
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
     const { targetUserId, currentUserId } = input;
-    if (!adminApp) initializeAdmin();
 
     if (currentUserId === targetUserId) {
       throw new Error('Users cannot follow themselves.');
@@ -119,7 +79,6 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 export async function updateAvatar(input: { userId: string; file: File; }) {
     const { userId, file } = input;
-    if (!adminApp) initializeAdmin();
     
     try {
         const bucket = adminStorage.bucket();
@@ -154,7 +113,6 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
 
 export async function testAdminSdkWrite(input: { userId: string; }) {
     const { userId } = input;
-    if (!adminApp) initializeAdmin();
 
     try {
         const userDocRef = adminDb.collection('users').doc(userId);
