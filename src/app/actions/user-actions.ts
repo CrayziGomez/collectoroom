@@ -88,7 +88,7 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     const { userId, file } = input;
     
     try {
-        const bucket = adminStorage.bucket();
+        const bucket = adminStorage.bucket('studio-7145415565-66e7d.firebasestorage.app');
         if (!bucket) {
             throw new Error("Storage bucket is not available.");
         }

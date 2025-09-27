@@ -1,3 +1,6 @@
+
+'use server';
+
 // This file is NOT a 'use server' file. It is a server-side utility module.
 // It is safe to run on the server because it is only imported by server actions.
 require('dotenv').config();
@@ -22,15 +25,9 @@ try {
     Buffer.from(serviceAccountString, 'base64').toString('utf8')
   );
 
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
-   if (!storageBucket) {
-    throw new Error('FIREBASE_STORAGE_BUCKET environment variable is not set.');
-  }
-
   if (!getApps().length) {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: storageBucket,
     });
   } else {
     adminApp = getApps()[0];
