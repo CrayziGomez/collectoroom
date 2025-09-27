@@ -1,10 +1,12 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
+import { getStorage } from 'firebase-admin/storage';
+
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
     if (!adminDb) {
@@ -82,14 +84,16 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(input: { userId: string; file: File; }) {
-    if (!adminDb || !adminStorage) {
+    const { userId, file } = input;
+    const bucketName = 'studio-7145415565-66e7d.firebasestorage.app'; // Explicitly use the correct bucket name
+
+    if (!adminDb) {
         return { success: false, message: 'Firebase Admin SDK not initialized.' };
     }
-    const { userId, file } = input;
     
     try {
-        const bucketName = 'studio-7145415565-66e7d.appspot.com';
-        const bucket = adminStorage.bucket(bucketName);
+        const storage = getStorage(); // Get a fresh storage instance
+        const bucket = storage.bucket(bucketName); // Explicitly get the bucket
         
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
@@ -98,11 +102,15 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
 
         const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-        await fileRef.save(fileBuffer, {
-            metadata: { contentType: file.type },
+        await new Promise((resolve, reject) => {
+            const stream = fileRef.createWriteStream({
+                metadata: { contentType: file.type },
+            });
+            stream.on('finish', resolve);
+            stream.on('error', reject);
+            stream.end(fileBuffer);
         });
-
-        // Get public URL using the public-facing format
+        
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
         
         await adminDb.collection('users').doc(userId).update({
