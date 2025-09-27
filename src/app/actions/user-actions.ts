@@ -101,11 +101,12 @@ export async function updateAvatar(formData: FormData) {
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
-                const oldUrl = new URL(userData.avatarUrl);
-                const oldPath = decodeURIComponent(oldUrl.pathname.split('/o/')[1].split('?')[0]);
-                if (oldPath) {
-                    await bucket.file(oldPath).delete();
-                }
+                 const oldUrl = new URL(userData.avatarUrl);
+                 // Extract path from a URL like https://storage.googleapis.com/BUCKET_NAME/PATH_TO_OBJECT
+                 const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
+                 if (oldPath) {
+                     await bucket.file(oldPath).delete();
+                 }
             } catch (deleteError) {
                 console.error("Failed to delete old avatar, continuing...", deleteError);
             }
@@ -119,19 +120,18 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        const [signedUrl] = await fileRef.getSignedUrl({
-            action: 'read',
-            expires: '01-01-2100',
-        });
+        // Make the file public and construct the public URL
+        await fileRef.makePublic();
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
         
         await userDocRef.update({
-            avatarUrl: signedUrl,
+            avatarUrl: publicUrl,
         });
 
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
+        return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
