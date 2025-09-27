@@ -6,7 +6,7 @@ import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/badge';
 import { usePathname } from 'next/navigation';
@@ -47,8 +47,8 @@ export function Header() {
       return;
     }
 
-    let unsubscribeChats: () => void;
-    let unsubscribeNotifications: () => void;
+    let unsubscribeChats: Unsubscribe = () => {};
+    let unsubscribeNotifications: Unsubscribe = () => {};
 
     try {
       const chatsQuery = query(
@@ -78,12 +78,8 @@ export function Header() {
     }
 
     return () => {
-      if (unsubscribeChats) {
-        unsubscribeChats();
-      }
-      if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-      }
+      unsubscribeChats();
+      unsubscribeNotifications();
     };
   }, [user, loading]);
   
