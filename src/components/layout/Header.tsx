@@ -47,33 +47,43 @@ export function Header() {
       return;
     }
 
-    const chatsQuery = query(
-      collection(db, 'chats'),
-      where('participantIds', 'array-contains', user.uid),
-      where(`unreadCount.${user.uid}`, '>', 0)
-    );
+    let unsubscribeChats: () => void;
+    let unsubscribeNotifications: () => void;
 
-    const unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
-      setUnreadChatsCount(querySnapshot.size);
-    }, (error) => {
-      console.error("Error fetching unread chats count:", error);
-    });
-    
-    const notificationsQuery = query(
-      collection(db, 'notifications'),
-      where('recipientId', '==', user.uid),
-      where('isRead', '==', false)
-    );
+    try {
+      const chatsQuery = query(
+        collection(db, 'chats'),
+        where('participantIds', 'array-contains', user.uid),
+        where(`unreadCount.${user.uid}`, '>', 0)
+      );
+      unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
+        setUnreadChatsCount(querySnapshot.size);
+      }, (error) => {
+        console.error("Error fetching unread chats count:", error);
+      });
+      
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('recipientId', '==', user.uid),
+        where('isRead', '==', false)
+      );
+      unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
+        setUnreadNotificationsCount(querySnapshot.size);
+      }, (error) => {
+        console.error("Error fetching unread notifications count:", error);
+      });
 
-    const unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
-      setUnreadNotificationsCount(querySnapshot.size);
-    }, (error) => {
-      console.error("Error fetching unread notifications count:", error);
-    });
+    } catch (error) {
+      console.error("Error setting up listeners:", error);
+    }
 
     return () => {
-      unsubscribeChats();
-      unsubscribeNotifications();
+      if (unsubscribeChats) {
+        unsubscribeChats();
+      }
+      if (unsubscribeNotifications) {
+        unsubscribeNotifications();
+      }
     };
   }, [user, loading]);
   
