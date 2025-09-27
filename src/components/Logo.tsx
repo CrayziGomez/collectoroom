@@ -10,7 +10,6 @@ export function Logo() {
         alt="CollectoRoom Logo" 
         width={32} 
         height={32} 
-        className="h-8 w-8"
       />
       <span className="text-[25px] font-bold tracking-tight">
         <span className="text-primary">Collecto</span>
