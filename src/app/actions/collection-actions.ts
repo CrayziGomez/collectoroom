@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '../../lib/firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
 
