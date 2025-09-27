@@ -20,7 +20,7 @@ function initializeAdmin() {
      try {
       const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
       if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
       }
       
       const serviceAccount = JSON.parse(
@@ -29,7 +29,7 @@ function initializeAdmin() {
 
       adminApp = initializeApp({
         credential: cert(serviceAccount),
-        storageBucket: `${serviceAccount.project_id}.appspot.com`,
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
 
     } catch (e: any) {
@@ -133,11 +133,9 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
                 contentType: file.type,
             },
         });
-
-        const [publicUrl] = await fileRef.getSignedUrl({
-            action: 'read',
-            expires: '03-09-2491', // Far-future expiration date
-        });
+        
+        // Construct the public URL manually. This is the standard GCS public URL format.
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 
         await adminDb.collection('users').doc(userId).update({
             avatarUrl: publicUrl,
