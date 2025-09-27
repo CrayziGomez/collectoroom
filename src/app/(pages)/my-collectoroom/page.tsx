@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import type { Collection } from '@/lib/types';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -45,7 +45,7 @@ export default function MyCollectoRoomPage() {
     }
 
     setCollectionsLoading(true);
-    const q = query(collection(db, 'collections'), where('userId', '==', user.uid));
+    const q = query(collection(db, 'collections'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const collectionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Collection);

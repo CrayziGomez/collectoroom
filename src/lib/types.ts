@@ -44,6 +44,7 @@ export interface Collection {
   coverImage: string;
   coverImageHint: string;
   keywords?: string;
+  createdAt: string;
 }
 
 export interface Card {
@@ -67,7 +68,7 @@ export interface Chat {
         timestamp: any;
     };
     unreadCount?: {
-        [key: string]: number;
+        [key:string]: number;
     };
 }
 
@@ -92,7 +93,7 @@ export interface Notification {
   recipientId: string;
   senderId: string;
   senderName: string;
-  type: 'NEW_COLLECTION';
+  type: 'NEW_FOLLOWER' | 'NEW_COLLECTION';
   message: string;
   link: string;
   isRead: boolean;
