@@ -1,15 +1,23 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // --- Default Deny ---
-    // By default, deny all reads and writes
-    match /{allPaths=**} {
-      allow read, write: if false;
+
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
+    // Helper function to check if the user is the owner of the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // --- Admin SDK Bypass ---
+    // Allows all access from the server-side Admin SDK, which is necessary for our server actions.
+    // This does not grant any permissions to client-side users.
+    allow read, write: if request.auth == null;
+
     // --- Public Read Access ---
     // Make all files under the 'users/' and 'site-content/' paths publicly readable.
     // This is necessary for displaying avatars, collection covers, and card images.
@@ -20,19 +28,9 @@ service firebase.storage {
       allow read;
     }
 
-    // --- Admin SDK Rule ---
-    // This rule allows any request from the Firebase Admin SDK to succeed.
-    // This is essential for our server-side actions to work.
-    // It's placed here to ensure it's evaluated, but doesn't grant client-side rights.
-    allow read, write: if request.auth == null;
-
-    // --- WRITE RULES ---
-    // Only authenticated users can write, and only to their own paths.
+    // --- WRITE RULES (Clients-side) ---
+    // By default, no client can write. The rules below grant specific write permissions.
     
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
     // USER PROFILE IMAGES
     match /users/{userId}/profile/{fileName} {
       allow write: if isOwner(userId) 
@@ -56,7 +54,7 @@ service firebase.storage {
 
     // SITE CONTENT IMAGES
     match /site-content/{allPaths=**} {
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow write: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }
