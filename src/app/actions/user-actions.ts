@@ -4,6 +4,7 @@
 import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
     if (!adminDb) {
@@ -88,7 +89,9 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
     
     try {
         const bucket = adminStorage.bucket();
-        const filePath = `users/${userId}/profile/${Date.now()}-${file.name}`;
+        const fileExtension = file.name.split('.').pop();
+        const fileName = `${uuidv4()}.${fileExtension}`;
+        const filePath = `users/${userId}/profile/${fileName}`;
         const fileRef = bucket.file(filePath);
         
         const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -99,16 +102,18 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
             },
         });
         
+        // Construct the public URL manually
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 
         await adminDb.collection('users').doc(userId).update({
             avatarUrl: publicUrl,
         });
 
-        revalidatePath('/my-collectoroom');
         revalidatePath('/my-collectoroom/settings');
+        revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: publicUrl };
+
+        return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: 'Failed to update avatar.', avatarUrl: null };
