@@ -109,12 +109,15 @@ export async function updateAvatar(formData: FormData) {
                 // Extract the file path from the URL
                 const url = new URL(oldAvatarUrl);
                 // The pathname will be something like /v0/b/bucket-name/o/path%2Fto%2Ffile.jpg
+                // We need to extract the actual file path after the /o/ and before the ?token
                 const decodedPath = decodeURIComponent(url.pathname);
-                // We need to extract the actual file path after the /o/
-                const filePath = decodedPath.substring(decodedPath.indexOf('/o/') + 3);
+                const pathParts = decodedPath.split('/o/');
                 
-                if (filePath) {
-                     await bucket.file(filePath).delete();
+                if (pathParts.length > 1) {
+                     const filePath = pathParts[1];
+                     if (filePath) {
+                        await bucket.file(filePath).delete();
+                     }
                 }
              } catch(deleteError) {
                 console.error("Failed to delete old avatar:", deleteError);
