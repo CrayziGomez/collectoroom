@@ -47,20 +47,16 @@ export function Header() {
       return;
     }
 
-    let unsubscribeChats: (() => void) | null = null;
-    let unsubscribeNotifications: (() => void) | null = null;
-
     const chatsQuery = query(
       collection(db, 'chats'),
       where('participantIds', 'array-contains', user.uid),
       where(`unreadCount.${user.uid}`, '>', 0)
     );
 
-    unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
+    const unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
       setUnreadChatsCount(querySnapshot.size);
     }, (error) => {
       console.error("Error fetching unread chats count:", error);
-      // setUnreadChatsCount(0);
     });
     
     const notificationsQuery = query(
@@ -69,21 +65,16 @@ export function Header() {
       where('isRead', '==', false)
     );
 
-    unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
       setUnreadNotificationsCount(querySnapshot.size);
     }, (error) => {
       console.error("Error fetching unread notifications count:", error);
-      setUnreadNotificationsCount(0);
     });
 
     return () => {
-      if (unsubscribeChats) {
-        unsubscribeChats();
-      }
-      if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-      }
-    }
+      unsubscribeChats();
+      unsubscribeNotifications();
+    };
   }, [user, loading]);
   
   const totalUnread = unreadChatsCount + unreadNotificationsCount;

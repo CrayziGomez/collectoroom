@@ -1,12 +1,17 @@
+
 import Link from 'next/link';
-import { Layers3 } from 'lucide-react';
+import Image from 'next/image';
 
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2" aria-label="CollectoRoom Home">
-      <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
-        <Layers3 className="h-5 w-5" />
-      </div>
+      <Image 
+        src="/images/logo.svg" 
+        alt="CollectoRoom Logo" 
+        width={32} 
+        height={32} 
+        className="h-8 w-8"
+      />
       <span className="text-[25px] font-bold tracking-tight">
         <span className="text-primary">Collecto</span>
         <span className="text-accent">Room</span>
