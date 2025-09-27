@@ -94,8 +94,8 @@ export async function updateAvatar(formData: FormData) {
           throw new Error('Firebase Admin SDK not initialized correctly.');
         }
         
-        // Explicitly define the correct bucket name from user-provided config.
-        const bucketName = 'studio-7145415565-66e7d.appspot.com';
+        // Explicitly define the correct bucket name from the user-provided config.
+        const bucketName = 'studio-7145415565-66e7d.firebasestorage.app';
         const bucket = adminStorage.bucket(bucketName);
         
         const userDocRef = adminDb.collection('users').doc(userId);
