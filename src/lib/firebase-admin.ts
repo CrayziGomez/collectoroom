@@ -7,40 +7,55 @@ import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getStorage, Storage } from 'firebase-admin/storage';
 
-let adminApp: App;
-let adminAuth: Auth;
-let adminDb: Firestore;
-let adminStorage: Storage;
-
-try {
-    if (!getApps().length) {
-        const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-        if (!serviceAccountString) {
-            throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-        }
-        
-        const serviceAccount = JSON.parse(
-            Buffer.from(serviceAccountString, 'base64').toString('utf8')
-        );
-
-        const bucketName = `${serviceAccount.project_id}.appspot.com`;
-
-        adminApp = initializeApp({
-            credential: cert(serviceAccount),
-            storageBucket: bucketName,
-        });
-    } else {
-        adminApp = getApps()[0];
-    }
-    
-    adminAuth = getAuth(adminApp);
-    adminDb = getFirestore(adminApp);
-    adminStorage = getStorage(adminApp);
-
-} catch (e: any) {
-  console.error('Firebase Admin SDK initialization failed.', e);
-  // Re-throw the error to make it clear that initialization failed
-  throw new Error(`Firebase Admin SDK initialization failed: ${e.message}`);
+// Define a type for our singleton object
+interface FirebaseAdminSingleton {
+  app: App;
+  auth: Auth;
+  db: Firestore;
+  storage: Storage;
 }
+
+// This function ensures we initialize the app only once
+function initializeAdminApp(): FirebaseAdminSingleton {
+  if (getApps().length > 0) {
+    const existingApp = getApps()[0];
+    return {
+      app: existingApp,
+      auth: getAuth(existingApp),
+      db: getFirestore(existingApp),
+      storage: getStorage(existingApp),
+    };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+
+  try {
+    const serviceAccount = JSON.parse(
+      Buffer.from(serviceAccountString, 'base64').toString('utf8')
+    );
+
+    const bucketName = `${serviceAccount.project_id}.appspot.com`;
+
+    const newApp = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: bucketName,
+    });
+
+    return {
+      app: newApp,
+      auth: getAuth(newApp),
+      db: getFirestore(newApp),
+      storage: getStorage(newApp),
+    };
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization failed.', error);
+    throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
+  }
+}
+
+const { app: adminApp, auth: adminAuth, db: adminDb, storage: adminStorage } = initializeAdminApp();
 
 export { adminApp, adminAuth, adminDb, adminStorage };

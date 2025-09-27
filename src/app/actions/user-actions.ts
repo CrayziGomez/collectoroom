@@ -97,11 +97,13 @@ export async function updateAvatar(formData: FormData) {
         const bucket = adminStorage.bucket();
         const userDocRef = adminDb.collection('users').doc(userId);
 
+        // Delete old avatar if it exists
         const userDoc = await userDocRef.get();
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
                  const oldUrl = new URL(userData.avatarUrl);
+                 // Extract path after the bucket name
                  const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/', 1) + 1));
                  if (oldPath) {
                      await bucket.file(oldPath).delete();
@@ -111,6 +113,7 @@ export async function updateAvatar(formData: FormData) {
             }
         }
 
+        // Upload new avatar
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = `users/${userId}/profile/${fileName}`;
@@ -119,17 +122,21 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        await fileRef.makePublic();
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+        // Generate a long-lived signed URL
+        const [signedUrl] = await fileRef.getSignedUrl({
+          action: 'read',
+          expires: '01-01-2100', // Set a very distant expiration date
+        });
         
+        // Save the signed URL to Firestore
         await userDocRef.update({
-            avatarUrl: publicUrl,
+            avatarUrl: signedUrl,
         });
 
         revalidatePath('/my-collectoroom/settings');
         revalidatePath('/my-collectoroom');
 
-        return { success: true, avatarUrl: publicUrl, message: 'Avatar updated successfully' };
+        return { success: true, avatarUrl: signedUrl, message: 'Avatar updated successfully' };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
         return { success: false, message: error.message || 'Failed to update avatar.', avatarUrl: null };
