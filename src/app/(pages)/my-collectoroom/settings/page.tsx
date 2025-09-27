@@ -36,12 +36,6 @@ export default function SettingsPage() {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    // --- Test State ---
-    const [testImageUrl, setTestImageUrl] = useState<string | null>(null);
-    const [testMessage, setTestMessage] = useState<string>('');
-    // --- End Test State ---
-
-
     useEffect(() => {
         if (authLoading) return;
         if (!user) {
@@ -104,9 +98,6 @@ export default function SettingsPage() {
         if (!user || !avatarFile) return;
 
         setIsUploading(true);
-        // Clear previous test results
-        setTestMessage('');
-        setTestImageUrl(null);
         try {
             const formData = new FormData();
             formData.append('userId', user.uid);
@@ -119,11 +110,6 @@ export default function SettingsPage() {
                 toast({ title: "Avatar Updated!", description: successMsg });
                 updateUser({ avatarUrl: result.avatarUrl }); // Immediately update client-side user state
                 
-                // --- Update Test State ---
-                setTestMessage(successMsg + ` (URL: ${result.avatarUrl})`);
-                setTestImageUrl(result.avatarUrl);
-                // --- End Update Test State ---
-                
                 setIsAvatarDialogOpen(false);
                 setAvatarFile(null);
                 setAvatarPreview(null);
@@ -133,7 +119,6 @@ export default function SettingsPage() {
         } catch (error: any) {
             const errorMsg = error.message || "An unknown error occurred.";
             toast({ title: "Upload Failed", description: errorMsg, variant: "destructive" });
-            setTestMessage(`Upload Failed: ${errorMsg}`);
         } finally {
             setIsUploading(false);
         }
@@ -216,34 +201,6 @@ export default function SettingsPage() {
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </Button>
-                    </CardContent>
-                </Card>
-                 {/* --- Diagnostic Test Card --- */}
-                <Card className="mt-6">
-                    <CardHeader>
-                        <CardTitle>Diagnostic Test Area</CardTitle>
-                        <CardDescription>This area shows the results of the latest avatar upload attempt.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 text-sm">
-                        <div>
-                            <Label className="font-bold">Last Action Result:</Label>
-                            <p className="mt-1 p-2 bg-muted rounded-md break-words">{testMessage || 'No test run yet.'}</p>
-                        </div>
-                        <div>
-                            <Label className="font-bold">Client-side user.avatarUrl:</Label>
-                            <p className="mt-1 p-2 bg-muted rounded-md break-words">{user?.avatarUrl || 'Not set'}</p>
-                        </div>
-                        <div>
-                            <Label className="font-bold">Direct Image Render Test:</Label>
-                            {testImageUrl ? (
-                                <div>
-                                    <p className="text-xs text-muted-foreground break-words mb-2">Attempting to render: {testImageUrl}</p>
-                                    <img src={testImageUrl} alt="Direct render test" className="w-24 h-24 border rounded-md" />
-                                </div>
-                            ) : (
-                                <p className="mt-1 text-muted-foreground">No image URL to test.</p>
-                            )}
-                        </div>
                     </CardContent>
                 </Card>
             </div>
