@@ -2,8 +2,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db, app } from '@/lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
+import { db, app } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
@@ -83,6 +83,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!firebaseInitialized) return;
 
+    const auth = getAuth(app);
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       let unsubscribeDoc: (() => void) | null = null;
       setLoading(true);
