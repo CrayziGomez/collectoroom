@@ -22,15 +22,15 @@ try {
     Buffer.from(serviceAccountString, 'base64').toString('utf8')
   );
 
-  const storageBucketUri = process.env.FIREBASE_STORAGE_BUCKET_GS_URI;
-   if (!storageBucketUri) {
-    throw new Error('FIREBASE_STORAGE_BUCKET_GS_URI environment variable is not set.');
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+   if (!storageBucket) {
+    throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
   }
 
   if (!getApps().length) {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: storageBucketUri.replace('gs://', ''), // Use the correct bucket name, removing gs://
+      storageBucket: storageBucket,
     });
   } else {
     adminApp = getApps()[0];
