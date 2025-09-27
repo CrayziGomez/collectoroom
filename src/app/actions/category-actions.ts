@@ -1,12 +1,15 @@
 
 'use server';
 
-import { adminDb } from '../../lib/firebase-admin';
+import { adminDb } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 
 
 export async function addCategory(input: { name: string; description: string }) {
+  if (!adminDb) {
+      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+  }
   try {
     const { name, description } = input;
 

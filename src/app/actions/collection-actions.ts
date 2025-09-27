@@ -1,13 +1,16 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '../../lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
 
 
 // --- Server Action to Create a Collection ---
 export async function createCollection(formData: FormData) {
+    if (!adminDb || !adminStorage) {
+      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+    }
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;

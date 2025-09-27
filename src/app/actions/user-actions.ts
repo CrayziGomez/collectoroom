@@ -1,11 +1,14 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '../../lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
+    if (!adminDb) {
+      throw new Error('Firebase Admin SDK not initialized.');
+    }
     const { targetUserId, currentUserId } = input;
 
     if (currentUserId === targetUserId) {
@@ -78,6 +81,9 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(input: { userId: string; file: File; }) {
+    if (!adminDb || !adminStorage) {
+      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+    }
     const { userId, file } = input;
     
     try {
@@ -93,14 +99,12 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
             },
         });
         
-        // Construct the public URL manually. This is the standard GCS public URL format.
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 
         await adminDb.collection('users').doc(userId).update({
             avatarUrl: publicUrl,
         });
 
-        // Revalidate user-related paths if needed
         revalidatePath('/my-collectoroom');
         revalidatePath('/my-collectoroom/settings');
 
@@ -112,6 +116,9 @@ export async function updateAvatar(input: { userId: string; file: File; }) {
 }
 
 export async function testAdminSdkWrite(input: { userId: string; }) {
+    if (!adminDb) {
+      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+    }
     const { userId } = input;
 
     try {

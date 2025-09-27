@@ -26,10 +26,10 @@ import { Skeleton } from './ui/skeleton';
 
 export function UserNav() {
   const { user, loading } = useAuth();
-  const auth = getAuth(app);
   const router = useRouter();
 
   const handleLogout = async () => {
+    const auth = getAuth(app);
     await signOut(auth);
     router.push('/');
   };

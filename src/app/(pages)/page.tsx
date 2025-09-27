@@ -21,8 +21,6 @@ import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
 import { collection, getDocs } from 'firebase/firestore';
 
 
-const storage = getStorage(app);
-
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -125,6 +123,7 @@ export default function HomePage() {
     setIsSavingImage(true);
 
     try {
+      const storage = getStorage(app);
       const storageRef = ref(storage, `site-content/homePage-hero-${Date.now()}`);
       const uploadResult = await uploadBytes(storageRef, imageFile);
       const downloadURL = await getDownloadURL(uploadResult.ref);
@@ -365,3 +364,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    
