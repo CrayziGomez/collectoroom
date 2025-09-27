@@ -1,64 +1,18 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Helper function to check if the user is the owner of the resource
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // --- Admin SDK Rule ---
-    // This rule allows any request from the Firebase Admin SDK (where auth is null) to succeed.
-    // It is crucial for server-side operations like the avatar upload.
-    // It does not grant any client-side users additional permissions.
-    allow read, write: if request.auth == null;
-
-    // --- Client-Side Rules Start Here ---
-
-    // PUBLIC READ RULE
-    // Anyone can view any file. This is necessary for a public gallery.
-    match /{allPaths=**} {
+    // Profile pictures are publicly readable, but only the user can write to their own.
+    match /users/{userId}/profile/{allPaths=**} {
       allow read;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // USER PROFILE IMAGES
-    // A user can only write to their own profile folder.
-    // The uploaded file must be an image and under 2MB.
-    match /users/{userId}/profile/{fileName} {
-      allow write: if isOwner(userId) 
-                    && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('image/.*');
-    }
-    
-    // COLLECTION COVER IMAGES
-    // A user can only write to a collection folder under their own user ID.
-    // The file must be an image and under 5MB.
-    match /users/{userId}/collections/{collectionId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-    
-    // CARD IMAGES
-    // A user can only write to a card folder under their own user ID.
-    // The file must be an image and under 5MB.
-     match /users/{userId}/cards/{cardId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-
-    // --- SITE CONTENT IMAGES ---
-    // Allow admins to upload images for site content (like the homepage hero).
-    match /site-content/{allPaths=**} {
-      allow write: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // Default rule: All other files are private and require authentication.
+    // This rule is less specific, so the profile picture rule above will be checked first.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
