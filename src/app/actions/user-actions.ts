@@ -1,12 +1,10 @@
 
 'use server';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { getStorage } from 'firebase-admin/storage';
-
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
     if (!adminDb) {
@@ -87,8 +85,8 @@ export async function updateAvatar(formData: FormData) {
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
 
-    if (!adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+    if (!adminDb || !adminStorage) {
+      return { success: false, message: 'Firebase Admin SDK not initialized correctly.' };
     }
 
     if (!userId || !file) {
@@ -96,7 +94,7 @@ export async function updateAvatar(formData: FormData) {
     }
     
     try {
-        const bucket = getStorage().bucket(); // Get default bucket
+        const bucket = adminStorage.bucket(); // Get default bucket from initialized admin
         
         const userDocRef = adminDb.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
@@ -106,10 +104,7 @@ export async function updateAvatar(formData: FormData) {
         // Delete old file if it exists and is a GCS URL
         if (oldAvatarUrl && (oldAvatarUrl.includes('storage.googleapis.com') || oldAvatarUrl.includes('firebasestorage.googleapis.com')) ) {
              try {
-                // Extract the file path from the URL
                 const url = new URL(oldAvatarUrl);
-                // The pathname will be something like /v0/b/bucket-name/o/path%2Fto%2Ffile.jpg
-                // We need to extract the actual file path after the /o/ and before the ?token
                 const decodedPath = decodeURIComponent(url.pathname);
                 const pathParts = decodedPath.split('/o/');
                 
@@ -121,7 +116,6 @@ export async function updateAvatar(formData: FormData) {
                 }
              } catch(deleteError) {
                 console.error("Failed to delete old avatar:", deleteError);
-                // Don't block the upload if deletion fails
              }
         }
 
