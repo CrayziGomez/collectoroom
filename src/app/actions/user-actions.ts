@@ -94,17 +94,7 @@ export async function updateAvatar(formData: FormData) {
           throw new Error('Firebase Admin SDK not initialized correctly.');
         }
         
-        const bucketNameFromEnv = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-        if (!bucketNameFromEnv) {
-            throw new Error('Firebase Storage bucket name is not configured in environment variables.');
-        }
-
-        // --- CRITICAL FIX ---
-        // The environment variable contains an incorrect ".appspot.com" suffix.
-        // We strip it here to get the actual bucket name.
-        const correctBucketName = bucketNameFromEnv.replace('.appspot.com', '');
-        
-        const bucket = adminStorage.bucket(correctBucketName);
+        const bucket = adminStorage.bucket();
         const userDocRef = adminDb.collection('users').doc(userId);
 
         // Delete old avatar if it exists

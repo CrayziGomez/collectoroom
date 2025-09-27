@@ -37,11 +37,14 @@ function initializeAdminApp(): FirebaseAdminSingleton {
       Buffer.from(serviceAccountString, 'base64').toString('utf8')
     );
 
-    const bucketName = `${serviceAccount.project_id}.appspot.com`;
+    const bucketNameFromEnv = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!bucketNameFromEnv) {
+        throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
+    }
 
     const newApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: bucketName,
+      storageBucket: bucketNameFromEnv,
     });
 
     return {
