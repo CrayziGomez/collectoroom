@@ -11,11 +11,12 @@ import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { app } from '@/lib/firebase';
-
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const auth = getAuth(app);
   const router = useRouter();
   const { toast } = useToast();
@@ -53,7 +54,25 @@ export default function LoginPage() {
               Forgot your password?
             </Link>
           </div>
-          <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute inset-y-0 right-0 h-full px-3"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
         <Button onClick={handleLogin} className="w-full">
           Login
