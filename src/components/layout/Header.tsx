@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { UserNav } from '../UserNav';
 import { Bell, Menu, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '../ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { Separator } from '../ui/separator';
 
 /*
@@ -125,6 +125,12 @@ export function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Main Menu</SheetTitle>
+                  <SheetDescription>
+                    Navigate through the CollectoRoom application.
+                  </SheetDescription>
+                </SheetHeader>
                 <Logo />
                 <Separator className="my-4" />
                 <nav className="flex flex-col gap-4 text-lg font-medium">
