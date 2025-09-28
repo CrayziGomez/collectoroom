@@ -15,6 +15,8 @@ import type { Collection, User, Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 /*
   [DEVELOPER NOTE] Firestore Index Required for Gallery Filtering:
   
