@@ -7,11 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UploadCloud } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
@@ -25,7 +24,6 @@ export default function CreateCollectionPage() {
     const { toast } = useToast();
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [collectionName, setCollectionName] = useState('');
@@ -36,10 +34,6 @@ export default function CreateCollectionPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
     
-    // Cover Image State
-    const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
-    const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null);
-
     useEffect(() => {
         if (!authLoading && !user) {
             router.push('/login');
@@ -56,27 +50,14 @@ export default function CreateCollectionPage() {
         fetchCategories();
 
     }, [user, authLoading, router]);
-
-    const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                toast({ title: 'File too large', description: 'Please select an image under 5MB.', variant: 'destructive'});
-                return;
-            }
-            setCoverImageFile(file);
-            const previewUrl = URL.createObjectURL(file);
-            setCoverImagePreview(previewUrl);
-        }
-    };
     
     const handleCreateCollection = async () => {
         if (!user) {
             toast({ title: "Error", description: "You must be logged in to create a collection.", variant: "destructive" });
             return;
         }
-        if (!collectionName || !category || !coverImageFile) {
-            toast({ title: "Validation Error", description: "Name, Category, and a Cover Image are required.", variant: "destructive" });
+        if (!collectionName || !category) {
+            toast({ title: "Validation Error", description: "Name and Category are required.", variant: "destructive" });
             return;
         }
 
@@ -90,7 +71,6 @@ export default function CreateCollectionPage() {
             formData.append('keywords', keywords);
             formData.append('category', category);
             formData.append('isPublic', String(isPublic));
-            formData.append('coverImage', coverImageFile);
             
             const result = await createCollection(formData);
 
@@ -135,32 +115,6 @@ export default function CreateCollectionPage() {
                 <Card>
                     <CardContent className="p-6 grid gap-6">
                         <div className="grid gap-2">
-                             <Label htmlFor="cover-image">Cover Image</Label>
-                              <div 
-                                className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted aspect-[4/3] flex items-center justify-center"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                {coverImagePreview ? (
-                                    <Image src={coverImagePreview} alt="Cover image preview" layout="fill" className="object-cover rounded-md" />
-                                ) : (
-                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                    <UploadCloud className="h-10 w-10" />
-                                    <p className="font-semibold">Click to upload an image</p>
-                                    <p className="text-xs">PNG, JPG, WEBP up to 5MB</p>
-                                    </div>
-                                )}
-                            </div>
-                            <Input 
-                                ref={fileInputRef}
-                                id="cover-image"
-                                type="file" 
-                                className="hidden" 
-                                accept="image/png, image/jpeg, image/webp" 
-                                onChange={handleCoverImageSelect}
-                                disabled={isCreating}
-                            />
-                        </div>
-                        <div className="grid gap-2">
                             <Label htmlFor="name">Collection Name</Label>
                             <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} disabled={isCreating} />
                         </div>
@@ -196,7 +150,7 @@ export default function CreateCollectionPage() {
 
                 <div className="flex justify-end gap-2 mt-6">
                     <Button variant="outline" asChild disabled={isCreating}><Link href="/my-collectoroom">Cancel</Link></Button>
-                    <Button onClick={handleCreateCollection} disabled={isCreating || !collectionName || !category || !coverImageFile}>
+                    <Button onClick={handleCreateCollection} disabled={isCreating || !collectionName || !category}>
                         {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isCreating ? 'Creating...' : 'Create Collection'}
                     </Button>

@@ -9,7 +9,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 // --- Server Action to Create a Collection ---
 export async function createCollection(formData: FormData) {
-    if (!adminDb || !adminStorage) {
+    if (!adminDb) {
       return { success: false, message: 'Firebase Admin SDK not initialized.' };
     }
 
@@ -19,30 +19,17 @@ export async function createCollection(formData: FormData) {
     const keywords = formData.get('keywords') as string;
     const category = formData.get('category') as string;
     const isPublic = formData.get('isPublic') === 'true';
-    const coverImageFile = formData.get('coverImage') as File;
-    const coverImageHint = 'custom upload'; // We can enhance this later with AI
 
-    if (!userId || !name || !category || !coverImageFile) {
+    // Placeholder image details
+    const coverImage = `https://picsum.photos/seed/${uuidv4()}/400/300`;
+    const coverImageHint = 'collection display';
+
+    if (!userId || !name || !category) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        // 1. Upload Image to Storage
-        const collectionId = adminDb.collection('collections').doc().id; // Generate ID beforehand
-        const imageFileName = `${uuidv4()}-${coverImageFile.name}`;
-        
-        const bucket = adminStorage.bucket();
-        const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
-        const fileRef = bucket.file(imagePath);
-        
-        const fileBuffer = Buffer.from(await coverImageFile.arrayBuffer());
-        await fileRef.save(fileBuffer, { metadata: { contentType: coverImageFile.type } });
-
-        // Get public URL using a long-lived signed URL
-        const [signedUrl] = await fileRef.getSignedUrl({
-          action: 'read',
-          expires: '01-01-2100',
-        });
+        const collectionId = adminDb.collection('collections').doc().id;
 
         // 2. Create Collection Document in Firestore
         await adminDb.collection('collections').doc(collectionId).set({
@@ -52,7 +39,7 @@ export async function createCollection(formData: FormData) {
             keywords,
             category,
             isPublic,
-            coverImage: signedUrl,
+            coverImage: coverImage,
             coverImageHint,
             cardCount: 0,
             createdAt: FieldValue.serverTimestamp(),
