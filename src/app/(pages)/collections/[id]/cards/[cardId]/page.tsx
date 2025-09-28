@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFollow } from "@/hooks/use-follow";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function CardDetailPage() {
     const params = useParams();
@@ -219,6 +219,10 @@ export default function CardDetailPage() {
         </div>
          <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
             <DialogContent className="max-w-4xl p-2 bg-transparent border-0">
+                 <DialogHeader className="sr-only">
+                    <DialogTitle>Image Viewer</DialogTitle>
+                    <DialogDescription>A larger view of the selected card image.</DialogDescription>
+                </DialogHeader>
                 <button onClick={() => setIsViewerOpen(false)} className="absolute top-2 right-2 z-50 text-white bg-black/50 rounded-full p-1">
                     <X className="h-6 w-6" />
                 </button>
