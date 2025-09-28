@@ -52,6 +52,14 @@ export async function createCard(formData: FormData) {
 
         const cardRef = adminDb.collection('cards').doc(cardId);
         const collectionRef = adminDb.collection('collections').doc(collectionId);
+        
+        // Fetch collection to check card count
+        const collectionDoc = await collectionRef.get();
+        if (!collectionDoc.exists) {
+            throw new Error("Collection not found.");
+        }
+        const collectionData = collectionDoc.data();
+        const isFirstCard = (collectionData?.cardCount || 0) === 0;
 
         const batch = adminDb.batch();
 
@@ -66,7 +74,17 @@ export async function createCard(formData: FormData) {
             createdAt: FieldValue.serverTimestamp(),
         });
         
-        batch.update(collectionRef, { cardCount: FieldValue.increment(1) });
+        const collectionUpdate: { [key: string]: any } = { 
+            cardCount: FieldValue.increment(1) 
+        };
+
+        // If it's the first card and it has images, set the cover photo
+        if (isFirstCard && imageRecords.length > 0) {
+            collectionUpdate.coverImage = imageRecords[0].url;
+            collectionUpdate.coverImageHint = imageRecords[0].hint;
+        }
+
+        batch.update(collectionRef, collectionUpdate);
         
         await batch.commit();
 
