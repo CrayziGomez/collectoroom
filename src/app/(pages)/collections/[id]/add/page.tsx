@@ -201,7 +201,7 @@ export default function AddCardPage() {
                         <div className="grid gap-2">
                              <div className="flex justify-between items-center">
                                 <Label>Images ({imageFiles.length}/{MAX_IMAGES})</Label>
-                                <span className="text-xs text-muted-foreground">For best results use 3:2 ratio</span>
+                                <span className="text-xs text-muted-foreground">📸 Upload Guideline: For best viewing results please upload photos in a 3:2 aspect ratio (width:height). This helps keep your images clear and properly framed across all devices.</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                                 {imagePreviews.map((preview, index) => (
