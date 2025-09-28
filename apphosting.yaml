@@ -6,6 +6,8 @@ specVersion: v1alpha1
 
 # The command to build your app.
 build:
+  # Specify the runtime to ensure the correct Node.js version is used.
+  runtime: nodejs20
   # The command to run to build your app.
   run: npm run build
 
