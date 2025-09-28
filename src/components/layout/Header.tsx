@@ -47,8 +47,8 @@ export function Header() {
       return;
     }
 
-    let unsubscribeChats: Unsubscribe = () => {};
-    let unsubscribeNotifications: Unsubscribe = () => {};
+    let unsubscribeChats: Unsubscribe | undefined;
+    let unsubscribeNotifications: Unsubscribe | undefined;
 
     try {
       const chatsQuery = query(
@@ -78,8 +78,12 @@ export function Header() {
     }
 
     return () => {
-      unsubscribeChats();
-      unsubscribeNotifications();
+        if (unsubscribeChats) {
+            unsubscribeChats();
+        }
+        if (unsubscribeNotifications) {
+            unsubscribeNotifications();
+        }
     };
   }, [user, loading]);
   
