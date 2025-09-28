@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2, View } from 'lucide-react';
 import { SEED_CATEGORIES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -40,6 +40,7 @@ import { PRICING_TIERS } from '@/lib/constants';
 import { addCategory } from '@/app/actions/category-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAuth();
@@ -275,6 +276,11 @@ export default function AdminPage() {
                                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/profile/${u.username}`}>
+                                    <View className="mr-2 h-4 w-4" /> View Collections
+                                  </Link>
+                                </DropdownMenuItem>
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem className="text-destructive" disabled={u.uid === user.uid}>
                                     <Trash2 className="mr-2 h-4 w-4" /> Delete User
