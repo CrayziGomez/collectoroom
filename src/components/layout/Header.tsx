@@ -13,7 +13,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { UserNav } from '../UserNav';
-import { Bell, Menu, X } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { Separator } from '../ui/separator';
 
@@ -124,16 +124,18 @@ export function Header() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left">
+              <SheetContent side="left" className="flex flex-col">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Main Menu</SheetTitle>
                   <SheetDescription>
                     Navigate through the CollectoRoom application.
                   </SheetDescription>
                 </SheetHeader>
-                <Logo />
-                <Separator className="my-4" />
-                <nav className="flex flex-col gap-4 text-lg font-medium">
+                <div className="mb-4">
+                  <Logo />
+                </div>
+                <Separator />
+                <nav className="flex-grow flex flex-col gap-4 text-lg font-medium mt-4">
                   {navLinks.map((link) => (
                      <Link
                       key={link.href}
@@ -150,6 +152,19 @@ export function Header() {
                     </Link>
                   ))}
                 </nav>
+                {!loading && !user && (
+                    <div className="mt-auto">
+                        <Separator className="my-4" />
+                        <div className="flex flex-col gap-2">
+                             <Button asChild>
+                                <Link href="/signup">Sign Up</Link>
+                             </Button>
+                             <Button variant="outline" asChild>
+                                <Link href="/login">Log in</Link>
+                             </Button>
+                        </div>
+                    </div>
+                )}
               </SheetContent>
             </Sheet>
         </div>
