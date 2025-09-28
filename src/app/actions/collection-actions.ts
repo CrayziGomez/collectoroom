@@ -31,8 +31,7 @@ export async function createCollection(formData: FormData) {
         const collectionId = adminDb.collection('collections').doc().id; // Generate ID beforehand
         const imageFileName = `${uuidv4()}-${coverImageFile.name}`;
         
-        const correctBucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-        const bucket = adminStorage.bucket(correctBucketName);
+        const bucket = adminStorage.bucket();
         const imagePath = `users/${userId}/collections/${collectionId}/${imageFileName}`;
         const fileRef = bucket.file(imagePath);
         

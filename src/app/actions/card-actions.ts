@@ -9,8 +9,7 @@ import type { ImageRecord } from '@/lib/types';
 
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const correctBucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-    const bucket = adminStorage.bucket(correctBucketName);
+    const bucket = adminStorage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
     const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
     const fileRef = bucket.file(imagePath);
@@ -110,8 +109,7 @@ export async function updateCard(formData: FormData) {
             !existingImages.some(existImg => existImg.path === origImg.path)
         );
 
-        const correctBucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-        const bucket = adminStorage.bucket(correctBucketName);
+        const bucket = adminStorage.bucket();
         await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         
         // --- Image Upload ---
@@ -149,8 +147,7 @@ export async function deleteCard(input: { cardId: string, collectionId: string, 
         const collectionRef = adminDb.collection('collections').doc(collectionId);
 
         // Delete images from storage
-        const correctBucketName = 'studio-7145415565-66e7d.firebasestorage.app';
-        const bucket = adminStorage.bucket(correctBucketName);
+        const bucket = adminStorage.bucket();
         if (images && images.length > 0) {
             await Promise.all(images.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         }
