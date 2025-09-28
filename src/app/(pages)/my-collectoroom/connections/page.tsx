@@ -22,18 +22,21 @@ function UserRow({ userToList, currentUser, onFollowToggle }: { userToList: User
 
   return (
     <div className="flex items-center justify-between p-4">
-      <div className="flex items-center gap-4">
+      <Link href={`/profile/${userToList.username}`} className="flex items-center gap-4 group">
         <Avatar>
           <AvatarImage src={userToList.avatarUrl} alt={userToList.username} />
           <AvatarFallback>{userToList.username?.charAt(0)}</AvatarFallback>
         </Avatar>
-        <p className="font-semibold">{userToList.username}</p>
-      </div>
+        <p className="font-semibold group-hover:text-primary transition-colors">{userToList.username}</p>
+      </Link>
       {!isSelf && (
         <Button
           variant={isFollowing ? "outline" : "default"}
           size="sm"
-          onClick={toggleFollow}
+          onClick={(e) => {
+              e.preventDefault(); // Prevent link navigation
+              toggleFollow();
+            }}
           disabled={isLoading || isProcessing}
         >
           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
