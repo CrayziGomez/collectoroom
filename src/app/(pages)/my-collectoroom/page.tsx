@@ -26,6 +26,22 @@ import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
+/*
+  [DEVELOPER NOTE] Firestore Index Required for My CollectoRoom:
+
+  To fix the "The query requires an index" error when a logged-in user views their
+  collections, a composite index must be created. This index allows Firestore to 
+  filter collections by `userId` and sort them by `createdAt`.
+
+  Please create the index by visiting the following URL in your browser.
+
+  https://console.firebase.google.com/v1/r/project/studio-7145415565-66e7d/firestore/indexes?create_composite=Cltwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY29sbGVjdGlvbnMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+
+  After creating the index, it may take a few minutes to build. Once it's enabled,
+  the error will be resolved.
+*/
+
+
 export default function MyCollectoRoomPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
