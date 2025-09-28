@@ -208,7 +208,7 @@ export default function HomePage() {
              )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Button size="lg" asChild>
-                <Link href="/signup">Start Your Collection <ArrowRight className="ml-2 h-5 w-5" /></Link>
+                <Link href={user ? '/my-collectoroom/create' : '/signup'}>Start Your Collection <ArrowRight className="ml-2 h-5 w-5" /></Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="/gallery">Explore the Gallery</Link>
@@ -364,5 +364,7 @@ export default function HomePage() {
     </>
   );
 }
+
+    
 
     
