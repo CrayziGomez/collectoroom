@@ -112,11 +112,11 @@ export function Header() {
 
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         
         {/* Mobile Menu */}
-        <div className="md:hidden flex items-center">
+        <div className="md:hidden">
            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -124,18 +124,10 @@ export function Header() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="pr-0">
-                <div className="flex justify-between items-center pr-6">
-                    <Logo />
-                     <SheetClose asChild>
-                         <Button variant="ghost" size="icon">
-                            <X className="h-6 w-6" />
-                            <span className="sr-only">Close menu</span>
-                        </Button>
-                    </SheetClose>
-                </div>
+              <SheetContent side="left">
+                <Logo />
                 <Separator className="my-4" />
-                <nav className="flex flex-col gap-4 text-lg font-medium pr-6">
+                <nav className="flex flex-col gap-4 text-lg font-medium">
                   {navLinks.map((link) => (
                      <Link
                       key={link.href}
@@ -157,35 +149,36 @@ export function Header() {
         </div>
 
         {/* Desktop Logo & Nav */}
-        <div className="flex-1 md:flex-initial md:flex md:items-center">
-            <div className="hidden md:flex md:mr-4">
-                <Logo />
-            </div>
-             <div className="flex-1 text-center md:text-left md:hidden">
-                <Logo />
-            </div>
+        <div className="hidden md:flex md:items-center md:gap-6">
+            <Logo />
+            <nav className="flex items-center space-x-6 text-sm font-medium">
+              {navLinks.map((link) => (
+                 <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "relative transition-colors hover:text-foreground/80",
+                    pathname === link.href ? "text-foreground" : "text-foreground/60"
+                  )}
+                >
+                  {link.label}
+                  {link.badge && link.badge > 0 ? (
+                     <Badge variant="destructive" className="absolute -right-4 -top-2 h-5 w-5 justify-center p-0">{link.badge}</Badge>
+                  ) : null}
+                </Link>
+              ))}
+            </nav>
         </div>
         
-        <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
-          {navLinks.map((link) => (
-             <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "relative transition-colors hover:text-foreground/80",
-                pathname === link.href ? "text-foreground" : "text-foreground/60"
-              )}
-            >
-              {link.label}
-              {link.badge && link.badge > 0 ? (
-                 <Badge variant="destructive" className="absolute -right-4 -top-2 h-5 w-5 justify-center p-0">{link.badge}</Badge>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex-1 md:hidden">
+            <div className="flex justify-center">
+                 <Logo />
+            </div>
+        </div>
+
 
         {/* Right side actions */}
-        <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="flex items-center justify-end space-x-2">
            {!loading && !user && (
             <div className="hidden md:flex items-center gap-2">
               <Button variant="ghost" asChild>
