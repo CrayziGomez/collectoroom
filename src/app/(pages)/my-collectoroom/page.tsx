@@ -139,7 +139,6 @@ export default function MyCollectoRoomPage() {
             </Avatar>
             <div>
               <h1 className="text-3xl font-bold font-headline">{user.username}</h1>
-              <p className="text-muted-foreground">My digital collection space</p>
               <div className="flex items-center gap-4 mt-2">
                  <Badge variant="outline">{user.tier} Plan</Badge>
                  <div className="flex gap-4 text-sm">
