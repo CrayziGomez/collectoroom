@@ -13,7 +13,9 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { UserNav } from '../UserNav';
-import { Bell } from 'lucide-react';
+import { Bell, Menu, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from '../ui/sheet';
+import { Separator } from '../ui/separator';
 
 /*
   [DEVELOPER NOTE] Firestore Index Required for Unread Chat Count:
@@ -39,6 +41,11 @@ export function Header() {
   const pathname = usePathname();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (loading || !user) {
@@ -107,9 +114,58 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <div className="mr-4 hidden md:flex">
-          <Logo />
+        
+        {/* Mobile Menu */}
+        <div className="md:hidden flex items-center">
+           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="pr-0">
+                <div className="flex justify-between items-center pr-6">
+                    <Logo />
+                     <SheetClose asChild>
+                         <Button variant="ghost" size="icon">
+                            <X className="h-6 w-6" />
+                            <span className="sr-only">Close menu</span>
+                        </Button>
+                    </SheetClose>
+                </div>
+                <Separator className="my-4" />
+                <nav className="flex flex-col gap-4 text-lg font-medium pr-6">
+                  {navLinks.map((link) => (
+                     <Link
+                      key={link.href}
+                      href={link.href}
+                      className={cn(
+                        "flex items-center justify-between transition-colors hover:text-foreground",
+                        pathname === link.href ? "text-foreground" : "text-muted-foreground"
+                      )}
+                    >
+                      <span>{link.label}</span>
+                      {link.badge && link.badge > 0 ? (
+                         <Badge variant="destructive">{link.badge}</Badge>
+                      ) : null}
+                    </Link>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
         </div>
+
+        {/* Desktop Logo & Nav */}
+        <div className="flex-1 md:flex-initial md:flex md:items-center">
+            <div className="hidden md:flex md:mr-4">
+                <Logo />
+            </div>
+             <div className="flex-1 text-center md:text-left md:hidden">
+                <Logo />
+            </div>
+        </div>
+        
         <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
           {navLinks.map((link) => (
              <Link
@@ -127,9 +183,11 @@ export function Header() {
             </Link>
           ))}
         </nav>
+
+        {/* Right side actions */}
         <div className="flex flex-1 items-center justify-end space-x-2">
            {!loading && !user && (
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               <Button variant="ghost" asChild>
                 <Link href="/login">Log in</Link>
               </Button>
