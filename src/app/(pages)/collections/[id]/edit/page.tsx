@@ -2,7 +2,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,9 +14,11 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter, useParams, notFound } from "next/navigation";
-import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Collection, Category } from "@/lib/types";
+import type { Collection, Category, Card as CardType, ImageRecord } from "@/lib/types";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 
 export default function EditCollectionPage() {
@@ -28,11 +30,14 @@ export default function EditCollectionPage() {
 
     const [collectionData, setCollectionData] = useState<Collection | null>(null);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [cardImages, setCardImages] = useState<ImageRecord[]>([]);
+
     const [collectionName, setCollectionName] = useState('');
     const [keywords, setKeywords] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('');
     const [isPublic, setIsPublic] = useState(true);
+    const [selectedCoverImage, setSelectedCoverImage] = useState<ImageRecord | null>(null);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +75,14 @@ export default function EditCollectionPage() {
                 setKeywords(data.keywords || '');
                 setCategory(data.category);
                 setIsPublic(data.isPublic);
+                setSelectedCoverImage({ url: data.coverImage, path: '', hint: data.coverImageHint });
+
+                // Fetch cards for this collection to get images
+                const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionSnap.id));
+                const cardsSnapshot = await getDocs(cardsQuery);
+                const images = cardsSnapshot.docs.flatMap(doc => (doc.data() as CardType).images || []);
+                setCardImages(images);
+
             } else {
                 notFound();
             }
@@ -99,6 +112,10 @@ export default function EditCollectionPage() {
                 keywords,
                 category,
                 isPublic,
+                ...(selectedCoverImage && { 
+                    coverImage: selectedCoverImage.url,
+                    coverImageHint: selectedCoverImage.hint,
+                })
             });
 
             toast({
@@ -129,46 +146,78 @@ export default function EditCollectionPage() {
 
     return (
         <div className="container py-8">
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-4xl mx-auto">
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold font-headline">Edit "{collectionData.name}"</h1>
                     <p className="text-muted-foreground">Update the details for your collection.</p>
                 </div>
+                <div className="grid md:grid-cols-2 gap-8">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Collection Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Collection Name</Label>
+                                <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} disabled={isSaving} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="keywords">Keywords</Label>
+                                <Input id="keywords" placeholder="e.g., comic books, vintage, DC, Marvel" value={keywords} onChange={e => setKeywords(e.target.value)} disabled={isSaving} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea id="description" placeholder="A brief description of what your collection is about." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="category">Category</Label>
+                                <Select onValueChange={setCategory} value={category} disabled={isSaving || categories.length === 0}>
+                                    <SelectTrigger id="category">
+                                        <SelectValue placeholder={categories.length === 0 ? 'Loading...' : 'Select a category'} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categories.map(cat => (
+                                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="isPublic" checked={isPublic} onCheckedChange={(checked) => setIsPublic(Boolean(checked))} disabled={isSaving} />
+                                <Label htmlFor="isPublic">Make this collection public</Label>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                <Card>
-                    <CardContent className="p-6 grid gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Collection Name</Label>
-                            <Input id="name" placeholder="e.g., Vintage Comic Books" value={collectionName} onChange={e => setCollectionName(e.target.value)} disabled={isSaving} />
-                        </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="keywords">Keywords</Label>
-                            <Input id="keywords" placeholder="e.g., comic books, vintage, DC, Marvel" value={keywords} onChange={e => setKeywords(e.target.value)} disabled={isSaving} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" placeholder="A brief description of what your collection is about." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="category">Category</Label>
-                             <Select onValueChange={setCategory} value={category} disabled={isSaving || categories.length === 0}>
-                                <SelectTrigger id="category">
-                                    <SelectValue placeholder={categories.length === 0 ? 'Loading...' : 'Select a category'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map(cat => (
-                                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Cover Photo</CardTitle>
+                             <CardDescription>Select an image from one of your cards to be the cover photo for this collection.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             {cardImages.length > 0 ? (
+                                <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+                                    {cardImages.map((image, index) => (
+                                        <button key={index} className="relative aspect-square rounded-md overflow-hidden focus:ring-2 focus:ring-primary focus:outline-none" onClick={() => setSelectedCoverImage(image)}>
+                                            <Image src={image.url} alt={`Card image ${index + 1}`} layout="fill" className="object-cover" />
+                                            {selectedCoverImage?.url === image.url && (
+                                                <div className="absolute inset-0 bg-primary/70 flex items-center justify-center">
+                                                    <p className="text-primary-foreground font-bold text-sm">Selected</p>
+                                                </div>
+                                            )}
+                                            <div className={cn("absolute inset-0 ring-2 ring-inset ring-transparent", selectedCoverImage?.url === image.url && "ring-primary")}></div>
+                                        </button>
                                     ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Checkbox id="isPublic" checked={isPublic} onCheckedChange={(checked) => setIsPublic(Boolean(checked))} disabled={isSaving} />
-                            <Label htmlFor="isPublic">Make this collection public</Label>
-                        </div>
+                                </div>
+                            ) : (
+                                <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
+                                    <p>No card images available. Add cards with images to this collection to select a cover photo.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
 
-                    </CardContent>
-                </Card>
 
                 <div className="flex justify-end gap-2 mt-6">
                     <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${collectionId}`}>Cancel</Link></Button>
@@ -181,3 +230,4 @@ export default function EditCollectionPage() {
         </div>
     );
 }
+

@@ -1,8 +1,7 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
-import { v4 as uuidv4 } from 'uuid';
+import { adminDb } from '@/lib/firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -20,9 +19,9 @@ export async function createCollection(formData: FormData) {
     const category = formData.get('category') as string;
     const isPublic = formData.get('isPublic') === 'true';
 
-    // Placeholder image details
-    const coverImage = `https://picsum.photos/seed/${uuidv4()}/400/300`;
-    const coverImageHint = 'collection display';
+    // Default image is now the logo
+    const coverImage = '/images/CR_Logo_Gry.png';
+    const coverImageHint = 'CollectoRoom logo';
 
     if (!userId || !name || !category) {
         return { success: false, message: 'Missing required fields.' };
@@ -31,7 +30,6 @@ export async function createCollection(formData: FormData) {
     try {
         const collectionId = adminDb.collection('collections').doc().id;
 
-        // 2. Create Collection Document in Firestore
         await adminDb.collection('collections').doc(collectionId).set({
             userId,
             name,
@@ -45,7 +43,6 @@ export async function createCollection(formData: FormData) {
             createdAt: FieldValue.serverTimestamp(),
         });
         
-        // 3. Revalidate paths
         revalidatePath('/my-collectoroom');
         revalidatePath('/gallery');
         
