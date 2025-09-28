@@ -147,21 +147,21 @@ export default function EditCardPage() {
         }
 
         setIsSaving(true);
-        try {
-            const formData = new FormData();
-            formData.append('userId', user!.uid);
-            formData.append('cardId', cardId);
-            formData.append('collectionId', collectionId);
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('status', status);
-            
-            // Pass existing images and new images separately
-            formData.append('existingImages', JSON.stringify(existingImages));
-            newImageFiles.forEach(file => {
-                formData.append('newImages', file);
-            });
+        const formData = new FormData();
+        formData.append('userId', user!.uid);
+        formData.append('cardId', cardId);
+        formData.append('collectionId', collectionId);
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('status', status);
+        
+        // Pass existing images and new images separately
+        formData.append('existingImages', JSON.stringify(existingImages));
+        newImageFiles.forEach(file => {
+            formData.append('newImages', file);
+        });
 
+        try {
             const result = await updateCard(formData);
 
             if (result.success) {
@@ -191,7 +191,10 @@ export default function EditCardPage() {
 
         setIsDeleting(true);
         try {
-            await deleteCard({ cardId, collectionId, images: cardData?.images || [] });
+            const result = await deleteCard({ cardId, collectionId, images: cardData?.images || [] });
+             if (!result.success) {
+                throw new Error(result.message);
+            }
             
             toast({
                 title: "Card Deleted",
@@ -199,11 +202,11 @@ export default function EditCardPage() {
             });
             router.push(`/collections/${collectionId}`);
 
-        } catch (error) {
+        } catch (error: any) {
              console.error("Error deleting card:", error);
             toast({
                 title: "Error Deleting Card",
-                description: "Could not delete the card. Please try again.",
+                description: error.message || "Could not delete the card. Please try again.",
                 variant: "destructive",
             });
         } finally {

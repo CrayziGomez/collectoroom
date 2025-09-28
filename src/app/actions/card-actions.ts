@@ -76,7 +76,7 @@ export async function createCard(formData: FormData) {
 
     } catch (error: any) {
         console.error('Error creating card:', error);
-        return { success: false, message: error.message };
+        return { success: false, message: error.message || 'An unknown error occurred while creating the card.' };
     }
 }
 
@@ -134,7 +134,7 @@ export async function updateCard(formData: FormData) {
 
     } catch (error: any) {
         console.error('Error updating card:', error);
-        return { success: false, message: error.message };
+        return { success: false, message: error.message || 'An unknown error occurred while updating the card.' };
     }
 }
 
@@ -164,6 +164,6 @@ export async function deleteCard(input: { cardId: string, collectionId: string, 
 
     } catch (error: any) {
          console.error('Error deleting card:', error);
-        return { success: false, message: error.message };
+        return { success: false, message: error.message || 'An unknown error occurred while deleting the card.' };
     }
 }

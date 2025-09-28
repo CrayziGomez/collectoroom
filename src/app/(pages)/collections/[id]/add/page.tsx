@@ -143,19 +143,19 @@ export default function AddCardPage() {
         }
 
         setIsSaving(true);
+        const formData = new FormData();
+        formData.append('userId', user.uid);
+        formData.append('collectionId', collectionData.id);
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('status', status);
+        formData.append('category', collectionData.category);
+
+        imageFiles.forEach(file => {
+            formData.append('images', file);
+        });
+
         try {
-            const formData = new FormData();
-            formData.append('userId', user.uid);
-            formData.append('collectionId', collectionData.id);
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('status', status);
-            formData.append('category', collectionData.category);
-
-            imageFiles.forEach(file => {
-                formData.append('images', file);
-            });
-
             const result = await createCard(formData);
 
             if (result.success && result.cardId) {
