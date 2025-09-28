@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Share2, UserCheck, UserPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, Share2, UserCheck, UserPlus, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFollow } from "@/hooks/use-follow";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function CardDetailPage() {
     const params = useParams();
@@ -33,6 +34,15 @@ export default function CardDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const { isFollowing, toggleFollow, isLoading: isFollowLoading, isProcessing: isFollowProcessing } = useFollow(collectionOwner?.uid || '');
+    
+    const [isViewerOpen, setIsViewerOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+    const openImageViewer = (imageUrl: string) => {
+        setSelectedImage(imageUrl);
+        setIsViewerOpen(true);
+    };
+
 
     useEffect(() => {
         if (authLoading) return;
@@ -117,6 +127,7 @@ export default function CardDetailPage() {
     const FollowButtonIcon = isFollowing ? UserCheck : UserPlus;
 
     return (
+        <>
         <div className="container py-8">
             <div className="mb-6">
                 <Button variant="ghost" asChild>
@@ -133,14 +144,14 @@ export default function CardDetailPage() {
                         <Carousel className="w-full max-w-xs mx-auto">
                             <CarouselContent>
                                 {cardData.images.map((image, index) => (
-                                    <CarouselItem key={index}>
+                                    <CarouselItem key={index} onClick={() => openImageViewer(image.url)} className="cursor-pointer">
                                         <Card className="overflow-hidden">
                                             <Image
                                                 src={image.url}
                                                 alt={`${cardData.title} - Image ${index + 1}`}
                                                 width={600}
-                                                height={800}
-                                                className="w-full aspect-[3/4] object-cover"
+                                                height={400}
+                                                className="w-full aspect-[3/2] object-cover"
                                                 data-ai-hint={image.hint}
                                             />
                                         </Card>
@@ -152,7 +163,7 @@ export default function CardDetailPage() {
                         </Carousel>
                     ) : (
                          <Card className="overflow-hidden sticky top-24">
-                             <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center">
+                             <div className="w-full aspect-[3/2] bg-muted flex items-center justify-center">
                                 <p className="text-muted-foreground">No Image</p>
                             </div>
                          </Card>
@@ -206,5 +217,22 @@ export default function CardDetailPage() {
                 </div>
             </div>
         </div>
+         <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
+            <DialogContent className="max-w-4xl p-2 bg-transparent border-0">
+                <button onClick={() => setIsViewerOpen(false)} className="absolute top-2 right-2 z-50 text-white bg-black/50 rounded-full p-1">
+                    <X className="h-6 w-6" />
+                </button>
+                {selectedImage && (
+                    <Image
+                        src={selectedImage}
+                        alt="Full size view"
+                        width={1920}
+                        height={1080}
+                        className="w-full h-auto object-contain rounded-lg"
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

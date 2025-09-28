@@ -230,12 +230,12 @@ export default function CollectionPage() {
                             src={firstImage.url}
                             alt={card.title}
                             width={300}
-                            height={400}
-                            className="aspect-[3/4] object-cover w-full group-hover:scale-105 transition-transform duration-300"
+                            height={200}
+                            className="aspect-[3/2] object-cover w-full group-hover:scale-105 transition-transform duration-300"
                             data-ai-hint={firstImage.hint}
                         />
                     ) : (
-                        <div className="aspect-[3/4] bg-muted flex items-center justify-center">
+                        <div className="aspect-[3/2] bg-muted flex items-center justify-center">
                             <p className="text-xs text-muted-foreground">No Image</p>
                         </div>
                     )}
@@ -263,7 +263,7 @@ export default function CollectionPage() {
               </Card>
             )})}
             {isOwner && !hasReachedCardLimit && cards.length > 0 && (
-              <Link href={`/collections/${collectionData.id}/add`} className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/4]">
+              <Link href={`/collections/${collectionData.id}/add`} className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/2]">
                   <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
                   <p className="text-muted-foreground font-semibold text-center">Add New Card</p>
               </Link>
