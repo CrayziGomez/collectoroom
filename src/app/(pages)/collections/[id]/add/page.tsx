@@ -199,7 +199,10 @@ export default function AddCardPage() {
                 <Card>
                     <CardContent className="p-6 grid gap-6">
                         <div className="grid gap-2">
-                            <Label>Images ({imageFiles.length}/{MAX_IMAGES})</Label>
+                             <div className="flex justify-between items-center">
+                                <Label>Images ({imageFiles.length}/{MAX_IMAGES})</Label>
+                                <span className="text-xs text-muted-foreground">For best results use 3:2 ratio</span>
+                            </div>
                             <div className="grid grid-cols-3 gap-2">
                                 {imagePreviews.map((preview, index) => (
                                     <div key={index} className="relative aspect-square">
