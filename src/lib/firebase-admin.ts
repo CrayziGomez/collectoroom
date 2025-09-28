@@ -31,13 +31,13 @@ function initializeAdminApp(): FirebaseAdminServices {
 
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file.');
   }
 
   // Use the reliable client-side environment variable for the bucket name.
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!storageBucket) {
-    throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env file');
+    throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env.local file');
   }
 
   try {
@@ -47,8 +47,8 @@ function initializeAdminApp(): FirebaseAdminServices {
 
     const newApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: storageBucket, // Explicitly set the bucket name here
-    }, 'firebase-admin-app'); // Give the app a unique name
+      storageBucket: storageBucket,
+    }, 'firebase-admin-app');
 
     const services: FirebaseAdminServices = {
       app: newApp,
@@ -66,6 +66,10 @@ function initializeAdminApp(): FirebaseAdminServices {
     if (error.code === 'app/duplicate-app') {
       console.warn("Firebase admin app already initialized, returning existing instance.");
       return global.__firebase_admin_app__!;
+    }
+     if (error instanceof SyntaxError) {
+      console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in .env.local is a correctly Base64-encoded service account JSON file.', error);
+       throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
     }
     console.error('Firebase Admin SDK initialization failed.', error);
     throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
