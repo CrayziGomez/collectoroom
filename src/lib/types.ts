@@ -47,14 +47,19 @@ export interface Collection {
   createdAt: string;
 }
 
+export interface ImageRecord {
+  url: string;
+  path: string;
+  hint: string;
+}
+
 export interface Card {
   id: string;
   collectionId: string;
   userId: string;
   title: string;
   description: string;
-  imageUrl: string;
-  imageHint: string;
+  images: ImageRecord[];
   category: string;
   status: 'Display only' | 'For sale' | 'For rent' | 'Previously owned' | 'Wish list' | '';
 }

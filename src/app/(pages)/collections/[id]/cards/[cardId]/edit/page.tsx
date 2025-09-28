@@ -7,20 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, UploadCloud, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound, useRouter, useParams } from "next/navigation";
 import { CARD_STATUSES } from "@/lib/constants";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteDoc, increment } from "firebase/firestore";
-import type { Card as CardType, Collection } from "@/lib/types";
+import { doc, getDoc } from "firebase/firestore";
+import type { Card as CardType, Collection, ImageRecord } from "@/lib/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { deleteCard, updateCard } from "@/app/actions/card-actions";
 
 const MAX_DESC_WORDS = 500;
 const MAX_TITLE_WORDS = 10;
+const MAX_IMAGES = 5;
 
 export default function EditCardPage() {
     const params = useParams();
@@ -29,12 +32,16 @@ export default function EditCardPage() {
     const { toast } = useToast();
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
-    const [collectionData, setCollectionData] = useState<Collection | null>(null);
     const [cardData, setCardData] = useState<CardType | null>(null);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<string>('');
+    const [existingImages, setExistingImages] = useState<ImageRecord[]>([]);
+    const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+    const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+
 
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -47,34 +54,31 @@ export default function EditCardPage() {
             return;
         }
 
-        const fetchCardAndCollection = async () => {
+        const fetchCard = async () => {
             if (!collectionId || !cardId) return;
             setIsLoading(true);
-
-            const collectionRef = doc(db, 'collections', collectionId);
-            const collectionSnap = await getDoc(collectionRef);
-            if (!collectionSnap.exists() || collectionSnap.data().userId !== user.uid) {
-                toast({ title: "Access Denied", description: "You don't own this collection.", variant: "destructive" });
-                router.push('/my-collectoroom');
-                return;
-            }
-            setCollectionData({ ...collectionSnap.data(), id: collectionSnap.id } as Collection);
 
             const cardRef = doc(db, 'cards', cardId);
             const cardSnap = await getDoc(cardRef);
             if (cardSnap.exists() && cardSnap.data().collectionId === collectionId) {
                 const data = cardSnap.data() as CardType;
+                 if (data.userId !== user.uid) {
+                    toast({ title: "Access Denied", description: "You don't own this card.", variant: "destructive" });
+                    router.push('/my-collectoroom');
+                    return;
+                }
                 setCardData({ ...data, id: cardSnap.id });
                 setTitle(data.title);
                 setDescription(data.description);
                 setStatus(data.status);
+                setExistingImages(data.images || []);
             } else {
                 notFound();
             }
             setIsLoading(false);
         };
 
-        fetchCardAndCollection();
+        fetchCard();
 
     }, [user, authLoading, collectionId, cardId, router, toast]);
 
@@ -102,6 +106,39 @@ export default function EditCardPage() {
 
     const titleWordCount = title.split(/\s+/).filter(Boolean).length;
     const descriptionWordCount = description.split(/\s+/).filter(Boolean).length;
+    const totalImageCount = existingImages.length + newImageFiles.length;
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const totalImages = existingImages.length + newImageFiles.length + files.length;
+
+            if (totalImages > MAX_IMAGES) {
+                toast({ title: `You can only have a maximum of ${MAX_IMAGES} images.`, variant: 'destructive'});
+                return;
+            }
+
+            const currentNewFiles = [...newImageFiles, ...files];
+            setNewImageFiles(currentNewFiles);
+
+            const currentNewPreviews = currentNewFiles.map(file => URL.createObjectURL(file));
+            setNewImagePreviews(currentNewPreviews);
+        }
+    };
+
+    const removeNewImage = (index: number) => {
+        const updatedFiles = newImageFiles.filter((_, i) => i !== index);
+        const updatedPreviews = updatedFiles.map(file => URL.createObjectURL(file));
+
+        URL.revokeObjectURL(newImagePreviews[index]);
+
+        setNewImageFiles(updatedFiles);
+        setNewImagePreviews(updatedPreviews);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
 
     const handleSaveChanges = async () => {
         if (!cardData || !title || !status) {
@@ -111,17 +148,31 @@ export default function EditCardPage() {
 
         setIsSaving(true);
         try {
-            const cardRef = doc(db, 'cards', cardId);
-            await updateDoc(cardRef, {
-                title,
-                description,
-                status,
+            const formData = new FormData();
+            formData.append('userId', user!.uid);
+            formData.append('cardId', cardId);
+            formData.append('collectionId', collectionId);
+            formData.append('title', title);
+            formData.append('description', description);
+            formData.append('status', status);
+            
+            // Pass existing images and new images separately
+            formData.append('existingImages', JSON.stringify(existingImages));
+            newImageFiles.forEach(file => {
+                formData.append('newImages', file);
             });
-            toast({
-                title: "Card Updated!",
-                description: `"${title}" has been updated.`,
-            });
-            router.push(`/collections/${collectionId}`);
+
+            const result = await updateCard(formData);
+
+            if (result.success) {
+                toast({
+                    title: "Card Updated!",
+                    description: `"${title}" has been updated.`,
+                });
+                router.push(`/collections/${collectionId}`);
+            } else {
+                 throw new Error(result.message || "An unknown error occurred.");
+            }
 
         } catch (error: any) {
             console.error("Error updating card:", error);
@@ -140,11 +191,7 @@ export default function EditCardPage() {
 
         setIsDeleting(true);
         try {
-            const cardRef = doc(db, 'cards', cardId);
-            await deleteDoc(cardRef);
-            
-            const collectionRef = doc(db, 'collections', collectionId);
-            await updateDoc(collectionRef, { cardCount: increment(-1) });
+            await deleteCard({ cardId, collectionId, images: cardData?.images || [] });
             
             toast({
                 title: "Card Deleted",
@@ -165,7 +212,7 @@ export default function EditCardPage() {
     }
 
 
-    if (isLoading || authLoading || !cardData || !collectionData) {
+    if (isLoading || authLoading || !cardData) {
         return (
             <div className="container py-8 flex justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -191,12 +238,12 @@ export default function EditCardPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete this card from your collection.
+                                    This action cannot be undone. This will permanently delete this card and all its images.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDeleteCard} disabled={isDeleting}>
+                                <AlertDialogAction onClick={handleDeleteCard} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
                                      {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                      Delete
                                 </AlertDialogAction>
@@ -206,7 +253,49 @@ export default function EditCardPage() {
                 </div>
 
                 <Card>
-                    <CardContent className="p-6 grid gap-4">
+                    <CardContent className="p-6 grid gap-6">
+                        <div className="grid gap-2">
+                            <Label>Images ({totalImageCount}/{MAX_IMAGES})</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {existingImages.map((image, index) => (
+                                    <div key={image.path} className="relative aspect-square">
+                                        <Image src={image.url} alt={`Image ${index + 1}`} layout="fill" className="object-cover rounded-md" />
+                                        <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => setExistingImages(existingImages.filter((_, i) => i !== index))}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                {newImagePreviews.map((preview, index) => (
+                                    <div key={index} className="relative aspect-square">
+                                        <Image src={preview} alt={`Preview ${index + 1}`} layout="fill" className="object-cover rounded-md" />
+                                        <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => removeNewImage(index)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                {totalImageCount < MAX_IMAGES && (
+                                    <div 
+                                        className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted aspect-square flex items-center justify-center"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                                            <UploadCloud className="h-8 w-8" />
+                                            <p className="text-xs font-semibold">Click to upload</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <Input 
+                                ref={fileInputRef}
+                                type="file" 
+                                className="hidden" 
+                                accept="image/png, image/jpeg, image/webp" 
+                                onChange={handleImageSelect}
+                                disabled={isSaving || totalImageCount >= MAX_IMAGES}
+                                multiple
+                            />
+                        </div>
+
                         <div className="grid gap-2">
                              <div className="flex justify-between items-center">
                                 <Label htmlFor="title">Card Title</Label>
@@ -239,7 +328,7 @@ export default function EditCardPage() {
 
                 <div className="flex justify-end gap-2 mt-6">
                     <Button variant="outline" asChild disabled={isSaving}><Link href={`/collections/${collectionId}`}>Cancel</Link></Button>
-                    <Button onClick={handleSaveChanges} disabled={isSaving || !title || !status}>
+                    <Button onClick={handleSaveChanges} disabled={isSaving || !title || !status || totalImageCount === 0}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>

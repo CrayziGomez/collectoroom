@@ -207,7 +207,9 @@ export default function CollectionPage() {
        ) : (
         <TooltipProvider>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {cards.map(card => (
+            {cards.map(card => {
+                const firstImage = card.images && card.images.length > 0 ? card.images[0] : null;
+                return (
               <Card key={card.id} className="overflow-hidden group">
                 <div className="relative">
                    {isOwner && (
@@ -223,14 +225,20 @@ export default function CollectionPage() {
                     </Tooltip>
                   )}
                   <Link href={`/collections/${collectionData.id}/cards/${card.id}`}>
-                    <Image
-                      src={card.imageUrl}
-                      alt={card.title}
-                      width={300}
-                      height={400}
-                      className="aspect-[3/4] object-cover w-full group-hover:scale-105 transition-transform duration-300"
-                      data-ai-hint={card.imageHint}
-                    />
+                    {firstImage ? (
+                        <Image
+                            src={firstImage.url}
+                            alt={card.title}
+                            width={300}
+                            height={400}
+                            className="aspect-[3/4] object-cover w-full group-hover:scale-105 transition-transform duration-300"
+                            data-ai-hint={firstImage.hint}
+                        />
+                    ) : (
+                        <div className="aspect-[3/4] bg-muted flex items-center justify-center">
+                            <p className="text-xs text-muted-foreground">No Image</p>
+                        </div>
+                    )}
                   </Link>
                 </div>
                 <Link href={`/collections/${collectionData.id}/cards/${card.id}`} className="block p-4">
@@ -253,7 +261,7 @@ export default function CollectionPage() {
                   )}
                 </Link>
               </Card>
-            ))}
+            )})}
             {isOwner && !hasReachedCardLimit && cards.length > 0 && (
               <Link href={`/collections/${collectionData.id}/add`} className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg hover:bg-muted transition-colors p-6 aspect-[3/4]">
                   <PlusCircle className="h-10 w-10 text-muted-foreground mb-2" />
@@ -266,5 +274,3 @@ export default function CollectionPage() {
     </div>
   );
 }
-
-    

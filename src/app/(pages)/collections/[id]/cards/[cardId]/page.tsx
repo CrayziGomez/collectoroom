@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Share2, User, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Loader2, Share2, UserCheck, UserPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFollow } from "@/hooks/use-follow";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 export default function CardDetailPage() {
     const params = useParams();
@@ -128,16 +129,34 @@ export default function CardDetailPage() {
 
             <div className="grid md:grid-cols-3 gap-8">
                 <div className="md:col-span-1">
-                    <Card className="overflow-hidden sticky top-24">
-                        <Image
-                            src={cardData.imageUrl}
-                            alt={cardData.title}
-                            width={600}
-                            height={800}
-                            className="w-full aspect-[3/4] object-cover"
-                            data-ai-hint={cardData.imageHint}
-                        />
-                    </Card>
+                     {cardData.images && cardData.images.length > 0 ? (
+                        <Carousel className="w-full max-w-xs mx-auto">
+                            <CarouselContent>
+                                {cardData.images.map((image, index) => (
+                                    <CarouselItem key={index}>
+                                        <Card className="overflow-hidden">
+                                            <Image
+                                                src={image.url}
+                                                alt={`${cardData.title} - Image ${index + 1}`}
+                                                width={600}
+                                                height={800}
+                                                className="w-full aspect-[3/4] object-cover"
+                                                data-ai-hint={image.hint}
+                                            />
+                                        </Card>
+                                    </CarouselItem>
+                                ))}
+                            </CarouselContent>
+                            <CarouselPrevious className="left-2" />
+                            <CarouselNext className="right-2" />
+                        </Carousel>
+                    ) : (
+                         <Card className="overflow-hidden sticky top-24">
+                             <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center">
+                                <p className="text-muted-foreground">No Image</p>
+                            </div>
+                         </Card>
+                    )}
                 </div>
                 <div className="md:col-span-2">
                     <Card>
