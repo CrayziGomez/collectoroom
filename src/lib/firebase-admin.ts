@@ -45,7 +45,7 @@ function initializeAdminApp(): FirebaseAdminServices {
       Buffer.from(serviceAccountString, 'base64').toString('utf8')
     );
 
-    const newApp = initializeApp({
+    const newApp = getApps().find(app => app?.name === 'firebase-admin-app') || initializeApp({
       credential: cert(serviceAccount),
       storageBucket: storageBucket,
     }, 'firebase-admin-app');
