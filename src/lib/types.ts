@@ -85,12 +85,19 @@ export interface Message {
     timestamp: any;
 }
 
+export interface HowItWorksStep {
+  icon: string;
+  title: string;
+  description: string;
+}
+
 export interface SiteContent {
   id: string;
   title: string;
   description: string;
   imageUrl?: string;
   imageHint?: string;
+  howItWorksSteps?: HowItWorksStep[];
 }
 
 export interface Notification {

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useAuth } from '@/contexts/auth-context';
-import type { SiteContent, Category } from '@/lib/types';
+import type { SiteContent, Category, HowItWorksStep } from '@/lib/types';
 import { useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -40,6 +40,12 @@ export default function HomePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit How It Works Dialog State
+  const [isHowItWorksDialogOpen, setIsHowItWorksDialogOpen] = useState(false);
+  const [editingStep, setEditingStep] = useState<HowItWorksStep | null>(null);
+  const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
+  const [isSavingHowItWorks, setIsSavingHowItWorks] = useState(false);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -148,6 +154,37 @@ export default function HomePage() {
       setIsSavingImage(false);
     }
   };
+
+  const handleOpenHowItWorksDialog = (step: HowItWorksStep, index: number) => {
+    setEditingStep({ ...step });
+    setEditingStepIndex(index);
+    setIsHowItWorksDialogOpen(true);
+  };
+  
+  const handleSaveHowItWorks = async () => {
+    if (!user || !content || editingStep === null || editingStepIndex === null) return;
+    setIsSavingHowItWorks(true);
+    try {
+        const updatedSteps = [...(content.howItWorksSteps || [])];
+        updatedSteps[editingStepIndex] = editingStep;
+
+        const result = await updateSiteContent({
+            id: content.id,
+            howItWorksSteps: updatedSteps,
+        });
+        if (result.success) {
+            toast({ title: 'Success', description: 'Step updated!' });
+            setIsHowItWorksDialogOpen(false);
+            setContent(prev => prev ? { ...prev, howItWorksSteps: updatedSteps } : null);
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error: any) {
+        toast({ title: 'Error', description: error.message || 'Failed to update step.', variant: 'destructive' });
+    } finally {
+        setIsSavingHowItWorks(false);
+    }
+  };
   
   const heroContent = content || {
     id: 'homePage',
@@ -157,22 +194,10 @@ export default function HomePage() {
     imageHint: 'collection display'
   };
 
-  const howItWorksSteps = [
-    {
-      icon: Edit3,
-      title: 'Create Your Cards',
-      description: 'Easily digitize your items with titles, descriptions, and photos.',
-    },
-    {
-      icon: Database,
-      title: 'Organize in Collections',
-      description: 'Group your cards into themed collections. Keep them private or prepare them for the world to see.',
-    },
-    {
-      icon: Share2,
-      title: 'Share Your Passion',
-      description: 'Publish your collections to our gallery, share them via a link, and connect with a community of fellow collectors.',
-    },
+  const howItWorksSteps = content?.howItWorksSteps || [
+    { icon: 'Edit3', title: 'Create Your Cards', description: 'Easily digitize your items with titles, descriptions, and photos.'},
+    { icon: 'Database', title: 'Organize in Collections', description: 'Group your cards into themed collections. Keep them private or prepare them for the world to see.'},
+    { icon: 'Share2', title: 'Share Your Passion', description: 'Publish your collections to our gallery, share them via a link, and connect with a community of fellow collectors.'},
   ];
 
   return (
@@ -246,11 +271,16 @@ export default function HomePage() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Three simple steps to bring your collection online.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            {howItWorksSteps.map(step => (
-              <Card key={step.title} className="text-center">
+            {howItWorksSteps.map((step, index) => (
+              <Card key={index} className="text-center relative group">
+                 {user?.isAdmin && !loading && (
+                  <Button onClick={() => handleOpenHowItWorksDialog(step, index)} variant="secondary" size="icon" className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <CardHeader>
                   <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit">
-                    <step.icon className="h-8 w-8 text-primary" />
+                    <CategoryIcon categoryName={step.icon} className="h-8 w-8 text-primary" />
                   </div>
                   <CardTitle className="mt-4">{step.title}</CardTitle>
                 </CardHeader>
@@ -361,10 +391,44 @@ export default function HomePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+    {/* Edit How It Works Dialog */}
+    <Dialog open={isHowItWorksDialogOpen} onOpenChange={setIsHowItWorksDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle>Edit Step: {editingStep?.title}</DialogTitle>
+            <DialogDescription>
+                Update the title and description for this step. The icon cannot be changed.
+            </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+                <Label htmlFor="hiw-title">Title</Label>
+                <Input
+                id="hiw-title"
+                value={editingStep?.title || ''}
+                onChange={(e) => setEditingStep(prev => prev ? { ...prev, title: e.target.value } : null)}
+                />
+            </div>
+            <div className="grid gap-2">
+                <Label htmlFor="hiw-description">Description</Label>
+                <Textarea
+                id="hiw-description"
+                value={editingStep?.description || ''}
+                onChange={(e) => setEditingStep(prev => prev ? { ...prev, description: e.target.value } : null)}
+                className="min-h-[120px]"
+                />
+            </div>
+            </div>
+            <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleSaveHowItWorks} disabled={isSavingHowItWorks}>
+                {isSavingHowItWorks && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Step
+            </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
-
-    
-
-    
