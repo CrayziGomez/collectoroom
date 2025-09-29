@@ -40,14 +40,15 @@ const defaultHowItWorksSteps = [
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent | null> {
     if (!adminDb) {
-      console.error('Firebase Admin SDK not initialized for getSiteContent.');
+      // This is a diagnostic step. If this message appears on the homepage,
+      // it confirms the Admin SDK is not initializing in the production environment.
       return {
           id: 'homePage',
-          title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
-          description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
-          imageUrl: 'https://picsum.photos/seed/hero/1200/600',
-          imageHint: 'collection display',
-          howItWorksSteps: defaultHowItWorksSteps,
+          title: 'Initialization Error',
+          description: 'The Firebase Admin SDK could not be initialized. This is likely due to an issue with the FIREBASE_SERVICE_ACCOUNT_KEY environment variable in your production environment. Please verify the secret in Secret Manager and App Hosting permissions.',
+          imageUrl: 'https://picsum.photos/seed/error/1200/600',
+          imageHint: 'error illustration',
+          howItWorksSteps: [],
       };
     }
     try {
@@ -78,15 +79,15 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
             }
             return null;
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching site content:", error);
          return {
             id: 'homePage',
-            title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
-            description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
-            imageUrl: 'https://picsum.photos/seed/hero/1200/600',
-            imageHint: 'collection display',
-            howItWorksSteps: defaultHowItWorksSteps,
+            title: 'Data Fetch Error',
+            description: `Failed to fetch content from Firestore. Error: ${error.message}`,
+            imageUrl: 'https://picsum.photos/seed/error/1200/600',
+            imageHint: 'error illustration',
+            howItWorksSteps: [],
         };
     }
 }
