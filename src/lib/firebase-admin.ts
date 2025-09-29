@@ -48,7 +48,7 @@ function initializeAdminApp(): FirebaseAdminServices {
 
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
     if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file.');
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file and hosting provider configuration.');
     }
 
     // Use the reliable client-side environment variable for the bucket name.
@@ -83,7 +83,7 @@ function initializeAdminApp(): FirebaseAdminServices {
 
     } catch (error: any) {
         if (error instanceof SyntaxError) {
-            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in .env.local is a correctly Base64-encoded service account JSON file.', error);
+            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in your hosting environment is a correctly Base64-encoded service account JSON file.', error);
             throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
         }
         console.error('Firebase Admin SDK initialization failed.', error);
