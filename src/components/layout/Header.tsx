@@ -199,7 +199,7 @@ export function Header() {
 
 
         {/* Right side actions */}
-        <div className="flex items-center justify-end space-x-2">
+        <div className="flex flex-1 items-center justify-end space-x-2">
            {!loading && !user && (
             <div className="hidden md:flex items-center gap-2">
               <Button variant="ghost" asChild>
