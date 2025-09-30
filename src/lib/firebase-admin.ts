@@ -51,12 +51,15 @@ function initializeAdminApp(): FirebaseAdminServices {
         throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your hosting provider configuration.');
     }
     
-    // Explicitly define the storage bucket. This is safe as it's public info.
-    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
-     if (!storageBucket) {
-        throw new Error('The storage bucket name could not be determined. Please check the hardcoded value in firebase-admin.ts.');
+    const projectId = "studio-7145415565-66e7d";
+    if (!projectId) {
+        throw new Error('The Firebase projectId could not be determined.');
     }
 
+    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
+    if (!storageBucket) {
+        throw new Error('The storage bucket name could not be determined. Please check the hardcoded value in firebase-admin.ts.');
+    }
 
     let serviceAccount: object;
     try {
@@ -75,6 +78,7 @@ function initializeAdminApp(): FirebaseAdminServices {
     try {
         const newApp = initializeApp({
             credential: cert(serviceAccount),
+            projectId: projectId, // Explicitly set the projectId
             storageBucket: storageBucket,
         });
 
