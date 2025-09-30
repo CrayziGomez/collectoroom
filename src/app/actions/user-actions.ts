@@ -22,7 +22,7 @@ function initializeAdmin() {
   
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(serviceAccountString);
+    serviceAccount = JSON.parse(serviceAccountString.trim());
   } catch (error: any) {
     throw new Error(`Failed to parse service account JSON. Make sure the environment variable is set to the raw JSON content. Original error: ${error.message}`);
   }
