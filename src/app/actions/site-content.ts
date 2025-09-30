@@ -5,15 +5,16 @@ import { getFirestore as getClientFirestore, doc, getDoc, setDoc } from 'firebas
 import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-// This action now uses the CLIENT Firestore instance for reads.
+// --- Client-side DB for reads ---
 function getDb() {
   return getClientFirestore(getClientApp());
 }
 
+// --- Default Content Definitions ---
 const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
       icon: 'Edit3',
@@ -41,6 +42,7 @@ const defaultContent: SiteContent = {
     howItWorksSteps: defaultHowItWorksSteps,
 };
 
+// --- Public Read Action ---
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
         const db = getDb();
@@ -49,20 +51,17 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 
         if (docSnap.exists()) {
             const data = docSnap.data() as SiteContent;
-            // Ensure howItWorksSteps exists, if not, add it and return the merged data
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
                  await setDoc(docRef, { howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            // Document doesn't exist, create it
             await setDoc(doc(db, 'siteContent', input.pageId), defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
         console.error("Critical Error in getSiteContent:", error);
-        // Return default content with an error message to prevent site crash
         return {
            ...defaultContent,
            title: 'Error: Could Not Load Page Content',
@@ -71,9 +70,9 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
     }
 }
 
-// --- Admin Actions using Admin SDK ---
+// --- Admin Write Actions using Admin SDK ---
 
-// Consistent Admin SDK Initialization
+// This is the corrected, robust initialization function.
 function initializeAdmin() {
   const alreadyCreated = getApps();
   if (alreadyCreated.length > 0) {
@@ -88,10 +87,10 @@ function initializeAdmin() {
   
   let serviceAccount;
   try {
+    // Directly parse the JSON string.
     serviceAccount = JSON.parse(serviceAccountString);
   } catch (error: any) {
-    const preview = serviceAccountString.substring(0, 20);
-    throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
+    throw new Error(`Failed to parse service account JSON. Please verify the secret's format. Original error: ${error.message}`);
   }
 
   try {
@@ -108,22 +107,20 @@ function initializeAdmin() {
 
 export async function updateSiteContent(formData: FormData): Promise<{ success: boolean; message: string; imageUrl?: string; }> {
   try {
+    // This now uses the corrected initializeAdmin function.
     const { db, storage } = initializeAdmin();
     const id = formData.get('id') as string;
     const docRef = db.collection('siteContent').doc(id);
 
     const updates: { [key: string]: any } = {};
 
-    // Handle text updates
     if (formData.has('title')) updates.title = formData.get('title');
     if (formData.has('description')) updates.description = formData.get('description');
     
-    // Handle "How It Works" steps updates
     if (formData.has('howItWorksSteps')) {
       updates.howItWorksSteps = JSON.parse(formData.get('howItWorksSteps') as string);
     }
     
-    // Handle image upload
     let imageUrl: string | undefined;
     if (formData.has('imageFile')) {
       const imageFile = formData.get('imageFile') as File;
@@ -136,11 +133,11 @@ export async function updateSiteContent(formData: FormData): Promise<{ success: 
       
       const [signedUrl] = await fileRef.getSignedUrl({
         action: 'read',
-        expires: '01-01-2100', // Far-future expiration date
+        expires: '01-01-2100',
       });
       
       updates.imageUrl = signedUrl;
-      imageUrl = signedUrl; // To return to the client
+      imageUrl = signedUrl;
     }
     
     if (Object.keys(updates).length > 0) {
