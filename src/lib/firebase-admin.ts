@@ -50,18 +50,28 @@ function initializeAdminApp(): FirebaseAdminServices {
     if (!serviceAccountString) {
         throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file and hosting provider configuration.');
     }
-
+    
     // Use the reliable client-side environment variable for the bucket name.
     const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!storageBucket) {
         throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env.local file');
     }
 
+    let serviceAccount: object;
     try {
-        const serviceAccount = JSON.parse(
+        serviceAccount = JSON.parse(
             Buffer.from(serviceAccountString, 'base64').toString('utf8')
         );
+    } catch (error: any) {
+        if (error instanceof SyntaxError) {
+            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in your hosting environment is a correctly Base64-encoded service account JSON file.', error);
+            throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
+        }
+        console.error('Firebase Admin SDK initialization failed during key parsing.', error);
+        throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
+    }
 
+    try {
         const newApp = initializeApp({
             credential: cert(serviceAccount),
             storageBucket: storageBucket,
@@ -82,12 +92,8 @@ function initializeAdminApp(): FirebaseAdminServices {
         return services;
 
     } catch (error: any) {
-        if (error instanceof SyntaxError) {
-            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in your hosting environment is a correctly Base64-encoded service account JSON file.', error);
-            throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
-        }
-        console.error('Firebase Admin SDK initialization failed.', error);
-        throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
+        console.error('Firebase Admin SDK initializeApp failed.', error);
+        throw new Error(`Firebase Admin SDK initializeApp failed: ${error.message}`);
     }
 }
 
