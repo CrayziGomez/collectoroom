@@ -74,37 +74,32 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 // --- Admin Actions using Admin SDK ---
 
 // Consistent Admin SDK Initialization
-function initializeAdmin(): { db: ReturnType<typeof getAdminFirestore>, storage: ReturnType<typeof getStorage>, app: App } {
+function initializeAdmin() {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    const app = alreadyCreated[0];
+    return { db: getAdminFirestore(app), storage: getStorage(app) };
+  }
+
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
   }
-
-  // Use a unique name for the admin app to avoid conflicts
-  const adminAppName = 'firebase-admin-app-site-content';
-  const existingApp = getApps().find(app => app.name === adminAppName);
-
-  if (existingApp) {
-    return { 
-      db: getAdminFirestore(existingApp), 
-      storage: getStorage(existingApp),
-      app: existingApp,
-    };
-  }
-
+  
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(serviceAccountString);
   } catch (error: any) {
-    throw new Error(`Failed to parse service account JSON. Please verify the secret's format. Original error: ${error.message}`);
+    const preview = serviceAccountString.substring(0, 20);
+    throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
   }
 
   try {
     const app = initializeApp({
       credential: cert(serviceAccount),
       storageBucket: 'studio-7145415565-66e7d.appspot.com',
-    }, adminAppName);
-    return { db: getAdminFirestore(app), storage: getStorage(app), app };
+    });
+    return { db: getAdminFirestore(app), storage: getStorage(app) };
   } catch (error: any) {
     throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
   }
