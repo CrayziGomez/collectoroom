@@ -38,7 +38,7 @@ export function initializeAdmin() {
   try {
     adminApp = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: 'studio-7145415565-66e7d.appspot.com',
+      storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
     });
     return { 
       db: getFirestore(adminApp), 
