@@ -57,7 +57,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
         
         const [currentUserSnap, followingSnap] = await Promise.all([
             transaction.get(currentUserRef),
-            transaction.get(followingRef)
+            transaction.get(followingSnap)
         ]);
 
         if (!currentUserSnap.exists) {

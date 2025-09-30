@@ -75,13 +75,31 @@ import { getFirestore as getAdminFirestore, Firestore } from 'firebase-admin/fir
 import { getStorage, Storage } from 'firebase-admin/storage';
 
 function initializeAdminApp(): { db: Firestore; storage: Storage } {
-  const apps = getApps();
-  const adminApp = apps.find(app => app.name === 'adminApp') || initializeApp({
-    credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!)),
-    storageBucket: 'studio-7145415565-66e7d.appspot.com',
-  }, 'adminApp');
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+  
+  let serviceAccount;
+  try {
+      serviceAccount = JSON.parse(serviceAccountString);
+  } catch (error: any) {
+      const preview = serviceAccountString.substring(0, 20);
+      throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
+  }
 
-  return { db: getAdminFirestore(adminApp), storage: getStorage(adminApp) };
+  const appName = 'adminApp';
+  const alreadyCreated = getApps().find(app => app.name === appName);
+  if (alreadyCreated) {
+    return { db: getAdminFirestore(alreadyCreated), storage: getStorage(alreadyCreated) };
+  }
+
+  const app = initializeApp({
+    credential: cert(serviceAccount),
+    storageBucket: 'studio-7145415565-66e7d.appspot.com',
+  }, appName);
+
+  return { db: getAdminFirestore(app), storage: getStorage(app) };
 }
 
 
