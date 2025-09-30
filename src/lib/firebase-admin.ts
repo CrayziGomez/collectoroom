@@ -24,45 +24,46 @@ declare global {
 }
 
 function initializeAdminApp(): FirebaseAdminServices {
+    // In development, hot-reloading can cause this file to be re-evaluated.
+    // We use a global symbol to preserve the initialized app across reloads.
+    if (process.env.NODE_ENV === 'development' && global.__firebase_admin_app__) {
+        return global.__firebase_admin_app__;
+    }
+
+    // Check if the app is already initialized. This is the standard way to handle this.
+    if (getApps().length > 0) {
+        const existingApp = getApps()[0];
+        const services: FirebaseAdminServices = {
+            app: existingApp,
+            auth: getAuth(existingApp),
+            db: getFirestore(existingApp),
+            storage: getStorage(existingApp),
+        };
+        // Also store it on the global for subsequent dev reloads
+        if (process.env.NODE_ENV === 'development') {
+            global.__firebase_admin_app__ = services;
+        }
+        return services;
+    }
+
+    // --- Robust Diagnostic Steps ---
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        throw new Error('DIAGNOSTIC: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or empty.');
+    }
+    
+    let serviceAccount: object;
     try {
-        // In development, hot-reloading can cause this file to be re-evaluated.
-        // We use a global symbol to preserve the initialized app across reloads.
-        if (process.env.NODE_ENV === 'development' && global.__firebase_admin_app__) {
-            return global.__firebase_admin_app__;
-        }
+        const decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
+        serviceAccount = JSON.parse(decodedKey);
+    } catch (error: any) {
+        throw new Error(`DIAGNOSTIC: Failed to parse service account key from Base64. Error: ${error.message}`);
+    }
 
-        // Check if the app is already initialized. This is the standard way to handle this.
-        if (getApps().length > 0) {
-            const existingApp = getApps()[0];
-            const services: FirebaseAdminServices = {
-                app: existingApp,
-                auth: getAuth(existingApp),
-                db: getFirestore(existingApp),
-                storage: getStorage(existingApp),
-            };
-            // Also store it on the global for subsequent dev reloads
-            if (process.env.NODE_ENV === 'development') {
-                global.__firebase_admin_app__ = services;
-            }
-            return services;
-        }
+    const projectId = "studio-7145415565-66e7d";
+    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
 
-        const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-        if (!serviceAccountString) {
-            throw new Error('DIAGNOSTIC: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or empty.');
-        }
-        
-        let serviceAccount: object;
-        try {
-            const decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
-            serviceAccount = JSON.parse(decodedKey);
-        } catch (error: any) {
-            throw new Error(`DIAGNOSTIC: Failed to parse service account key from Base64. Error: ${error.message}`);
-        }
-
-        const projectId = "studio-7145415565-66e7d";
-        const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
-
+    try {
         const newApp = initializeApp({
             credential: cert(serviceAccount),
             projectId: projectId,
@@ -85,8 +86,8 @@ function initializeAdminApp(): FirebaseAdminServices {
     } catch (error: any) {
         // This is the critical diagnostic block.
         // We re-throw the error with a clear prefix to ensure it's visible in the logs.
-        console.error('CRITICAL: Firebase Admin SDK initialization failed.', error);
-        throw new Error(`DIAGNOSTIC_ERROR: Firebase Admin initialization failed with error: "${error.message}"`);
+        console.error('CRITICAL: Firebase Admin SDK initializeApp failed.', error);
+        throw new Error(`DIAGNOSTIC_ERROR: Firebase Admin initializeApp failed with error: "${error.message}"`);
     }
 }
 
