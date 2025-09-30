@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2, View } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2, View, Terminal } from 'lucide-react';
 import { SEED_CATEGORIES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -41,6 +41,12 @@ import { addCategory } from '@/app/actions/category-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+
+const IAM_COMMANDS = [
+    'gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/firebase.admin"',
+    'gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/iam.serviceAccountTokenCreator"',
+    'gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/storage.admin"'
+];
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAuth();
@@ -191,6 +197,19 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
         <p className="text-muted-foreground">Manage users, categories, and view platform statistics.</p>
       </div>
+
+       <Alert variant="destructive">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Action Required: Set IAM Permissions</AlertTitle>
+            <AlertDescription>
+                <p>The app may not function correctly until you grant the required permissions to the Firebase service account. Please run the following commands in your local terminal (ensure you have gcloud CLI installed and authenticated):</p>
+                <pre className="mt-2 p-3 bg-black/80 text-white rounded-md text-xs overflow-x-auto">
+                    <code>
+                        {IAM_COMMANDS.join('\n')}
+                    </code>
+                </pre>
+            </AlertDescription>
+        </Alert>
       
       {/* Statistics */}
       <div className="grid gap-4 md:grid-cols-3">
