@@ -66,7 +66,7 @@ function initializeAdminApp(): FirebaseAdminServices {
     }
 
     const projectId = "studio-7145415565-66e7d";
-    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
+    const storageBucket = "studio-7145415565-66e7d.appspot.com";
 
     try {
         const newApp = initializeApp({
