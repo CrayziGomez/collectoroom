@@ -1,44 +1,11 @@
 
 'use server';
 
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import type { ImageRecord } from '@/lib/types';
-
-// Self-contained Firebase Admin initialization
-function initializeAdmin() {
-  const alreadyCreated = getApps();
-  if (alreadyCreated.length > 0) {
-    const app = alreadyCreated[0];
-    return { db: getFirestore(app), storage: getStorage(app) };
-  }
-
-  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountString) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-  }
-  
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(serviceAccountString);
-  } catch (error: any) {
-    const preview = serviceAccountString.substring(0, 20);
-    throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
-  }
-
-  try {
-    const app = initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
-    });
-    return { db: getFirestore(app), storage: getStorage(app) };
-  } catch (error: any) {
-    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
-  }
-}
+import { initializeAdmin } from '@/lib/firebase-admin';
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
     const { storage } = initializeAdmin();

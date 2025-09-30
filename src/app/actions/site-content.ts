@@ -5,9 +5,7 @@ import { getFirestore as getClientFirestore, doc, getDoc, setDoc } from 'firebas
 import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+import { initializeAdmin } from '@/lib/firebase-admin';
 
 // --- Client-side DB for reads ---
 function getDb() {
@@ -71,43 +69,8 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 }
 
 // --- Admin Write Actions using Admin SDK ---
-
-// This is the corrected, robust initialization function.
-function initializeAdmin() {
-  const alreadyCreated = getApps();
-  if (alreadyCreated.length > 0) {
-    const app = alreadyCreated[0];
-    return { db: getAdminFirestore(app), storage: getStorage(app) };
-  }
-
-  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountString) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-  }
-  
-  let serviceAccount;
-  try {
-    // Directly parse the JSON string.
-    serviceAccount = JSON.parse(serviceAccountString);
-  } catch (error: any) {
-    throw new Error(`Failed to parse service account JSON. Please verify the secret's format. Original error: ${error.message}`);
-  }
-
-  try {
-    const app = initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
-    });
-    return { db: getAdminFirestore(app), storage: getStorage(app) };
-  } catch (error: any) {
-    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
-  }
-}
-
-
 export async function updateSiteContent(formData: FormData): Promise<{ success: boolean; message: string; imageUrl?: string; }> {
   try {
-    // This now uses the corrected initializeAdmin function.
     const { db, storage } = initializeAdmin();
     const id = formData.get('id') as string;
     const docRef = db.collection('siteContent').doc(id);
