@@ -35,9 +35,9 @@ This phase ensures your local development environment is running correctly and y
 
 ---
 
-## Phase 2: Firebase Storage & Feature Enhancement
+## Phase 2: Firebase Storage, Permissions & Feature Enhancement
 
-This phase integrates Firebase Storage for file uploads, starting with user avatars.
+This phase integrates Firebase Storage, ensures the correct permissions are set, and enables file uploads.
 
 ### 2.1: Enable Firebase Storage
 - **Objective:** Activate the Storage service in your Firebase project.
@@ -47,11 +47,21 @@ This phase integrates Firebase Storage for file uploads, starting with user avat
   - In the left-hand menu, go to **Build > Storage**.
   - Click "Get started" and follow the prompts to enable it. You can use the default security rules for now, as we will override them.
 
-### 2.2: Implement Profile Photo Uploads
+### 2.2: Grant Required IAM Roles
+- **Objective:** Grant the necessary permissions to your service account so the backend can access Firebase services.
+- **Action:**
+  - Run the following command in your terminal. This grants the Admin SDK the roles it needs to manage users, data, and files.
+  ```bash
+  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/firebase.admin"
+  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/iam.serviceAccountTokenCreator"
+  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/storage.admin"
+  ```
+
+### 2.3: Implement Profile Photo Uploads
 - **Objective:** Allow users to upload and change their profile avatar.
 - **Status:** **Implemented.** The code for this is now in place. Users can change their avatar from the "Profile Settings" page.
 
-### 2.3: Implement Collection & Card Image Uploads
+### 2.4: Implement Collection & Card Image Uploads
 - **Objective:** Replace placeholder images with real image uploads for collections and cards.
 - **Action:**
   - This will involve updating the "Create/Edit Collection" and "Add/Edit Card" pages to include file upload components.
