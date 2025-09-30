@@ -21,7 +21,7 @@ function initializeAdminApp(): { db: Firestore; storage: Storage } {
   
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(serviceAccountString.trim());
+    serviceAccount = JSON.parse(serviceAccountString);
   } catch (error: any) {
     const preview = serviceAccountString.substring(0, 20);
     throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
