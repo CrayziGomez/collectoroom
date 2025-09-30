@@ -137,9 +137,9 @@ export function HomePageClientContent({
       if (result.success && result.imageUrl) {
         toast({ title: 'Success', description: 'Hero image updated!' });
         setIsImageDialogOpen(false);
-        setHeroContent(prev => ({ ...prev, imageUrl: result.imageUrl }));
+        setHeroContent(prev => ({ ...prev, imageUrl: result.imageUrl! }));
       } else {
-        throw new Error(result.message);
+        throw new Error(result.message || 'An unknown error occurred while updating the image.');
       }
 
     } catch (error: any) {
@@ -403,3 +403,5 @@ export function HomePageClientContent({
     </>
   );
 }
+
+    

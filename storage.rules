@@ -1,46 +1,43 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
     
     // --- Public Read Access for All Files ---
-    // Allow public read access to all files.
+    // Allow public read access to all files by default.
+    // This simplifies development and is acceptable for public assets.
     match /{allPaths=**} {
       allow read;
     }
 
     // --- WRITE RULES ---
-    // Only authenticated users can write, and only to their own paths.
-    
+    // Function to verify that the user is the owner of the path.
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // USER PROFILE IMAGES
+    // USER PROFILE IMAGES: Only the owner can upload their avatar.
     match /users/{userId}/profile/{fileName} {
       allow write: if isOwner(userId) 
-                    && request.resource.size < 2 * 1024 * 1024
+                    && request.resource.size < 2 * 1024 * 1024 // 2MB limit
                     && request.resource.contentType.matches('image/.*');
     }
     
-    // COLLECTION COVER IMAGES
-    match /users/{userId}/collections/{collectionId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-    
-    // CARD IMAGES
+    // CARD IMAGES: Only the owner can upload images for their cards.
      match /users/{userId}/cards/{cardId}/{fileName} {
        allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
+                     && request.resource.size < 5 * 1024 * 1024 // 5MB limit
                      && request.resource.contentType.matches('image/.*');
     }
 
-    // SITE CONTENT IMAGES
-    // Disallow all client-side writes. All writes must go through the server action.
+    // SITE CONTENT IMAGES: Disallow all client-side writes.
+    // All uploads to this path MUST be done via a secure server action
+    // using the Firebase Admin SDK, which bypasses these rules.
     match /site-content/{allPaths=**} {
       allow write: if false;
     }
   }
 }
+
+    
