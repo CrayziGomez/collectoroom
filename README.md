@@ -117,4 +117,4 @@ This is the final phase to make your site live on a custom domain.
 - **Action:**
   - After pushing to your `main` branch and a successful build, your site will be available at your custom domain. Congratulations!
 
-this is a test update
+this is a test updated
