@@ -19,6 +19,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from '@/lib/firebase';
 import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
 import { collection, getDocs } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function HomePage() {
@@ -212,10 +213,10 @@ export default function HomePage() {
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              {loading ? (
+              {loading || !content ? (
                 <div className="space-y-4">
-                    <div className="h-10 w-3/4 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></div>
-                    <div className="h-10 w-1/2 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></div>
+                    <Skeleton className="h-10 w-3/4 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></Skeleton>
+                    <Skeleton className="h-10 w-1/2 bg-muted animate-pulse rounded-md mx-auto md:mx-0"></Skeleton>
                 </div>
               ) : (
                 <h1
@@ -224,8 +225,8 @@ export default function HomePage() {
                 />
               )}
             </div>
-             {loading ? (
-                <div className="h-12 w-full bg-muted animate-pulse rounded-md max-w-xl mx-auto md:mx-0"></div>
+             {loading || !content ? (
+                <Skeleton className="h-12 w-full bg-muted animate-pulse rounded-md max-w-xl mx-auto md:mx-0"></Skeleton>
               ) : (
                 <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
                   {heroContent.description}
@@ -241,23 +242,25 @@ export default function HomePage() {
             </div>
           </div>
           <div className="relative">
-            {loading ? (
-              <div className="rounded-lg shadow-lg aspect-video bg-muted animate-pulse" />
+            {loading || !content ? (
+              <Skeleton className="rounded-lg shadow-lg aspect-video bg-muted animate-pulse" />
             ) : (
-              <Image
-                src={heroContent.imageUrl || 'https://picsum.photos/seed/hero/1200/600'}
-                alt={heroContent.description}
-                width={600}
-                height={400}
-                className="rounded-lg shadow-lg aspect-video object-cover"
-                data-ai-hint={heroContent.imageHint}
-                key={heroContent.imageUrl}
-              />
-            )}
-            {user?.isAdmin && !loading && (
-              <Button onClick={handleOpenImageDialog} variant="secondary" size="icon" className="absolute top-4 right-4 h-8 w-8">
-                <Pencil className="h-4 w-4" />
-              </Button>
+              <>
+                <Image
+                  src={heroContent.imageUrl || 'https://picsum.photos/seed/hero/1200/600'}
+                  alt={heroContent.description}
+                  width={600}
+                  height={400}
+                  className="rounded-lg shadow-lg aspect-video object-cover"
+                  data-ai-hint={heroContent.imageHint}
+                  key={heroContent.imageUrl}
+                />
+                {user?.isAdmin && (
+                  <Button onClick={handleOpenImageDialog} variant="secondary" size="icon" className="absolute top-4 right-4 h-8 w-8">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -1,8 +1,6 @@
 
 'use server';
 
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { getClientApp } from '@/lib/firebase'; // Use the universal initializer
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { adminDb } from '@/lib/firebase-admin';
 
@@ -40,36 +38,28 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
             return { id: input.pageId, title: 'Page Content', description: '...' };
         }
         
-        // Initialize the app and Firestore on the server correctly
-        const app = getClientApp();
-        const db = getFirestore(app);
-
-        const docRef = doc(db, 'siteContent', input.pageId);
-        const docSnap = await getDoc(docRef);
+        const docRef = adminDb.collection('siteContent').doc(input.pageId);
+        const docSnap = await docRef.get();
 
         if (docSnap.exists()) {
             const data = docSnap.data() as SiteContent;
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
+                 await docRef.set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            // Attempt to create the document with public rules. This might fail if rules
-            // are restrictive, but the page will still render with default content.
-            await setDoc(doc(db, 'siteContent', 'homePage'), defaultContent).catch(e => {
-                console.warn("Could not create default site content, likely due to Firestore security rules. This is non-critical.", e.message);
-            });
+            await adminDb.collection('siteContent').doc('homePage').set(defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
         console.error("Critical Error in getSiteContent. Returning default content.", error);
-        // Return a fallback object so the page can still render with an error message
-        const errorContent = {
+        // Return a fallback object so the page can still render
+        return {
            ...defaultContent,
            title: 'Error: Could Not Load Page Content',
-           description: `There was a problem connecting to the database. Please check your Firestore security rules. Error: ${error.message}`,
+           description: `There was a problem connecting to the database. Please check your service account permissions. Original error: ${error.message}`,
         };
-        return errorContent;
     }
 }
 

@@ -1,3 +1,4 @@
+
 // This file is NOT a 'use server' file. It is a server-side utility module.
 // It is safe to run on the server because it is only imported by server actions.
 
@@ -45,34 +46,23 @@ function initializeAdminApp(): FirebaseAdminServices {
         return services;
     }
 
-    // --- Robust Diagnostic Steps ---
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
     if (!serviceAccountString) {
-        throw new Error('DIAGNOSTIC: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or empty.');
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. This is required for server-side operations.');
     }
     
-    let decodedKey: string;
-    try {
-        decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
-    } catch (error: any) {
-        throw new Error(`DIAGNOSTIC: Failed to decode Base64 service account key. Error: ${error.message}`);
-    }
-
     let serviceAccount: object;
     try {
+        const decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
         serviceAccount = JSON.parse(decodedKey);
     } catch (error: any) {
-        throw new Error(`DIAGNOSTIC: Failed to parse service account key from decoded JSON. Error: ${error.message}`);
+        throw new Error(`Failed to parse service account key. Check if the environment variable is a valid Base64 encoded JSON. Error: ${error.message}`);
     }
-
-    const projectId = "studio-7145415565-66e7d";
-    const storageBucket = "studio-7145415565-66e7d.appspot.com";
 
     try {
         const newApp = initializeApp({
             credential: cert(serviceAccount),
-            projectId: projectId,
-            storageBucket: storageBucket,
+            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
         });
 
         const services: FirebaseAdminServices = {
@@ -89,10 +79,8 @@ function initializeAdminApp(): FirebaseAdminServices {
         return services;
 
     } catch (error: any) {
-        // This is the critical diagnostic block.
-        // We re-throw the error with a clear prefix to ensure it's visible in the logs.
         console.error('CRITICAL: Firebase Admin SDK initializeApp failed.', error);
-        throw new Error(`DIAGNOSTIC_ERROR: Firebase Admin initializeApp failed with error: "${error.message}"`);
+        throw new Error(`Firebase Admin initializeApp failed: "${error.message}"`);
     }
 }
 
