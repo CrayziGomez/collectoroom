@@ -21,13 +21,9 @@ function initializeAdminApp(): { db: Firestore; storage: Storage } {
   
   let serviceAccount;
   try {
-    const decodedString = Buffer.from(serviceAccountString, 'base64').toString('utf8');
-    serviceAccount = JSON.parse(decodedString);
+    serviceAccount = JSON.parse(serviceAccountString);
   } catch (error: any) {
-    if (error.message.includes("Unexpected token")) {
-       throw new Error(`Failed to parse decoded service account JSON. The decoded string is not valid JSON. Original error: ${error.message}`);
-    }
-    throw new Error(`Failed to decode FIREBASE_SERVICE_ACCOUNT_KEY from Base64. Make sure it is a valid Base64-encoded string. Original error: ${error.message}`);
+    throw new Error(`Failed to parse service account JSON. Make sure the environment variable is set to the raw JSON content. Original error: ${error.message}`);
   }
 
   try {
