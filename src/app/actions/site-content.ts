@@ -1,14 +1,14 @@
 
 'use server';
 
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore as getClientFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 
 // This action now uses the CLIENT Firestore instance for reads.
 function getDb() {
-  return getFirestore(getClientApp());
+  return getClientFirestore(getClientApp());
 }
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
