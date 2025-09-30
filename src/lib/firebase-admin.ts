@@ -48,14 +48,15 @@ function initializeAdminApp(): FirebaseAdminServices {
 
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
     if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file and hosting provider configuration.');
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your hosting provider configuration.');
     }
     
-    // Use the reliable client-side environment variable for the bucket name.
-    const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-    if (!storageBucket) {
-        throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env.local file');
+    // Explicitly define the storage bucket. This is safe as it's public info.
+    const storageBucket = "studio-7145415565-66e7d.appspot.com";
+     if (!storageBucket) {
+        throw new Error('The storage bucket name could not be determined. Please check the hardcoded value in firebase-admin.ts.');
     }
+
 
     let serviceAccount: object;
     try {
@@ -64,7 +65,7 @@ function initializeAdminApp(): FirebaseAdminServices {
         );
     } catch (error: any) {
         if (error instanceof SyntaxError) {
-            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in your hosting environment is a correctly Base64-encoded service account JSON file.', error);
+            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Ensure FIREBASE_SERVICE_ACCOUNT_KEY is a correctly Base64-encoded service account JSON file.', error);
             throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
         }
         console.error('Firebase Admin SDK initialization failed during key parsing.', error);
