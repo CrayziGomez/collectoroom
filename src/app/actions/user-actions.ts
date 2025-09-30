@@ -7,12 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    let db;
-    try {
-        db = initializeAdminApp().db;
-    } catch (error) {
-        throw new Error('Failed to initialize Firebase Admin SDK.');
-    }
+    const { db } = initializeAdminApp();
     
     const { targetUserId, currentUserId } = input;
 
@@ -86,14 +81,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    let db, storage;
-    try {
-        const admin = initializeAdminApp();
-        db = admin.db;
-        storage = admin.storage;
-    } catch (error) {
-        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-    }
+    const { db, storage } = initializeAdminApp();
 
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;

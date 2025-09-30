@@ -7,12 +7,7 @@ import { revalidatePath } from 'next/cache';
 
 
 export async function addCategory(input: { name: string; description: string }) {
-  let db;
-  try {
-      db = initializeAdminApp().db;
-  } catch (error) {
-      return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-  }
+  const { db } = initializeAdminApp();
 
   try {
     const { name, description } = input;

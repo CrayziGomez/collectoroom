@@ -32,12 +32,7 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
 
 
 export async function createCard(formData: FormData) {
-    let db;
-    try {
-        db = initializeAdminApp().db;
-    } catch (error) {
-        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-    }
+    const { db } = initializeAdminApp();
 
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -105,14 +100,7 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(formData: FormData) {
-    let db, storage;
-    try {
-        const admin = initializeAdminApp();
-        db = admin.db;
-        storage = admin.storage;
-    } catch (error) {
-        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-    }
+    const { db, storage } = initializeAdminApp();
 
     const userId = formData.get('userId') as string;
     const cardId = formData.get('cardId') as string;
@@ -170,15 +158,7 @@ export async function updateCard(formData: FormData) {
 
 
 export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
-    let db, storage;
-    try {
-        const admin = initializeAdminApp();
-        db = admin.db;
-        storage = admin.storage;
-    } catch (error) {
-        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-    }
-
+    const { db, storage } = initializeAdminApp();
     const { cardId, collectionId, images } = input;
     
     try {

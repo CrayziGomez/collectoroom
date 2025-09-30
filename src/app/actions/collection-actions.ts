@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -9,12 +9,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 // --- Server Action to Create a Collection ---
 export async function createCollection(formData: FormData) {
     
-    let db;
-    try {
-        db = initializeAdminApp();
-    } catch (error) {
-        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-    }
+    const { db } = initializeAdminApp();
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;

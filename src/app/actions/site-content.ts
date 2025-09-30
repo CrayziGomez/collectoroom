@@ -66,12 +66,7 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 
 
 export async function updateSiteContent(input: any) {
-  let db;
-  try {
-      db = initializeAdminApp().db;
-  } catch (error) {
-      return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
-  }
+  const { db } = initializeAdminApp();
 
   try {
     const docRef = db.collection('siteContent').doc(input.id);
