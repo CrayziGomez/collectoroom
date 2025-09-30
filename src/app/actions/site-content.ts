@@ -39,25 +39,16 @@ const defaultHowItWorksSteps = [
 ];
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent | null> {
-    if (!adminDb) {
-      // This is a diagnostic step. If this message appears on the homepage,
-      // it confirms the Admin SDK is not initializing in the production environment.
-      return {
-          id: 'homePage',
-          title: 'Initialization Error',
-          description: 'The Firebase Admin SDK could not be initialized. This is likely due to an issue with the FIREBASE_SERVICE_ACCOUNT_KEY environment variable in your production environment. Please verify the secret in Secret Manager and App Hosting permissions.',
-          imageUrl: 'https://picsum.photos/seed/error/1200/600',
-          imageHint: 'error illustration',
-          howItWorksSteps: [],
-      };
-    }
     try {
+        if (!adminDb) {
+          throw new Error('Firebase Admin SDK (adminDb) is not initialized. Check your server environment variables and firebase-admin.ts file.');
+        }
+
         const docRef = adminDb.collection('siteContent').doc(input.pageId);
         const docSnap = await docRef.get();
 
         if (docSnap.exists) {
             const data = docSnap.data();
-            // If howItWorksSteps is missing, add the default and update the document
             if (!data?.howItWorksSteps && input.pageId === 'homePage') {
                 const updatedData = { ...data, howItWorksSteps: defaultHowItWorksSteps };
                 await docRef.set(updatedData, { merge: true });
@@ -80,11 +71,11 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
             return null;
         }
     } catch (error: any) {
-        console.error("Error fetching site content:", error);
+        console.error("Critical Error in getSiteContent:", error);
          return {
             id: 'homePage',
-            title: 'Data Fetch Error',
-            description: `Failed to fetch content from Firestore. Error: ${error.message}`,
+            title: 'Error: Could not load page content.',
+            description: `A critical server error occurred. Please check the server logs. Error message: "${error.message}". Stack: ${error.stack}`,
             imageUrl: 'https://picsum.photos/seed/error/1200/600',
             imageHint: 'error illustration',
             howItWorksSteps: [],
