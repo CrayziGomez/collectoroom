@@ -1,15 +1,19 @@
 
 'use server';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 
 
 export async function addCategory(input: { name: string; description: string }) {
-  if (!adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized.' };
+  let db;
+  try {
+      db = initializeAdminApp().db;
+  } catch (error) {
+      return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
   }
+
   try {
     const { name, description } = input;
 
@@ -17,7 +21,7 @@ export async function addCategory(input: { name: string; description: string }) 
       throw new Error('Category name is required.');
     }
 
-    const categoryRef = adminDb.collection('categories').doc();
+    const categoryRef = db.collection('categories').doc();
     await categoryRef.set({
       name,
       description,
@@ -25,11 +29,9 @@ export async function addCategory(input: { name: string; description: string }) 
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Revalidate paths where categories are used
     revalidatePath('/admin');
     revalidatePath('/gallery');
     revalidatePath('/my-collectoroom/create');
-    // Add any other paths that need revalidation
 
     return { success: true, message: `Category "${name}" added successfully.` };
   } catch (error: any) {

@@ -1,15 +1,19 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    if (!adminDb) {
-      throw new Error('Firebase Admin SDK not initialized.');
+    let db;
+    try {
+        db = initializeAdminApp().db;
+    } catch (error) {
+        throw new Error('Failed to initialize Firebase Admin SDK.');
     }
+    
     const { targetUserId, currentUserId } = input;
 
     if (currentUserId === targetUserId) {
@@ -17,9 +21,9 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
     }
 
     try {
-      const newState = await adminDb.runTransaction(async (transaction) => {
-        const currentUserRef = adminDb.collection('users').doc(currentUserId);
-        const targetUserRef = adminDb.collection('users').doc(targetUserId);
+      const newState = await db.runTransaction(async (transaction) => {
+        const currentUserRef = db.collection('users').doc(currentUserId);
+        const targetUserRef = db.collection('users').doc(targetUserId);
         const followingRef = currentUserRef.collection('following').doc(targetUserId);
         const followerRef = targetUserRef.collection('followers').doc(currentUserId);
         
@@ -55,7 +59,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
           transaction.update(targetUserRef, { followerCount: FieldValue.increment(1) });
           
           // --- Notification Logic ---
-          const notificationRef = adminDb.collection('notifications').doc();
+          const notificationRef = db.collection('notifications').doc();
           transaction.set(notificationRef, {
             recipientId: targetUserId,
             senderId: currentUserId,
@@ -82,29 +86,32 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
+    let db, storage;
+    try {
+        const admin = initializeAdminApp();
+        db = admin.db;
+        storage = admin.storage;
+    } catch (error) {
+        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
+    }
+
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
 
     if (!userId || !file) {
         return { success: false, message: 'Missing userId or file.' };
     }
-
-    if (!adminStorage || !adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized correctly.' };
-    }
         
     try {
-        const bucket = adminStorage.bucket();
-        const userDocRef = adminDb.collection('users').doc(userId);
+        const bucket = storage.bucket();
+        const userDocRef = db.collection('users').doc(userId);
 
-        // Delete old avatar if it exists
         const userDoc = await userDocRef.get();
         const userData = userDoc.data();
         if (userData?.avatarUrl) {
             try {
                  if (userData.avatarUrl.includes(bucket.name)) {
                     const oldUrl = new URL(userData.avatarUrl);
-                    // Extract path from a URL like: https://storage.googleapis.com/BUCKET_NAME/path/to/file.jpg
                     const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf(bucket.name) + bucket.name.length + 1));
                     if (oldPath) {
                         await bucket.file(oldPath).delete({ ignoreNotFound: true });
@@ -115,7 +122,6 @@ export async function updateAvatar(formData: FormData) {
             }
         }
 
-        // Upload new avatar
         const fileExtension = file.name.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = `users/${userId}/profile/${fileName}`;
@@ -124,13 +130,11 @@ export async function updateAvatar(formData: FormData) {
 
         await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
         
-        // Generate a long-lived signed URL for reliable access
         const [signedUrl] = await fileRef.getSignedUrl({
           action: 'read',
-          expires: '01-01-2100', // Set a very distant expiration date
+          expires: '01-01-2100',
         });
         
-        // Save the signed URL to Firestore
         await userDocRef.update({
             avatarUrl: signedUrl,
         });
@@ -141,7 +145,6 @@ export async function updateAvatar(formData: FormData) {
         return { success: true, avatarUrl: signedUrl, message: `Avatar updated successfully (URL: ${signedUrl})` };
     } catch (error: any) {
         console.error('Error updating avatar:', error);
-        // Provide a more structured error response
         const errorMessage = error.message || 'An unknown error occurred during avatar upload.';
         const errorCode = error.code || 'UNKNOWN';
         return { success: false, message: `Upload Failed: {"code":"${errorCode}","message":"${errorMessage}"}`, avatarUrl: null };

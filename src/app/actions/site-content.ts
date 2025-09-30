@@ -2,7 +2,7 @@
 'use server';
 
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
-import { adminDb } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
@@ -34,11 +34,13 @@ const defaultContent: SiteContent = {
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
+        const { db } = initializeAdminApp();
+        
         if (input.pageId !== 'homePage') {
             return { id: input.pageId, title: 'Page Content', description: '...' };
         }
         
-        const docRef = adminDb.collection('siteContent').doc(input.pageId);
+        const docRef = db.collection('siteContent').doc(input.pageId);
         const docSnap = await docRef.get();
 
         if (docSnap.exists()) {
@@ -49,12 +51,11 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            await adminDb.collection('siteContent').doc('homePage').set(defaultContent);
+            await db.collection('siteContent').doc('homePage').set(defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
         console.error("Critical Error in getSiteContent. Returning default content.", error);
-        // Return a fallback object so the page can still render
         return {
            ...defaultContent,
            title: 'Error: Could Not Load Page Content',
@@ -65,11 +66,15 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 
 
 export async function updateSiteContent(input: any) {
-  if (!adminDb) {
-      return { success: false, message: 'Firebase Admin SDK not initialized.' };
-  }
+  let db;
   try {
-    const docRef = adminDb.collection('siteContent').doc(input.id);
+      db = initializeAdminApp().db;
+  } catch (error) {
+      return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
+  }
+
+  try {
+    const docRef = db.collection('siteContent').doc(input.id);
     const { id, ...content } = input;
     await docRef.set(content, { merge: true });
     return { success: true, message: 'Content updated successfully.' };

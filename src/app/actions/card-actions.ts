@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +9,8 @@ import type { ImageRecord } from '@/lib/types';
 
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const bucket = adminStorage.bucket();
+    const { storage } = initializeAdminApp();
+    const bucket = storage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
     const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
     const fileRef = bucket.file(imagePath);
@@ -31,6 +32,13 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
 
 
 export async function createCard(formData: FormData) {
+    let db;
+    try {
+        db = initializeAdminApp().db;
+    } catch (error) {
+        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
+    }
+
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
     const title = formData.get('title') as string;
@@ -44,16 +52,15 @@ export async function createCard(formData: FormData) {
     }
 
     try {
-        const cardId = adminDb.collection('cards').doc().id;
+        const cardId = db.collection('cards').doc().id;
 
         const imageRecords = await Promise.all(
             images.map(image => uploadImage(image, userId, collectionId, cardId))
         );
 
-        const cardRef = adminDb.collection('cards').doc(cardId);
-        const collectionRef = adminDb.collection('collections').doc(collectionId);
+        const cardRef = db.collection('cards').doc(cardId);
+        const collectionRef = db.collection('collections').doc(collectionId);
         
-        // Fetch collection to check card count
         const collectionDoc = await collectionRef.get();
         if (!collectionDoc.exists) {
             throw new Error("Collection not found.");
@@ -61,7 +68,7 @@ export async function createCard(formData: FormData) {
         const collectionData = collectionDoc.data();
         const isFirstCard = (collectionData?.cardCount || 0) === 0;
 
-        const batch = adminDb.batch();
+        const batch = db.batch();
 
         batch.set(cardRef, {
             userId,
@@ -78,7 +85,6 @@ export async function createCard(formData: FormData) {
             cardCount: FieldValue.increment(1) 
         };
 
-        // If it's the first card and it has images, set the cover photo
         if (isFirstCard && imageRecords.length > 0) {
             collectionUpdate.coverImage = imageRecords[0].url;
             collectionUpdate.coverImageHint = imageRecords[0].hint;
@@ -99,6 +105,15 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(formData: FormData) {
+    let db, storage;
+    try {
+        const admin = initializeAdminApp();
+        db = admin.db;
+        storage = admin.storage;
+    } catch (error) {
+        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
+    }
+
     const userId = formData.get('userId') as string;
     const cardId = formData.get('cardId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -113,7 +128,7 @@ export async function updateCard(formData: FormData) {
     }
 
     try {
-        const cardRef = adminDb.collection('cards').doc(cardId);
+        const cardRef = db.collection('cards').doc(cardId);
         const cardDoc = await cardRef.get();
         const cardData = cardDoc.data();
 
@@ -121,23 +136,20 @@ export async function updateCard(formData: FormData) {
             throw new Error("Card not found.");
         }
         
-        // --- Image Deletion ---
         const originalImages: ImageRecord[] = cardData.images || [];
         const imagesToDelete = originalImages.filter(origImg => 
             !existingImages.some(existImg => existImg.path === origImg.path)
         );
 
-        const bucket = adminStorage.bucket();
+        const bucket = storage.bucket();
         await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         
-        // --- Image Upload ---
         const newImageRecords = await Promise.all(
             newImages.map(image => uploadImage(image, userId, collectionId, cardId))
         );
 
         const finalImages = [...existingImages, ...newImageRecords];
 
-        // --- Update Firestore ---
         await cardRef.update({
             title,
             description,
@@ -158,20 +170,27 @@ export async function updateCard(formData: FormData) {
 
 
 export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
+    let db, storage;
+    try {
+        const admin = initializeAdminApp();
+        db = admin.db;
+        storage = admin.storage;
+    } catch (error) {
+        return { success: false, message: 'Failed to initialize Firebase Admin SDK.' };
+    }
+
     const { cardId, collectionId, images } = input;
     
     try {
-        const cardRef = adminDb.collection('cards').doc(cardId);
-        const collectionRef = adminDb.collection('collections').doc(collectionId);
+        const cardRef = db.collection('cards').doc(cardId);
+        const collectionRef = db.collection('collections').doc(collectionId);
 
-        // Delete images from storage
-        const bucket = adminStorage.bucket();
+        const bucket = storage.bucket();
         if (images && images.length > 0) {
             await Promise.all(images.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         }
 
-        // Delete Firestore document and update collection count in a batch
-        const batch = adminDb.batch();
+        const batch = db.batch();
         batch.delete(cardRef);
         batch.update(collectionRef, { cardCount: FieldValue.increment(-1) });
         await batch.commit();
