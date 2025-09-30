@@ -24,6 +24,9 @@ function initializeAdmin() {
     });
     return { db: getFirestore(app) };
   } catch (error: any) {
+    if (error.code === 'SyntaxError') {
+       throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it is a valid, Base64-encoded JSON string. Original error: ${error.message}`);
+    }
     throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
   }
 }
