@@ -1,15 +1,40 @@
 
 'use server';
 
-import { initializeAdminApp } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import type { ImageRecord } from '@/lib/types';
 
+// Self-contained Firebase Admin initialization
+function initializeAdmin() {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    const app = alreadyCreated[0];
+    return { db: getFirestore(app), storage: getStorage(app) };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+  
+  try {
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    const app = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+    return { db: getFirestore(app), storage: getStorage(app) };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+  }
+}
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const { storage } = initializeAdminApp();
+    const { storage } = initializeAdmin();
     const bucket = storage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
     const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
@@ -32,7 +57,7 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
 
 
 export async function createCard(formData: FormData) {
-    const { db } = initializeAdminApp();
+    const { db } = initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -100,7 +125,7 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(formData: FormData) {
-    const { db, storage } = initializeAdminApp();
+    const { db } = initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const cardId = formData.get('cardId') as string;
@@ -120,15 +145,16 @@ export async function updateCard(formData: FormData) {
         const cardDoc = await cardRef.get();
         const cardData = cardDoc.data();
 
-        if (!cardData) {
+        if (!cardDoc.exists) {
             throw new Error("Card not found.");
         }
         
-        const originalImages: ImageRecord[] = cardData.images || [];
+        const originalImages: ImageRecord[] = cardData?.images || [];
         const imagesToDelete = originalImages.filter(origImg => 
             !existingImages.some(existImg => existImg.path === origImg.path)
         );
 
+        const { storage } = initializeAdmin();
         const bucket = storage.bucket();
         await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         
@@ -158,7 +184,7 @@ export async function updateCard(formData: FormData) {
 
 
 export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
-    const { db, storage } = initializeAdminApp();
+    const { db, storage } = initializeAdmin();
     const { cardId, collectionId, images } = input;
     
     try {
@@ -184,5 +210,3 @@ export async function deleteCard(input: { cardId: string, collectionId: string, 
         return { success: false, message: error.message || 'An unknown error occurred while deleting the card.' };
     }
 }
-
-    

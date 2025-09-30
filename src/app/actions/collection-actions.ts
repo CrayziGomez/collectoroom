@@ -1,12 +1,35 @@
 
 'use server';
 
-import { initializeAdminApp } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 
+// Self-contained Firebase Admin initialization
+function initializeAdmin() {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    return { db: getFirestore(alreadyCreated[0]) };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+  
+  try {
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    const app = initializeApp({
+      credential: cert(serviceAccount)
+    });
+    return { db: getFirestore(app) };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+  }
+}
+
 export async function createCollection(formData: FormData) {
-    const { db } = initializeAdminApp();
+    const { db } = initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
@@ -15,7 +38,6 @@ export async function createCollection(formData: FormData) {
     const category = formData.get('category') as string;
     const isPublic = formData.get('isPublic') === 'true';
 
-    // Default image is now the logo
     const coverImage = '/images/CR_Logo_Gry.png';
     const coverImageHint = 'CollectoRoom logo';
 
@@ -49,5 +71,3 @@ export async function createCollection(formData: FormData) {
         return { success: false, message: error.message || 'Failed to create collection.' };
     }
 }
-
-    

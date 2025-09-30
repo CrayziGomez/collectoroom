@@ -1,13 +1,39 @@
 
 'use server';
 
-import { initializeAdminApp } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 
+// Self-contained Firebase Admin initialization
+function initializeAdmin() {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    const app = alreadyCreated[0];
+    return { db: getFirestore(app), storage: getStorage(app) };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+  
+  try {
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    const app = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+    return { db: getFirestore(app), storage: getStorage(app) };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+  }
+}
+
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    const { db } = initializeAdminApp();
+    const { db } = initializeAdmin();
     
     const { targetUserId, currentUserId } = input;
 
@@ -81,7 +107,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    const { db, storage } = initializeAdminApp();
+    const { db, storage } = initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
@@ -138,5 +164,3 @@ export async function updateAvatar(formData: FormData) {
         return { success: false, message: `Upload Failed: {"code":"${errorCode}","message":"${errorMessage}"}`, avatarUrl: null };
     }
 }
-
-    

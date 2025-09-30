@@ -1,11 +1,35 @@
 
 'use server';
 
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { initializeAdminApp } from '@/lib/firebase-admin';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 
+// Self-contained Firebase Admin initialization
+function initializeAdminApp(): { db: Firestore; storage: Storage } {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    const app = alreadyCreated[0];
+    return { db: getFirestore(app), storage: getStorage(app) };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+  }
+  
+  try {
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    const app = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+    return { db: getFirestore(app), storage: getStorage(app) };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+  }
+}
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
@@ -36,30 +60,27 @@ const defaultContent: SiteContent = {
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
-        if (input.pageId !== 'homePage') {
-            return { id: input.pageId, title: 'Page Content', description: '...' };
-        }
-        
-        const docRef = doc(db, 'siteContent', input.pageId);
-        const docSnap = await getDoc(docRef);
+        const { db } = initializeAdminApp();
+        const docRef = db.collection('siteContent').doc(input.pageId);
+        const docSnap = await docRef.get();
 
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
             const data = docSnap.data() as SiteContent;
-            // Ensure howItWorksSteps exists, if not, add it
+            // Ensure howItWorksSteps exists, if not, add it and return the merged data
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
-                 const { db: adminDb } = initializeAdminApp();
-                 await adminDb.collection('siteContent').doc(input.pageId).set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
+                 await docRef.set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            // Document doesn't exist, create it using the admin SDK
+            // Document doesn't exist, create it
             const { db: adminDb } = initializeAdminApp();
-            await adminDb.collection('siteContent').doc('homePage').set(defaultContent);
+            await adminDb.collection('siteContent').doc(input.pageId).set(defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
-        console.error("Critical Error in getSiteContent. Returning default content.", error);
+        console.error("Critical Error in getSiteContent:", error);
+        // Return default content with an error message to prevent site crash
         return {
            ...defaultContent,
            title: 'Error: Could Not Load Page Content',
@@ -70,10 +91,9 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 
 
 export async function updateSiteContent(input: any) {
-  const { db: adminDb } = initializeAdminApp();
-
   try {
-    const docRef = adminDb.collection('siteContent').doc(input.id);
+    const { db } = initializeAdminApp();
+    const docRef = db.collection('siteContent').doc(input.id);
     const { id, ...content } = input;
     await docRef.set(content, { merge: true });
     return { success: true, message: 'Content updated successfully.' };
@@ -82,5 +102,3 @@ export async function updateSiteContent(input: any) {
     return { success: false, message: `Update failed: ${error.message}` };
   }
 }
-
-    
