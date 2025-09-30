@@ -3,13 +3,15 @@
 
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase'; // Use the client-side initialized app
-import type { SiteContent } from '@/lib/types';
+import type { SiteContent, HowItWorksStep } from '@/lib/types';
+import { adminDb } from '@/lib/firebase-admin';
 
-// IMPORTANT: This action now uses the client-side SDK via the server
-// to avoid admin SDK initialization issues on page load.
+// IMPORTANT: getSiteContent now uses the client-side SDK via the server
+// to avoid admin SDK initialization issues on page load. updateSiteContent (admin-only)
+// still uses the admin SDK.
 const db = getFirestore(app);
 
-const defaultHowItWorksSteps = [
+const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
       icon: 'Edit3',
       title: 'Create Your Cards',
@@ -27,55 +29,52 @@ const defaultHowItWorksSteps = [
     },
 ];
 
-export async function getSiteContent(input: { pageId: string }): Promise<SiteContent | null> {
+const defaultContent: SiteContent = {
+    id: 'homePage',
+    title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
+    description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
+    imageUrl: 'https://picsum.photos/seed/hero/1200/600',
+    imageHint: 'collection display',
+    howItWorksSteps: defaultHowItWorksSteps,
+};
+
+
+export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
+        if (input.pageId !== 'homePage') {
+            // Return a fallback for any other page to prevent crashes
+            return { id: input.pageId, title: 'Page Content', description: '...' };
+        }
+
         const docRef = doc(db, 'siteContent', input.pageId);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-            const data = docSnap.data();
+            const data = docSnap.data() as SiteContent;
             // Ensure howItWorksSteps exists if it's the home page
-            if (!data?.howItWorksSteps && input.pageId === 'homePage') {
-                const updatedData = { ...data, howItWorksSteps: defaultHowItWorksSteps };
-                 // This write might fail if rules aren't set, but the read has succeeded.
-                await setDoc(docRef, updatedData, { merge: true }).catch(e => console.warn("Could not update site content with default steps:", e.message));
-                return { id: docSnap.id, ...updatedData } as SiteContent;
+            if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
+                 return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-             // If the document doesn't exist, create it for the homepage
-             if (input.pageId === 'homePage') {
-                const defaultContent: SiteContent = {
-                    id: 'homePage',
-                    title: 'Your Collection, <br /> <span class="text-primary">Digitized &amp; Showcased.</span>',
-                    description: 'CollectoRoom is the ultimate platform for enthusiasts to catalog, manage, and share their passions. From vintage toys to rare art, your collection deserves a digital home.',
-                    imageUrl: 'https://picsum.photos/seed/hero/1200/600',
-                    imageHint: 'collection display',
-                    howItWorksSteps: defaultHowItWorksSteps,
-                };
-                // This write might fail if rules aren't set, but we can still return the default content to render the page.
-                await setDoc(doc(db, 'siteContent', 'homePage'), defaultContent).catch(e => console.warn("Could not create default site content:", e.message));
-                return defaultContent;
-            }
-            return null;
+            // If the document doesn't exist, create it for the homepage
+            await setDoc(doc(db, 'siteContent', 'homePage'), defaultContent).catch(e => {
+                console.warn("Could not create default site content due to permissions:", e.message);
+            });
+            return defaultContent;
         }
     } catch (error: any) {
-        console.error("Critical Error in getSiteContent:", error);
+        console.error("Critical Error in getSiteContent. Returning default content.", error);
         // Return a fallback object so the page can still render with an error message
-         return {
-            id: 'homePage',
-            title: 'Error: Could not load page content.',
-            description: `A critical server error occurred while trying to fetch page content. Please check your Firestore security rules to ensure the 'siteContent' collection is readable. Error: ${error.message}`,
-            imageUrl: 'https://picsum.photos/seed/error/1200/600',
-            imageHint: 'error illustration',
-            howItWorksSteps: [],
+        const errorContent = {
+           ...defaultContent,
+           title: 'Error: Could Not Load Page Content',
+           description: `There was a problem connecting to the database. Please check your Firestore security rules. Error: ${error.message}`,
         };
+        return errorContent;
     }
 }
 
-// The admin-only update function still uses the admin SDK, which is fine
-// as it's not called on page load.
-import { adminDb } from '@/lib/firebase-admin';
 
 export async function updateSiteContent(input: any) {
   if (!adminDb) {
