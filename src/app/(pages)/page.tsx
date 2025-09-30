@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { app, db } from '@/lib/firebase';
 import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
@@ -67,10 +67,8 @@ export default function HomePage() {
       }
     };
 
-    if (!authLoading) {
-      fetchContent();
-    }
-  }, [authLoading, toast]);
+    fetchContent();
+  }, [toast]);
 
   const handleOpenTextDialog = () => {
     if (content) {
@@ -435,3 +433,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    

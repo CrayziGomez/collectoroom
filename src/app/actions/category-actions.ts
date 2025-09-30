@@ -1,31 +1,12 @@
 
 'use server';
 
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { initializeAdminApp } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 
-function initializeScopedAdminApp() {
-    const appName = 'scoped-category-actions-app';
-    const existingApp = getApps().find(app => app.name === appName);
-    if (existingApp) {
-        return existingApp;
-    }
-
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
-    }
-    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
-    return initializeApp({
-        credential: cert(serviceAccount)
-    }, appName);
-}
-
-
 export async function addCategory(input: { name: string; description: string }) {
-  const app = initializeScopedAdminApp();
-  const db = getFirestore(app);
+  const { db } = initializeAdminApp();
 
   try {
     const { name, description } = input;
@@ -52,3 +33,5 @@ export async function addCategory(input: { name: string; description: string }) 
     return { success: false, message: `Failed to add category: ${error.message}` };
   }
 }
+
+    
