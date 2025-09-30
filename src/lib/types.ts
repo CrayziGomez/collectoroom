@@ -20,6 +20,7 @@ export interface Category {
   name: string;
   icon: string;
   description: string;
+  createdAt?: any; // Can be a Firestore Timestamp or a string after serialization
 }
 
 export interface PricingTier {
@@ -44,7 +45,7 @@ export interface Collection {
   coverImage: string;
   coverImageHint: string;
   keywords?: string;
-  createdAt: string;
+  createdAt: any; // Can be a Firestore Timestamp or a string after serialization
 }
 
 export interface ImageRecord {

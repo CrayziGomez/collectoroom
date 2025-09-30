@@ -1,34 +1,67 @@
 
-import Image from 'next/image';
-import Link from 'next/link';
-import { ArrowRight, CheckCircle, Database, Edit3, Share2, Pencil } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CategoryIcon } from '@/components/CategoryIcon';
-import { getAuth } from 'firebase/auth';
-import { app } from '@/lib/firebase';
 import type { Category } from '@/lib/types';
 import { getSiteContent } from '@/app/actions/site-content';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { HomePageClientContent } from './HomePageClientContent';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // This is now a Server Component again. It fetches the initial data.
 export default async function HomePage() {
   
-  // Fetch initial content on the server.
-  // The getSiteContent action is now robust and will return default content on failure.
+  // Self-contained Firebase Admin initialization
+  function initializeAdmin() {
+    const alreadyCreated = getApps();
+    if (alreadyCreated.length > 0) {
+      const app = alreadyCreated[0];
+      return { db: getFirestore(app) };
+    }
+
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    }
+    
+    try {
+      const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+      const app = initializeApp({
+        credential: cert(serviceAccount),
+      });
+      return { db: getFirestore(app) };
+    } catch (error: any) {
+      throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+    }
+  }
+  
   const content = await getSiteContent({ pageId: 'homePage' });
 
-  // Fetch categories on the server.
-  // We'll wrap this in a try-catch to prevent site crashes if Firestore fails here.
   let categories: Category[] = [];
   try {
-    const catQuerySnapshot = await getDocs(collection(db, 'categories'));
-    categories = catQuerySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
+    const { db } = initializeAdmin();
+    const catQuerySnapshot = await db.collection('categories').get();
+    
+    // Manually serialize Firestore Timestamps to strings
+    categories = catQuerySnapshot.docs.map(doc => {
+      const data = doc.data();
+      const docId = doc.id;
+
+      // Create a plain object and copy properties
+      const plainObject: any = { id: docId };
+      for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          const value = data[key];
+          if (value && typeof value.toDate === 'function') {
+            // This is a Firestore Timestamp
+            plainObject[key] = value.toDate().toISOString();
+          } else {
+            plainObject[key] = value;
+          }
+        }
+      }
+      return plainObject as Category;
+    });
+
   } catch (error) {
     console.error("Error fetching categories on server:", error);
-    // Categories will be an empty array, the page will still render.
   }
 
   const heroContent = content || {
