@@ -31,7 +31,7 @@ function initializeAdmin() {
   try {
     const app = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: 'studio-7145415565-66e7d.firebaseapp.com',
+      storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
     });
     return { db: getFirestore(app), storage: getStorage(app) };
   } catch (error: any) {
