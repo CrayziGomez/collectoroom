@@ -97,7 +97,7 @@ function initializeAdminApp(): { db: Firestore; storage: Storage } {
   try {
     const app = initializeApp({
       credential: cert(serviceAccount),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      storageBucket: 'studio-7145415565-66e7d.appspot.com',
     }, 'adminApp'); // Use a unique name for the admin app
     return { db: getAdminFirestore(app), storage: getStorage(app) };
   } catch (error: any) {

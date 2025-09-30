@@ -27,7 +27,8 @@ function initializeAdmin() {
   
   try {
     const app = initializeApp({
-      credential: cert(serviceAccount)
+      credential: cert(serviceAccount),
+      storageBucket: 'studio-7145415565-66e7d.appspot.com',
     });
     return { db: getFirestore(app) };
   } catch (error: any) {
