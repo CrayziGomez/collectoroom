@@ -85,11 +85,12 @@ export function HomePageClientContent({
         .replace(/\n/g, '<br />')
         .replace(/Digitized & Showcased./g, '<span class="text-primary">Digitized &amp; Showcased.</span>');
 
-      const result = await updateSiteContent({
-        id: content.id,
-        title: formattedTitle,
-        description: editedDescription,
-      });
+      const formData = new FormData();
+      formData.append('id', content.id);
+      formData.append('title', formattedTitle);
+      formData.append('description', editedDescription);
+      
+      const result = await updateSiteContent(formData);
 
       if (result.success) {
         toast({ title: 'Success', description: 'Hero content updated!' });
@@ -127,20 +128,16 @@ export function HomePageClientContent({
     setIsSavingImage(true);
 
     try {
-      const storage = getStorage(app);
-      const storageRef = ref(storage, `site-content/homePage-hero-${Date.now()}`);
-      const uploadResult = await uploadBytes(storageRef, imageFile);
-      const downloadURL = await getDownloadURL(uploadResult.ref);
+      const formData = new FormData();
+      formData.append('id', content.id);
+      formData.append('imageFile', imageFile);
 
-      const result = await updateSiteContent({
-        id: content.id,
-        imageUrl: downloadURL,
-      });
+      const result = await updateSiteContent(formData);
       
-      if (result.success) {
+      if (result.success && result.imageUrl) {
         toast({ title: 'Success', description: 'Hero image updated!' });
         setIsImageDialogOpen(false);
-        setHeroContent(prev => ({ ...prev, imageUrl: downloadURL }));
+        setHeroContent(prev => ({ ...prev, imageUrl: result.imageUrl }));
       } else {
         throw new Error(result.message);
       }
@@ -166,10 +163,12 @@ export function HomePageClientContent({
         const updatedSteps = [...howItWorksSteps];
         updatedSteps[editingStepIndex] = editingStep;
 
-        const result = await updateSiteContent({
-            id: content.id,
-            howItWorksSteps: updatedSteps,
-        });
+        const formData = new FormData();
+        formData.append('id', content.id);
+        formData.append('howItWorksSteps', JSON.stringify(updatedSteps));
+
+        const result = await updateSiteContent(formData);
+
         if (result.success) {
             toast({ title: 'Success', description: 'Step updated!' });
             setIsHowItWorksDialogOpen(false);

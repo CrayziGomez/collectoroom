@@ -2,46 +2,15 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // --- Public Read Access for All Files ---
-    // For debugging purposes, allow public read access to all files.
-    // This removes permissions as a variable while troubleshooting URL issues.
-    match /{allPaths=**} {
-      allow read;
+    // Allow users to read and write to their own folder
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // --- WRITE RULES ---
-    // Only authenticated users can write, and only to their own paths.
-    
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    // USER PROFILE IMAGES
-    match /users/{userId}/profile/{fileName} {
-      allow write: if isOwner(userId) 
-                    && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('image/.*');
-    }
-    
-    // COLLECTION COVER IMAGES
-    match /users/{userId}/collections/{collectionId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-    
-    // CARD IMAGES
-     match /users/{userId}/cards/{cardId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-
-    // SITE CONTENT IMAGES
-    // Only admins can write to the site-content folder
+    // Allow any authenticated user to write to the site-content folder
+    // This is used for general site assets like the homepage hero image.
     match /site-content/{allPaths=**} {
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read, write: if request.auth != null;
     }
   }
 }

@@ -6,8 +6,7 @@ import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 
-// This action now uses the CLIENT Firestore instance.
-// It is intended to be called from client components.
+// This action now uses the CLIENT Firestore instance for reads.
 function getDb() {
   return getFirestore(getClientApp());
 }
@@ -64,56 +63,82 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
         return {
            ...defaultContent,
            title: 'Error: Could Not Load Page Content',
-           description: `There was a problem connecting to the database. Please check your service account permissions. Original error: ${error.message}`,
+           description: `There was a problem connecting to the database. Please verify your service account permissions. Original error: ${error.message}`,
         };
     }
 }
 
 // updateSiteContent MUST remain a server action that uses the Admin SDK to bypass security rules.
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore, Firestore } from 'firebase-admin/firestore';
-import { getStorage, Storage } from 'firebase-admin/storage';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
-function initializeAdminApp(): { db: Firestore; storage: Storage } {
+function initializeAdmin() {
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
   }
   
-  let serviceAccount;
-  try {
-      serviceAccount = JSON.parse(serviceAccountString);
-  } catch (error: any) {
-      const preview = serviceAccountString.substring(0, 20);
-      throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
-  }
+  const serviceAccount = JSON.parse(serviceAccountString);
 
-  const appName = 'adminApp';
-  const alreadyCreated = getApps().find(app => app.name === appName);
-  if (alreadyCreated) {
-    return { db: getAdminFirestore(alreadyCreated), storage: getStorage(alreadyCreated) };
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    return { db: getAdminFirestore(alreadyCreated[0]), storage: getStorage(alreadyCreated[0]) };
   }
 
   const app = initializeApp({
     credential: cert(serviceAccount),
-    storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
-  }, appName);
+    storageBucket: 'studio-7145415565-66e7d.appspot.com',
+  });
 
   return { db: getAdminFirestore(app), storage: getStorage(app) };
 }
 
-
-export async function updateSiteContent(input: any) {
+export async function updateSiteContent(formData: FormData): Promise<{ success: boolean; message: string; imageUrl?: string; }> {
   try {
-    // This MUST use the Admin SDK to bypass Firestore rules for admin users.
-    const { db } = initializeAdminApp();
-    const docRef = db.collection('siteContent').doc(input.id);
-    const { id, ...content } = input;
-    await docRef.set(content, { merge: true });
+    const { db } = initializeAdmin();
+    const id = formData.get('id') as string;
+    const docRef = db.collection('siteContent').doc(id);
+
+    const updates: { [key: string]: any } = {};
+
+    // Handle text updates
+    if (formData.has('title')) updates.title = formData.get('title');
+    if (formData.has('description')) updates.description = formData.get('description');
+    
+    // Handle "How It Works" steps updates
+    if (formData.has('howItWorksSteps')) {
+      updates.howItWorksSteps = JSON.parse(formData.get('howItWorksSteps') as string);
+    }
+    
+    // Handle image upload
+    let imageUrl: string | undefined;
+    if (formData.has('imageFile')) {
+      const { storage } = initializeAdmin();
+      const imageFile = formData.get('imageFile') as File;
+      const bucket = storage.bucket();
+      const imagePath = `site-content/homePage-hero-${Date.now()}`;
+      const fileRef = bucket.file(imagePath);
+      
+      const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
+      await fileRef.save(fileBuffer, { metadata: { contentType: imageFile.type } });
+      
+      const [signedUrl] = await fileRef.getSignedUrl({
+        action: 'read',
+        expires: '01-01-2100', // Far-future expiration date
+      });
+      
+      updates.imageUrl = signedUrl;
+      imageUrl = signedUrl; // To return to the client
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      await docRef.set(updates, { merge: true });
+    }
     
     revalidatePath('/');
 
-    return { success: true, message: 'Content updated successfully.' };
+    return { success: true, message: 'Content updated successfully.', imageUrl };
   } catch (error: any) {
     console.error('Error updating document:', error);
     return { success: false, message: `Update failed: ${error.message}` };
