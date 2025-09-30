@@ -52,12 +52,18 @@ function initializeAdminApp(): FirebaseAdminServices {
         throw new Error('DIAGNOSTIC: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or empty.');
     }
     
+    let decodedKey: string;
+    try {
+        decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
+    } catch (error: any) {
+        throw new Error(`DIAGNOSTIC: Failed to decode Base64 service account key. Error: ${error.message}`);
+    }
+
     let serviceAccount: object;
     try {
-        const decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
         serviceAccount = JSON.parse(decodedKey);
     } catch (error: any) {
-        throw new Error(`DIAGNOSTIC: Failed to parse service account key from Base64. Error: ${error.message}`);
+        throw new Error(`DIAGNOSTIC: Failed to parse service account key from decoded JSON. Error: ${error.message}`);
     }
 
     const projectId = "studio-7145415565-66e7d";
