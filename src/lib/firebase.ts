@@ -1,11 +1,9 @@
 
-'use client';
-
 import { initializeApp, getApps, getApp, FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// --- Client-side Firebase Initialization ---
+// --- Universal Firebase Initialization (Client & Server) ---
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,16 +14,18 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app;
-if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-} else {
-    app = getApp();
+// This function ensures that we initialize the app only once.
+// It's safe to call on both the server and the client.
+const getClientApp = () => {
+    if (getApps().length) {
+        return getApp();
+    }
+    return initializeApp(firebaseConfig);
 }
 
+const app = getClientApp();
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-
 // Export client modules
-export { app, db, storage };
+export { app, db, storage, getClientApp };

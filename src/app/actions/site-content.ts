@@ -2,14 +2,9 @@
 'use server';
 
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { app } from '@/lib/firebase'; // Use the client-side initialized app
+import { getClientApp } from '@/lib/firebase'; // Use the universal initializer
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { adminDb } from '@/lib/firebase-admin';
-
-// IMPORTANT: getSiteContent now uses the client-side SDK via the server
-// to avoid admin SDK initialization issues on page load. updateSiteContent (admin-only)
-// still uses the admin SDK.
-const db = getFirestore(app);
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
@@ -42,24 +37,27 @@ const defaultContent: SiteContent = {
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
         if (input.pageId !== 'homePage') {
-            // Return a fallback for any other page to prevent crashes
             return { id: input.pageId, title: 'Page Content', description: '...' };
         }
+        
+        // Initialize the app and Firestore on the server correctly
+        const app = getClientApp();
+        const db = getFirestore(app);
 
         const docRef = doc(db, 'siteContent', input.pageId);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
             const data = docSnap.data() as SiteContent;
-            // Ensure howItWorksSteps exists if it's the home page
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            // If the document doesn't exist, create it for the homepage
+            // Attempt to create the document with public rules. This might fail if rules
+            // are restrictive, but the page will still render with default content.
             await setDoc(doc(db, 'siteContent', 'homePage'), defaultContent).catch(e => {
-                console.warn("Could not create default site content due to permissions:", e.message);
+                console.warn("Could not create default site content, likely due to Firestore security rules. This is non-critical.", e.message);
             });
             return defaultContent;
         }
