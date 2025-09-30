@@ -1,41 +1,15 @@
 
 'use server';
 
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { getStorage, Storage } from 'firebase-admin/storage';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
+import { revalidatePath } from 'next/cache';
 
-// Self-contained Firebase Admin initialization
-function initializeAdminApp(): { db: Firestore; storage: Storage } {
-  const alreadyCreated = getApps();
-  if (alreadyCreated.length > 0) {
-    const app = alreadyCreated[0];
-    return { db: getFirestore(app), storage: getStorage(app) };
-  }
-
-  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountString) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-  }
-  
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(serviceAccountString);
-  } catch (error: any) {
-    const preview = serviceAccountString.substring(0, 20);
-    throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
-  }
-
-  try {
-    const app = initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    });
-    return { db: getFirestore(app), storage: getStorage(app) };
-  } catch (error: any) {
-    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
-  }
+// This action now uses the CLIENT Firestore instance.
+// It is intended to be called from client components.
+function getDb() {
+  return getFirestore(getClientApp());
 }
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
@@ -67,22 +41,21 @@ const defaultContent: SiteContent = {
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
-        const { db } = initializeAdminApp();
-        const docRef = db.collection('siteContent').doc(input.pageId);
-        const docSnap = await docRef.get();
+        const db = getDb();
+        const docRef = doc(db, 'siteContent', input.pageId);
+        const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists) {
+        if (docSnap.exists()) {
             const data = docSnap.data() as SiteContent;
             // Ensure howItWorksSteps exists, if not, add it and return the merged data
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
-                 await docRef.set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
+                 await setDoc(docRef, { howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
             // Document doesn't exist, create it
-            const { db: adminDb } = initializeAdminApp();
-            await adminDb.collection('siteContent').doc(input.pageId).set(defaultContent);
+            await setDoc(doc(db, 'siteContent', input.pageId), defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
@@ -96,13 +69,53 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
     }
 }
 
+// updateSiteContent MUST remain a server action that uses the Admin SDK to bypass security rules.
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getFirestore as getAdminFirestore, Firestore } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
+
+function initializeAdminApp(): { db: Firestore; storage: Storage } {
+  const alreadyCreated = getApps();
+  if (alreadyCreated.length > 0) {
+    const app = alreadyCreated[0];
+    return { db: getAdminFirestore(app), storage: getStorage(app) };
+  }
+
+  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountString) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set for admin actions.');
+  }
+  
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountString);
+  } catch (error: any) {
+    const preview = serviceAccountString.substring(0, 20);
+    throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Full string length is ${serviceAccountString.length}. Please verify the secret's format in your hosting environment. Original error: ${error.message}`);
+  }
+
+  try {
+    const app = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    }, 'adminApp'); // Use a unique name for the admin app
+    return { db: getAdminFirestore(app), storage: getStorage(app) };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+  }
+}
+
 
 export async function updateSiteContent(input: any) {
   try {
+    // This MUST use the Admin SDK to bypass Firestore rules for admin users.
     const { db } = initializeAdminApp();
     const docRef = db.collection('siteContent').doc(input.id);
     const { id, ...content } = input;
     await docRef.set(content, { merge: true });
+    
+    revalidatePath('/');
+
     return { success: true, message: 'Content updated successfully.' };
   } catch (error: any) {
     console.error('Error updating document:', error);

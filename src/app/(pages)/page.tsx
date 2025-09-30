@@ -1,67 +1,74 @@
 
-import type { Category } from '@/lib/types';
-import { getSiteContent } from '@/app/actions/site-content';
+// The homepage is now a client component to handle data fetching on the client-side,
+// bypassing the server-side environment variable issues.
+'use client';
+
 import { HomePageClientContent } from './HomePageClientContent';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import type { SiteContent, Category, HowItWorksStep } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { getSiteContent } from '@/app/actions/site-content';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// This is now a Server Component again. It fetches the initial data.
-export default async function HomePage() {
-  
-  // Self-contained Firebase Admin initialization
-  function initializeAdmin() {
-    const alreadyCreated = getApps();
-    if (alreadyCreated.length > 0) {
-      const app = alreadyCreated[0];
-      return { db: getFirestore(app) };
-    }
+// This is now a Client Component that orchestrates fetching data.
+export default function HomePage() {
+  const [content, setContent] = useState<SiteContent | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccountString) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-    }
-    
-    try {
-      const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
-      const app = initializeApp({
-        credential: cert(serviceAccount),
-      });
-      return { db: getFirestore(app) };
-    } catch (error: any) {
-      throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
-    }
-  }
-  
-  const content = await getSiteContent({ pageId: 'homePage' });
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch site content
+        const siteContentData = await getSiteContent({ pageId: 'homePage' });
+        setContent(siteContentData);
 
-  let categories: Category[] = [];
-  try {
-    const { db } = initializeAdmin();
-    const catQuerySnapshot = await db.collection('categories').get();
-    
-    // Manually serialize Firestore Timestamps to strings
-    categories = catQuerySnapshot.docs.map(doc => {
-      const data = doc.data();
-      const docId = doc.id;
+        // Fetch categories
+        const catQuerySnapshot = await getDocs(collection(db, 'categories'));
+        const categoriesData = catQuerySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return { ...data, id: doc.id } as Category;
+        });
+        setCategories(categoriesData);
 
-      // Create a plain object and copy properties
-      const plainObject: any = { id: docId };
-      for (const key in data) {
-        if (Object.prototype.hasOwnProperty.call(data, key)) {
-          const value = data[key];
-          if (value && typeof value.toDate === 'function') {
-            // This is a Firestore Timestamp
-            plainObject[key] = value.toDate().toISOString();
-          } else {
-            plainObject[key] = value;
-          }
-        }
+      } catch (error) {
+        console.error("Error fetching homepage data:", error);
+      } finally {
+        setLoading(false);
       }
-      return plainObject as Category;
-    });
+    }
+    fetchData();
+  }, []);
 
-  } catch (error) {
-    console.error("Error fetching categories on server:", error);
+  if (loading || !content) {
+    return (
+        <div className="container py-12 md:py-24 space-y-12">
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-6">
+                    <Skeleton className="h-12 w-3/4" />
+                    <Skeleton className="h-8 w-1/2" />
+                    <Skeleton className="h-10 w-full" />
+                    <div className="flex gap-4">
+                        <Skeleton className="h-12 w-40" />
+                        <Skeleton className="h-12 w-40" />
+                    </div>
+                </div>
+                <div>
+                    <Skeleton className="aspect-video w-full" />
+                </div>
+            </div>
+             <div className="text-center space-y-3 mb-12">
+                <Skeleton className="h-10 w-1/3 mx-auto" />
+                <Skeleton className="h-6 w-1/2 mx-auto" />
+            </div>
+             <div className="grid md:grid-cols-3 gap-8">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+            </div>
+        </div>
+    );
   }
 
   const heroContent = content || {
@@ -79,7 +86,7 @@ export default async function HomePage() {
   ];
 
   return (
-    // The client component handles all interactivity (dialogs, etc.)
+    // The client component handles all interactivity and now receives the fetched data.
     <HomePageClientContent 
       initialContent={content} 
       initialCategories={categories}
