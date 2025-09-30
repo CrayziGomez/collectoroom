@@ -1,8 +1,9 @@
 
 'use server';
-
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
-import { initializeAdminApp } from '@/lib/firebase-admin';
+
 
 const defaultHowItWorksSteps: HowItWorksStep[] = [
     {
@@ -31,10 +32,29 @@ const defaultContent: SiteContent = {
     howItWorksSteps: defaultHowItWorksSteps,
 };
 
+function initializeScopedAdminApp() {
+    // This function is now self-contained in each action file.
+    const appName = 'scoped-site-content-app';
+    const existingApp = getApps().find(app => app.name === appName);
+    if (existingApp) {
+        return existingApp;
+    }
+
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
+    }
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    return initializeApp({
+        credential: cert(serviceAccount)
+    }, appName);
+}
+
 
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
-        const { db } = initializeAdminApp();
+        const app = initializeScopedAdminApp();
+        const db = getFirestore(app);
         
         if (input.pageId !== 'homePage') {
             return { id: input.pageId, title: 'Page Content', description: '...' };
@@ -43,7 +63,7 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
         const docRef = db.collection('siteContent').doc(input.pageId);
         const docSnap = await docRef.get();
 
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
             const data = docSnap.data() as SiteContent;
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
                  await docRef.set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
@@ -66,7 +86,8 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 
 
 export async function updateSiteContent(input: any) {
-  const { db } = initializeAdminApp();
+  const app = initializeScopedAdminApp();
+  const db = getFirestore(app);
 
   try {
     const docRef = db.collection('siteContent').doc(input.id);

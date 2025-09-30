@@ -1,13 +1,34 @@
 
 'use server';
 
-import { initializeAdminApp } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 
+function initializeScopedAdminApp() {
+    const appName = 'scoped-user-actions-app';
+    const existingApp = getApps().find(app => app.name === appName);
+    if (existingApp) {
+        return existingApp;
+    }
+
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
+    }
+    const serviceAccount = JSON.parse(Buffer.from(serviceAccountString, 'base64').toString('utf8'));
+    return initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    }, appName);
+}
+
+
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    const { db } = initializeAdminApp();
+    const app = initializeScopedAdminApp();
+    const db = getFirestore(app);
     
     const { targetUserId, currentUserId } = input;
 
@@ -81,7 +102,9 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    const { db, storage } = initializeAdminApp();
+    const app = initializeScopedAdminApp();
+    const db = getFirestore(app);
+    const storage = getStorage(app);
 
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
