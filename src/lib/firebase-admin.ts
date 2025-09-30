@@ -52,7 +52,7 @@ function initializeAdminApp(): FirebaseAdminServices {
     }
     
     // Explicitly define the storage bucket. This is safe as it's public info.
-    const storageBucket = "studio-7145415565-66e7d.appspot.com";
+    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
      if (!storageBucket) {
         throw new Error('The storage bucket name could not be determined. Please check the hardcoded value in firebase-admin.ts.');
     }
