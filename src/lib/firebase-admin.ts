@@ -24,61 +24,48 @@ declare global {
 }
 
 function initializeAdminApp(): FirebaseAdminServices {
-    // In development, hot-reloading can cause this file to be re-evaluated.
-    // We use a global symbol to preserve the initialized app across reloads.
-    if (process.env.NODE_ENV === 'development' && global.__firebase_admin_app__) {
-        return global.__firebase_admin_app__;
-    }
-
-    // Check if the app is already initialized. This is the standard way to handle this.
-    if (getApps().length > 0) {
-        const existingApp = getApps()[0];
-        const services: FirebaseAdminServices = {
-            app: existingApp,
-            auth: getAuth(existingApp),
-            db: getFirestore(existingApp),
-            storage: getStorage(existingApp),
-        };
-        // Also store it on the global for subsequent dev reloads
-        if (process.env.NODE_ENV === 'development') {
-            global.__firebase_admin_app__ = services;
-        }
-        return services;
-    }
-
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccountString) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your hosting provider configuration.');
-    }
-    
-    const projectId = "studio-7145415565-66e7d";
-    if (!projectId) {
-        throw new Error('The Firebase projectId could not be determined.');
-    }
-
-    const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
-    if (!storageBucket) {
-        throw new Error('The storage bucket name could not be determined. Please check the hardcoded value in firebase-admin.ts.');
-    }
-
-    let serviceAccount: object;
     try {
-        serviceAccount = JSON.parse(
-            Buffer.from(serviceAccountString, 'base64').toString('utf8')
-        );
-    } catch (error: any) {
-        if (error instanceof SyntaxError) {
-            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Ensure FIREBASE_SERVICE_ACCOUNT_KEY is a correctly Base64-encoded service account JSON file.', error);
-            throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
+        // In development, hot-reloading can cause this file to be re-evaluated.
+        // We use a global symbol to preserve the initialized app across reloads.
+        if (process.env.NODE_ENV === 'development' && global.__firebase_admin_app__) {
+            return global.__firebase_admin_app__;
         }
-        console.error('Firebase Admin SDK initialization failed during key parsing.', error);
-        throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
-    }
 
-    try {
+        // Check if the app is already initialized. This is the standard way to handle this.
+        if (getApps().length > 0) {
+            const existingApp = getApps()[0];
+            const services: FirebaseAdminServices = {
+                app: existingApp,
+                auth: getAuth(existingApp),
+                db: getFirestore(existingApp),
+                storage: getStorage(existingApp),
+            };
+            // Also store it on the global for subsequent dev reloads
+            if (process.env.NODE_ENV === 'development') {
+                global.__firebase_admin_app__ = services;
+            }
+            return services;
+        }
+
+        const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+        if (!serviceAccountString) {
+            throw new Error('DIAGNOSTIC: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or empty.');
+        }
+        
+        let serviceAccount: object;
+        try {
+            const decodedKey = Buffer.from(serviceAccountString, 'base64').toString('utf8');
+            serviceAccount = JSON.parse(decodedKey);
+        } catch (error: any) {
+            throw new Error(`DIAGNOSTIC: Failed to parse service account key from Base64. Error: ${error.message}`);
+        }
+
+        const projectId = "studio-7145415565-66e7d";
+        const storageBucket = "studio-7145415565-66e7d.firebasestorage.app";
+
         const newApp = initializeApp({
             credential: cert(serviceAccount),
-            projectId: projectId, // Explicitly set the projectId
+            projectId: projectId,
             storageBucket: storageBucket,
         });
 
@@ -89,7 +76,6 @@ function initializeAdminApp(): FirebaseAdminServices {
             storage: getStorage(newApp),
         };
         
-        // Store the initialized services on the global for subsequent dev reloads
         if (process.env.NODE_ENV === 'development') {
             global.__firebase_admin_app__ = services;
         }
@@ -97,8 +83,10 @@ function initializeAdminApp(): FirebaseAdminServices {
         return services;
 
     } catch (error: any) {
-        console.error('Firebase Admin SDK initializeApp failed.', error);
-        throw new Error(`Firebase Admin SDK initializeApp failed: ${error.message}`);
+        // This is the critical diagnostic block.
+        // We re-throw the error with a clear prefix to ensure it's visible in the logs.
+        console.error('CRITICAL: Firebase Admin SDK initialization failed.', error);
+        throw new Error(`DIAGNOSTIC_ERROR: Firebase Admin initialization failed with error: "${error.message}"`);
     }
 }
 
