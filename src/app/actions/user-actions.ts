@@ -8,7 +8,7 @@ import { initializeAdmin } from '@/lib/firebase-admin';
 
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    const { db } = initializeAdmin();
+    const { db } = await initializeAdmin();
     
     const { targetUserId, currentUserId } = input;
 
@@ -82,7 +82,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    const { db, storage } = initializeAdmin();
+    const { db, storage } = await initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;

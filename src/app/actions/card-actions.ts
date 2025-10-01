@@ -8,7 +8,7 @@ import type { ImageRecord } from '@/lib/types';
 import { initializeAdmin } from '@/lib/firebase-admin';
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const { storage } = initializeAdmin();
+    const { storage } = await initializeAdmin();
     const bucket = storage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
     const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
@@ -31,7 +31,7 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
 
 
 export async function createCard(formData: FormData) {
-    const { db } = initializeAdmin();
+    const { db } = await initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -99,7 +99,7 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(formData: FormData) {
-    const { db } = initializeAdmin();
+    const { db } = await initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const cardId = formData.get('cardId') as string;
@@ -128,7 +128,7 @@ export async function updateCard(formData: FormData) {
             !existingImages.some(existImg => existImg.path === origImg.path)
         );
 
-        const { storage } = initializeAdmin();
+        const { storage } = await initializeAdmin();
         const bucket = storage.bucket();
         await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         
@@ -158,7 +158,7 @@ export async function updateCard(formData: FormData) {
 
 
 export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
-    const { db, storage } = initializeAdmin();
+    const { db, storage } = await initializeAdmin();
     const { cardId, collectionId, images } = input;
     
     try {

@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { initializeAdmin } from '@/lib/firebase-admin';
 
 export async function createCollection(formData: FormData) {
-    const { db } = initializeAdmin();
+    const { db } = await initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;

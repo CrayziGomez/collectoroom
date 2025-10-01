@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { initializeAdmin } from '@/lib/firebase-admin';
 
 export async function addCategory(input: { name: string; description: string }) {
-  const { db } = initializeAdmin();
+  const { db } = await initializeAdmin();
 
   try {
     const { name, description } = input;

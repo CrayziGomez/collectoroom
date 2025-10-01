@@ -71,7 +71,7 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 // --- Admin Write Actions using Admin SDK ---
 export async function updateSiteContent(formData: FormData): Promise<{ success: boolean; message: string; imageUrl?: string; }> {
   try {
-    const { db, storage } = initializeAdmin();
+    const { db, storage } = await initializeAdmin();
     const id = formData.get('id') as string;
     const docRef = db.collection('siteContent').doc(id);
 
