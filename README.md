@@ -8,11 +8,26 @@ This document outlines the key phases required to set up, enhance, and deploy yo
 
 This phase ensures your local development environment is running correctly and your Firestore database is properly configured.
 
-### 1.1: Environment Variables
-- **Objective:** Securely store your Firebase project configuration.
+### 1.1: Environment Variables & Service Account
+- **Objective:** Securely store your Firebase project configuration and provide the necessary server-side credentials for local development.
 - **Action:**
   - In the root of your project, create a file named `.env.local`.
-  - Add your Firebase project configuration to this file. This should have been provided during the initial setup.
+  - Add your Firebase project's **client-side configuration** to this file using the `NEXT_PUBLIC_` prefix.
+  - **Crucially**, you must also add the **server-side service account key** to this file under the variable `FIREBASE_SERVICE_ACCOUNT_KEY`. This is required for server actions like image uploads to work in your local environment.
+  - Your final `.env.local` file should look like this:
+
+    ```
+    # Client-side configuration
+    NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_API_KEY"
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID="YOUR_PROJECT_ID"
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
+    NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"
+
+    # Server-side service account for local development
+    FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account", "project_id": "...", ...}'
+    ```
 
 ### 1.2: Install Dependencies
 - **Objective:** Install all the necessary Node.js packages.
@@ -116,5 +131,3 @@ This is the final phase to make your site live on a custom domain.
 - **Objective:** Your site is now live and deployed.
 - **Action:**
   - After pushing to your `main` branch and a successful build, your site will be available at your custom domain. Congratulations!
-
-this is a test updated
