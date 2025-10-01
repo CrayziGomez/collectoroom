@@ -6,17 +6,20 @@ This document outlines the key phases required to set up, enhance, and deploy yo
 
 ## Phase 1: Initial Setup & Database Configuration
 
-This phase ensures your local development environment is running correctly and your Firestore database is properly configured.
+This phase ensures your local development environment is running correctly.
 
 ### 1.1: Environment Variables & Service Account
-- **Objective:** Securely store your Firebase project configuration and provide the necessary server-side credentials for local development.
+
+For local development, the application requires two credential files.
+
+**1. Create your Client-Side Configuration (`.env.local`)**
+
+- **Objective:** Provide your Next.js application with the public-facing Firebase configuration.
 - **Action:**
   - In the root of your project, create a file named `.env.local`.
-  - Add your Firebase project's **client-side configuration** to this file using the `NEXT_PUBLIC_` prefix.
-  - **Crucially**, you must also add the **server-side service account key** to this file under the variable `FIREBASE_SERVICE_ACCOUNT_KEY`.
-  - The entire service account JSON object must be pasted on a **single line**. Multi-line values are not supported in `.env` files.
+  - Add your Firebase project's **client-side configuration** to this file. Find these values in your Firebase project settings under "Your apps".
 
-  - Your final `.env.local` file should look like this example (ensure the `FIREBASE_SERVICE_ACCOUNT_KEY` value is on one continuous line):
+  - Your final `.env.local` file should look like this:
 
     ```env
     # Client-side configuration
@@ -26,10 +29,17 @@ This phase ensures your local development environment is running correctly and y
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
     NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"
-
-    # Server-side service account for local development (MUST BE A SINGLE LINE)
-    FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account", "project_id": "your-project-id", "private_key_id": "your-key-id", "private_key": "-----BEGIN PRIVATE KEY-----\\nYOUR_PRIVATE_KEY_LINE_1\\nYOUR_PRIVATE_KEY_LINE_2\\n...\\n-----END PRIVATE KEY-----\\n", "client_email": "your-client-email@your-project-id.iam.gserviceaccount.com", "client_id": "your-client-id", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/your-client-email%40your-project-id.iam.gserviceaccount.com"}'
     ```
+
+**2. Create your Server-Side Configuration (`serviceAccountKey.json`)**
+
+- **Objective:** Securely provide server-side credentials for the Firebase Admin SDK during local development.
+- **Action:**
+  - Go to your Firebase Project Settings -> Service accounts.
+  - Click "Generate new private key" to download your service account JSON file.
+  - Rename the downloaded file to `serviceAccountKey.json`.
+  - Place this file in the **root directory** of your project.
+  - The `.gitignore` file is already configured to prevent this file from being committed to your repository.
 
 ### 1.2: Install Dependencies
 - **Objective:** Install all the necessary Node.js packages.
