@@ -14,7 +14,7 @@ function initializeAdminApp(): App {
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountString) {
-        // Production or environment with explicit service account key
+        // Use service account key if available (both in production and locally if set)
         try {
             const serviceAccount = JSON.parse(serviceAccountString);
             // Handle escaped newlines in the private key
@@ -22,18 +22,19 @@ function initializeAdminApp(): App {
                 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
             }
             return initializeApp({
-                credential: cert(serviceAccount),
-                projectId: 'studio-7145415565-66e7d',
+                credential: cert(serviceAccount)
             });
         } catch (e: any) {
-            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY: ${e.message}`);
+            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Check .env.local file. Error: ${e.message}`);
         }
     } else {
-        // Local development using Application Default Credentials
-        console.log("FIREBASE_SERVICE_ACCOUNT_KEY not found. Using Application Default Credentials.");
-        return initializeApp({
-             projectId: 'studio-7145415565-66e7d',
-        });
+        // Fallback for local development using Application Default Credentials
+        console.log("FIREBASE_SERVICE_ACCOUNT_KEY not found. Using Application Default Credentials as a fallback.");
+        try {
+            return initializeApp();
+        } catch(error: any) {
+            throw new Error(`Failed to initialize with ADC. Run 'gcloud auth application-default login' or set FIREBASE_SERVICE_ACCOUNT_KEY in .env.local. Error: ${error.message}`);
+        }
     }
 }
 
