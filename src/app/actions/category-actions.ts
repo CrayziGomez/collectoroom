@@ -29,9 +29,8 @@ export async function addCategory(input: { name: string; description: string }) 
   }
 }
 
-export async function deleteCategory(input: { categoryId: string }) {
+export async function deleteCategory(categoryId: string) {
     const { db } = await initializeAdmin();
-    const { categoryId } = input;
 
     try {
         if (!categoryId) {

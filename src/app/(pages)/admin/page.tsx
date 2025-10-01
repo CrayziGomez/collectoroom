@@ -253,7 +253,7 @@ export default function AdminPage() {
     const handleDeleteCategory = async () => {
         if (!categoryToDelete) return;
         setIsDeletingCategory(true);
-        const result = await deleteCategory({ categoryId: categoryToDelete.id });
+        const result = await deleteCategory(categoryToDelete.id);
         if (result.success) {
             toast({ title: 'Success', description: result.message });
         } else {
