@@ -2,45 +2,20 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // --- Public Read Access for All Files ---
-    // Allow public read access to all files.
+    // Allow public read access for all files. URLs are unguessable.
     match /{allPaths=**} {
       allow read;
     }
 
-    // --- WRITE RULES ---
-    // Only authenticated users can write, and only to their own paths.
-    
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    // USER PROFILE IMAGES
-    match /users/{userId}/profile/{fileName} {
-      allow write: if isOwner(userId) 
-                    && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('image/.*');
-    }
-    
-    // COLLECTION COVER IMAGES
-    match /users/{userId}/collections/{collectionId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-    
-    // CARD IMAGES
-     match /users/{userId}/cards/{cardId}/{fileName} {
-       allow write: if isOwner(userId)
-                     && request.resource.size < 5 * 1024 * 1024
-                     && request.resource.contentType.matches('image/.*');
-    }
-
-    // SITE CONTENT IMAGES
-    // Disallow all client-side writes. All writes must go through the server action.
+    // Allow admins to write to the site-content folder for homepage images, etc.
     match /site-content/{allPaths=**} {
-      allow write: if false;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+
+    // Allow authenticated users to write only to their own folder.
+    // This covers profile pictures, collection images, and card images.
+    match /users/{userId}/{allPaths=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
