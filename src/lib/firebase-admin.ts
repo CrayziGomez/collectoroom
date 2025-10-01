@@ -49,7 +49,7 @@ export async function initializeAdmin() {
     try {
       adminApp = initializeApp({
         credential: cert(serviceAccount),
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+        storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
       });
     } catch (error: any) {
       throw new Error(`Failed to initialize Firebase Admin SDK in production: ${error.message}`);
@@ -59,7 +59,7 @@ export async function initializeAdmin() {
     console.log("Service account key not found. Attempting to use Application Default Credentials for local development.");
     try {
       adminApp = initializeApp({
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+        storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
       });
     } catch(error: any) {
         throw new Error(`Failed to initialize with Application Default Credentials. Please run 'gcloud auth application-default login' or ensure your local environment is authenticated. Original error: ${error.message}`);
