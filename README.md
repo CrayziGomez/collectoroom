@@ -13,10 +13,12 @@ This phase ensures your local development environment is running correctly and y
 - **Action:**
   - In the root of your project, create a file named `.env.local`.
   - Add your Firebase project's **client-side configuration** to this file using the `NEXT_PUBLIC_` prefix.
-  - **Crucially**, you must also add the **server-side service account key** to this file under the variable `FIREBASE_SERVICE_ACCOUNT_KEY`. This is required for server actions like image uploads to work in your local environment.
-  - Your final `.env.local` file should look like this:
+  - **Crucially**, you must also add the **server-side service account key** to this file under the variable `FIREBASE_SERVICE_ACCOUNT_KEY`.
+  - The entire service account JSON object must be pasted on a **single line**. Multi-line values are not supported in `.env` files.
 
-    ```
+  - Your final `.env.local` file should look like this example (ensure the `FIREBASE_SERVICE_ACCOUNT_KEY` value is on one continuous line):
+
+    ```env
     # Client-side configuration
     NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_API_KEY"
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
@@ -25,8 +27,8 @@ This phase ensures your local development environment is running correctly and y
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
     NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"
 
-    # Server-side service account for local development
-    FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account", "project_id": "...", ...}'
+    # Server-side service account for local development (MUST BE A SINGLE LINE)
+    FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account", "project_id": "your-project-id", "private_key_id": "your-key-id", "private_key": "-----BEGIN PRIVATE KEY-----\\nYOUR_PRIVATE_KEY_LINE_1\\nYOUR_PRIVATE_KEY_LINE_2\\n...\\n-----END PRIVATE KEY-----\\n", "client_email": "your-client-email@your-project-id.iam.gserviceaccount.com", "client_id": "your-client-id", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/your-client-email%40your-project-id.iam.gserviceaccount.com"}'
     ```
 
 ### 1.2: Install Dependencies
