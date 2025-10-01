@@ -2,7 +2,6 @@
 'use server';
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { revalidatePath } from 'next/cache';
 import { initializeAdmin } from '@/lib/firebase-admin';
 
 export async function addCategory(input: { name: string; description: string }) {
@@ -23,10 +22,6 @@ export async function addCategory(input: { name: string; description: string }) 
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    revalidatePath('/admin');
-    revalidatePath('/gallery');
-    revalidatePath('/my-collectoroom/create');
-
     return { success: true, message: `Category "${name}" added successfully.` };
   } catch (error: any) {
     console.error('Error adding category:', error);
@@ -46,14 +41,9 @@ export async function deleteCategory(input: { categoryId: string }) {
         const categoryRef = db.collection('categories').doc(categoryId);
         await categoryRef.delete();
 
-        revalidatePath('/admin');
-        revalidatePath('/gallery');
-
         return { success: true, message: 'Category deleted successfully.' };
     } catch (error: any) {
         console.error('Error deleting category:', error);
         return { success: false, message: `Failed to delete category: ${error.message}` };
     }
 }
-
-    
