@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
 import { db, app } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
 
@@ -29,11 +29,25 @@ const AuthContext = createContext<AuthContextType>({
     updateUser: () => {}
 });
 
-async function createUserDocument(user: FirebaseUser) {
+async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
     const userDocRef = doc(db, 'users', user.uid);
     const docSnap = await getDoc(userDocRef);
 
-    if (!docSnap.exists()) {
+    if (docSnap.exists()) {
+        const existingData = docSnap.data() as AppUser;
+        // Sync avatarUrl on login if it's different
+        if (user.photoURL && existingData.avatarUrl !== user.photoURL) {
+            try {
+                await updateDoc(userDocRef, { avatarUrl: user.photoURL });
+                return { ...existingData, avatarUrl: user.photoURL };
+            } catch (error) {
+                console.error("Error syncing avatar on login:", error);
+                return existingData;
+            }
+        }
+        return existingData;
+    } else {
+        // Document doesn't exist, create it
         const username = sessionStorage.getItem('pendingUsername') || user.email?.split('@')[0] || 'New User';
         const tier = sessionStorage.getItem('pendingTier') || 'Hobbyist';
         const isAdmin = user.email === 'admin@collectoroom.com';
@@ -49,27 +63,18 @@ async function createUserDocument(user: FirebaseUser) {
             followingCount: 0,
             avatarUrl: user.photoURL || '',
         };
-
+        
         try {
-            await setDoc(userDocRef, newUser);
+            await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
         } catch (error) {
             console.error("Error creating user document:", error);
+            // We throw here because subsequent operations will fail
+            throw new Error("Failed to create user profile.");
         } finally {
-            // Clean up session storage
             sessionStorage.removeItem('pendingUsername');
             sessionStorage.removeItem('pendingTier');
         }
-    } else {
-        // If user exists, ensure avatarUrl is synced from Firebase Auth
-        // This handles Google/other provider sign-ins where photoURL might be available
-        const existingData = docSnap.data();
-        if (user.photoURL && existingData.avatarUrl !== user.photoURL) {
-            try {
-                await updateDoc(userDocRef, { avatarUrl: user.photoURL });
-            } catch (error) {
-                console.error("Error syncing avatar on login:", error);
-            }
-        }
+        return newUser;
     }
 }
 
@@ -77,13 +82,6 @@ async function createUserDocument(user: FirebaseUser) {
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUserWithFirebase | null>(null);
   const [loading, setLoading] = useState(true);
-  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
-  
-  useEffect(() => {
-    if(app) {
-        setFirebaseInitialized(true);
-    }
-  }, []);
 
   const updateUser = useCallback((data: Partial<AppUser>) => {
     setUser(currentUser => {
@@ -96,47 +94,51 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!firebaseInitialized) return;
-
     const auth = getAuth(app);
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      let unsubscribeDoc: (() => void) | null = null;
+    let unsubscribeDoc: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
+      // Clean up previous listener if it exists
+      if (unsubscribeDoc) unsubscribeDoc();
 
       if (firebaseUser) {
-        // Create or update user document. This is idempotent.
-        await createUserDocument(firebaseUser);
-        
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        
-        unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
-            setUser({ ...appUser, firebaseUser });
-          } else {
-             // Should not happen often if createUserDocument works, but good to have
-             console.log('User document not found, waiting for creation...');
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Error listening to user document:", error);
+        try {
+          // Ensure user document exists before attaching a listener
+          await createUserDocument(firebaseUser);
+          
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          
+          unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
+              setUser({ ...appUser, firebaseUser });
+            } else {
+              console.error("User document disappeared after creation.");
+              setUser(null);
+            }
+            setLoading(false);
+          }, (error) => {
+            console.error("Error listening to user document:", error);
+            setUser(null);
+            setLoading(false);
+          });
+        } catch (error) {
+          console.error("Failed to setup user profile:", error);
           setUser(null);
           setLoading(false);
-        });
+        }
       } else {
         setUser(null);
         setLoading(false);
       }
-      
-      return () => {
-        if (unsubscribeDoc) {
-          unsubscribeDoc();
-        }
-      };
     });
 
-    return () => unsubscribeAuth();
-  }, [firebaseInitialized]);
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeDoc) unsubscribeDoc();
+    };
+  }, []);
 
   const contextValue = { user, loading, updateUser };
 
