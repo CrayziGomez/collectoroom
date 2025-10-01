@@ -11,25 +11,33 @@ function initializeAdminApp(): App {
         return existingApps[0];
     }
 
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    let serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountString) {
-        // Use service account key if available (both in production and locally if set)
         try {
+            // Most common issue: .env file has quotes around the JSON string.
+            // This removes them if they exist.
+            if (serviceAccountString.startsWith("'") && serviceAccountString.endsWith("'")) {
+                serviceAccountString = serviceAccountString.substring(1, serviceAccountString.length - 1);
+            }
+
             const serviceAccount = JSON.parse(serviceAccountString);
-            // Handle escaped newlines in the private key
+            
+            // Handle escaped newlines in the private key, a common issue with env vars.
             if (serviceAccount.private_key) {
                 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
             }
+
             return initializeApp({
                 credential: cert(serviceAccount)
             });
+
         } catch (e: any) {
-            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Check .env.local file. Error: ${e.message}`);
+            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Check .env.local format. Error: ${e.message}`);
         }
     } else {
-        // Fallback for local development using Application Default Credentials
-        console.log("FIREBASE_SERVICE_ACCOUNT_KEY not found. Using Application Default Credentials as a fallback.");
+        // Fallback for local development when the service account key is not in .env.local
+        console.warn("FIREBASE_SERVICE_ACCOUNT_KEY not found in .env.local. Falling back to Application Default Credentials. This may cause issues with services like URL signing.");
         try {
             return initializeApp();
         } catch(error: any) {
