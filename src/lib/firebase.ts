@@ -5,15 +5,21 @@ import { getStorage } from 'firebase/storage';
 // --- Universal Firebase Initialization (Client & Server) ---
 
 const getFirebaseConfig = (): FirebaseOptions => {
-  // --- IMPORTANT DEBUGGING LOGS ---
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
-  console.log("DEBUG: BUILD_ENV_NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
-  // --- END DEBUGGING LOGS ---
+  if (process.env.FIREBASE_WEBAPP_CONFIG) {
+    try {
+      const config = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
+      // Ensure the storageBucket from FIREBASE_WEBAPP_CONFIG is correct
+      if (config.storageBucket && !config.storageBucket.includes('firebasestorage.app')) {
+        config.storageBucket = `${config.projectId}.firebasestorage.app`;
+      }
+      return config;
+    } catch (e) {
+      console.error("Failed to parse FIREBASE_WEBAPP_CONFIG:", e);
+      // Fallback to individual env vars if parsing fails
+    }
+  }
 
+  // Fallback to individual NEXT_PUBLIC_FIREBASE_* environment variables
   return {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -40,7 +46,7 @@ const getClientApp = () => {
         return initializedAppInstance;
     } else {
         // Only initialize if no app exists globally or in this module scope
-        const firebaseConfig = getFirebaseConfig(); // Get config with logging
+        const firebaseConfig = getFirebaseConfig(); // Get config with logic
         initializedAppInstance = initializeApp(firebaseConfig);
         return initializedAppInstance;
     }
