@@ -100,7 +100,7 @@ export async function updateAvatar(formData: FormData) {
             try {
                  if (userData.avatarUrl.includes(bucket.name)) {
                     const oldUrl = new URL(userData.avatarUrl);
-                    const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf(bucket.name) + bucket.name.length + 1));
+                    const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf(bucket.name) + 1));
                     if (oldPath) {
                         await bucket.file(oldPath).delete({ ignoreNotFound: true });
                     }
@@ -138,6 +138,7 @@ export async function updateAvatar(formData: FormData) {
         return { success: false, message: `Upload Failed: {"code":"${errorCode}","message":"${errorMessage}"}`, avatarUrl: null };
     }
 }
+
 
 export async function deleteUser(input: { userId: string }): Promise<{ success: boolean; message?: string }> {
     const { db, storage, auth } = await initializeAdmin();
@@ -196,5 +197,3 @@ export async function deleteUser(input: { userId: string }): Promise<{ success: 
         };
     }
 }
-
-    
