@@ -28,7 +28,7 @@ export function initializeAdmin() {
   // Read the service account key from the environment variable.
   const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountString) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please ensure it is configured in your hosting environment secrets.');
   }
 
   let serviceAccount;
