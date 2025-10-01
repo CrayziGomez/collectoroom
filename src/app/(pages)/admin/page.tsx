@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2, View } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Users, Layers, FileText, Loader2, View, UploadCloud } from 'lucide-react';
 import { SEED_CATEGORIES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -25,10 +25,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { collection, onSnapshot, query, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Collection, Category } from '@/lib/types';
+import type { User, Collection, Category, SiteContent } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,6 +41,9 @@ import { addCategory } from '@/app/actions/category-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
+import { Textarea } from '@/components/ui/textarea';
+import Image from 'next/image';
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAuth();
@@ -52,6 +55,8 @@ export default function AdminPage() {
     const [collections, setCollections] = useState<Collection[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [totalCards, setTotalCards] = useState(0);
+    const [homePageContent, setHomePageContent] = useState<SiteContent | null>(null);
+
 
     // Loading states
     const [dataLoading, setDataLoading] = useState(true);
@@ -61,6 +66,15 @@ export default function AdminPage() {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newCategoryDesc, setNewCategoryDesc] = useState('');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+    // Homepage content editing state
+    const [editedTitle, setEditedTitle] = useState('');
+    const [editedDescription, setEditedDescription] = useState('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [isSavingContent, setIsSavingContent] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
 
     const seedCategories = useCallback(async () => {
         const categoriesRef = collection(db, 'categories');
@@ -106,6 +120,16 @@ export default function AdminPage() {
                 setCategories(categoriesData);
             }
         }, (error) => console.error("Error fetching categories:", error));
+        
+        const fetchHomePageContent = async () => {
+            const content = await getSiteContent({ pageId: 'homePage' });
+            setHomePageContent(content);
+            setEditedTitle(content.title.replace(/<br \/>/g, '\n').replace(/<\/?span[^>]*>/g, ''));
+            setEditedDescription(content.description);
+            setImagePreview(content.imageUrl || null);
+        };
+        
+        fetchHomePageContent();
 
         setDataLoading(false);
 
@@ -150,6 +174,51 @@ export default function AdminPage() {
             toast({ title: 'Error', description: result.message, variant: 'destructive' });
         }
         setIsAddingCategory(false);
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
+        }
+    };
+
+    const handleSaveContent = async () => {
+        if (!homePageContent) return;
+        setIsSavingContent(true);
+        try {
+            const formattedTitle = editedTitle
+                .replace(/\n/g, '<br />')
+                .replace(/Digitized & Showcased./g, '<span class="text-primary">Digitized &amp; Showcased.</span>');
+
+            const formData = new FormData();
+            formData.append('id', homePageContent.id);
+            formData.append('title', formattedTitle);
+            formData.append('description', editedDescription);
+            if (imageFile) {
+                 formData.append('imageFile', imageFile);
+            }
+            
+            const result = await updateSiteContent(formData);
+
+            if (result.success) {
+                toast({ title: 'Success', description: 'Homepage content updated!' });
+                if (result.imageUrl) {
+                    setImagePreview(result.imageUrl);
+                    setImageFile(null);
+                }
+            } else {
+                throw new Error(result.message);
+            }
+
+        } catch (error: any) {
+            console.error("Error updating content:", error);
+            toast({ title: 'Error', description: error.message || 'Failed to update content.', variant: 'destructive' });
+        } finally {
+            setIsSavingContent(false);
+        }
     };
 
 
@@ -222,6 +291,70 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Homepage Content Management */}
+      <Card>
+          <CardHeader>
+            <CardTitle>Homepage Content</CardTitle>
+            <CardDescription>Manage the hero section of the public homepage.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+                 <div className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="hero-title">Hero Title</Label>
+                        <Textarea
+                            id="hero-title"
+                            value={editedTitle}
+                            onChange={(e) => setEditedTitle(e.target.value)}
+                            className="min-h-[80px]"
+                            placeholder="Enter title. Use new lines for line breaks."
+                        />
+                        <p className="text-xs text-muted-foreground">"Digitized & Showcased." will be automatically highlighted.</p>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="hero-description">Hero Description</Label>
+                        <Textarea
+                            id="hero-description"
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            className="min-h-[120px]"
+                        />
+                    </div>
+                 </div>
+                 <div className="space-y-2">
+                     <Label>Hero Image</Label>
+                     <div 
+                        className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted aspect-video flex items-center justify-center"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        {imagePreview ? (
+                            <Image src={imagePreview} alt="New image preview" width={400} height={200} className="w-full h-auto object-contain rounded-md" />
+                        ) : (
+                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <UploadCloud className="h-10 w-10" />
+                                <p>Click or drag to upload an image</p>
+                            </div>
+                        )}
+                    </div>
+                    <Input 
+                        ref={fileInputRef}
+                        type="file" 
+                        className="hidden" 
+                        accept="image/png, image/jpeg, image/gif, image/webp" 
+                        onChange={handleImageSelect}
+                    />
+                 </div>
+            </div>
+             <div className="flex justify-end">
+                <Button onClick={handleSaveContent} disabled={isSavingContent}>
+                  {isSavingContent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Content
+                </Button>
+            </div>
+          </CardContent>
+        </Card>
+
 
       <div className="grid gap-8 md:grid-cols-2">
         {/* User Management */}

@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Loader2, Pencil, UploadCloud } from 'lucide-react';
+import { ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -12,13 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { updateSiteContent } from '@/app/actions/site-content';
 import type { SiteContent, Category, HowItWorksStep } from '@/lib/types';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { app } from '@/lib/firebase';
+import { Loader2 } from 'lucide-react';
 
 interface HomePageClientContentProps {
   initialContent: SiteContent | null;
@@ -36,119 +34,21 @@ export function HomePageClientContent({
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // State for editable content, initialized from server-fetched props
   const [content, setContent] = useState<SiteContent | null>(initialContent);
   const [categories] = useState<Category[]>(initialCategories);
   const [heroContent, setHeroContent] = useState<SiteContent>(initialHeroContent);
   const [howItWorksSteps, setHowItWorksSteps] = useState<HowItWorksStep[]>(initialHowItWorksSteps);
 
-
-  // Edit Text Dialog State
-  const [isTextDialogOpen, setIsTextDialogOpen] = useState(false);
-  const [editedTitle, setEditedTitle] = useState('');
-  const [editedDescription, setEditedDescription] = useState('');
-  const [isSavingText, setIsSavingText] = useState(false);
-  
-  // Edit Image Dialog State
-  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isSavingImage, setIsSavingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Edit How It Works Dialog State
   const [isHowItWorksDialogOpen, setIsHowItWorksDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<HowItWorksStep | null>(null);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [isSavingHowItWorks, setIsSavingHowItWorks] = useState(false);
   
-  // Update state if initial props change (e.g., on navigation)
   useEffect(() => {
     setContent(initialContent);
     setHeroContent(initialHeroContent);
     setHowItWorksSteps(initialHowItWorksSteps);
   }, [initialContent, initialHeroContent, initialHowItWorksSteps]);
-
-  const handleOpenTextDialog = () => {
-    if (heroContent) {
-      setEditedTitle(heroContent.title.replace(/<br \/>/g, '\n').replace(/<\/?span[^>]*>/g, ''));
-      setEditedDescription(heroContent.description);
-      setIsTextDialogOpen(true);
-    }
-  };
-
-  const handleSaveText = async () => {
-    if (!user || !content) return;
-    setIsSavingText(true);
-    try {
-      const formattedTitle = editedTitle
-        .replace(/\n/g, '<br />')
-        .replace(/Digitized & Showcased./g, '<span class="text-primary">Digitized &amp; Showcased.</span>');
-
-      const formData = new FormData();
-      formData.append('id', content.id);
-      formData.append('title', formattedTitle);
-      formData.append('description', editedDescription);
-      
-      const result = await updateSiteContent(formData);
-
-      if (result.success) {
-        toast({ title: 'Success', description: 'Hero content updated!' });
-        setIsTextDialogOpen(false);
-        setHeroContent(prev => ({ ...prev, title: formattedTitle, description: editedDescription }));
-      } else {
-        throw new Error(result.message);
-      }
-
-    } catch (error: any) {
-      console.error("Error updating content:", error);
-      toast({ title: 'Error', description: error.message || 'Failed to update content.', variant: 'destructive' });
-    } finally {
-      setIsSavingText(false);
-    }
-  };
-
-  const handleOpenImageDialog = () => {
-    setImageFile(null);
-    setImagePreview(heroContent?.imageUrl || null);
-    setIsImageDialogOpen(true);
-  };
-  
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      const previewUrl = URL.createObjectURL(file);
-      setImagePreview(previewUrl);
-    }
-  };
-
-  const handleSaveImage = async () => {
-    if (!user || !content || !imageFile) return;
-    setIsSavingImage(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('id', content.id);
-      formData.append('imageFile', imageFile);
-
-      const result = await updateSiteContent(formData);
-      
-      if (result.success && result.imageUrl) {
-        toast({ title: 'Success', description: 'Hero image updated!' });
-        setIsImageDialogOpen(false);
-        setHeroContent(prev => ({ ...prev, imageUrl: result.imageUrl! }));
-      } else {
-        throw new Error(result.message || 'An unknown error occurred while updating the image.');
-      }
-
-    } catch (error: any) {
-      console.error("Error updating image:", error);
-      toast({ title: 'Error', description: error.message || 'Failed to update image.', variant: 'destructive' });
-    } finally {
-      setIsSavingImage(false);
-    }
-  };
 
   const handleOpenHowItWorksDialog = (step: HowItWorksStep, index: number) => {
     setEditingStep({ ...step });
@@ -189,20 +89,13 @@ export function HomePageClientContent({
       <section className="container py-12 md:py-24">
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6 text-center md:text-left">
-             <div className="relative">
-              {user?.isAdmin && (
-                <Button onClick={handleOpenTextDialog} variant="ghost" size="icon" className="absolute -top-4 right-0 h-8 w-8">
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
-                <h1
-                  className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
-                  dangerouslySetInnerHTML={{ __html: heroContent.title }}
-                />
-            </div>
-              <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
-                {heroContent.description}
-              </p>
+            <h1
+              className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline tracking-tighter"
+              dangerouslySetInnerHTML={{ __html: heroContent.title }}
+            />
+            <p className="max-w-xl mx-auto md:mx-0 text-lg text-muted-foreground">
+              {heroContent.description}
+            </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Button size="lg" asChild>
                 <Link href={user ? '/my-collectoroom/create' : '/signup'}>Start Your Collection <ArrowRight className="ml-2 h-5 w-5" /></Link>
@@ -213,23 +106,16 @@ export function HomePageClientContent({
             </div>
           </div>
           <div className="relative">
-              <>
-                <Image
-                  src={heroContent.imageUrl || 'https://picsum.photos/seed/hero/1200/600'}
-                  alt={heroContent.description}
-                  width={600}
-                  height={400}
-                  className="rounded-lg shadow-lg aspect-video object-cover"
-                  data-ai-hint={heroContent.imageHint}
-                  key={heroContent.imageUrl}
-                  priority // Ensure hero image loads quickly
-                />
-                {user?.isAdmin && (
-                  <Button onClick={handleOpenImageDialog} variant="secondary" size="icon" className="absolute top-4 right-4 h-8 w-8">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-              </>
+            <Image
+              src={heroContent.imageUrl || 'https://picsum.photos/seed/hero/1200/600'}
+              alt={heroContent.description}
+              width={600}
+              height={400}
+              className="rounded-lg shadow-lg aspect-video object-cover"
+              data-ai-hint={heroContent.imageHint}
+              key={heroContent.imageUrl}
+              priority // Ensure hero image loads quickly
+            />
           </div>
         </div>
       </section>
@@ -282,126 +168,43 @@ export function HomePageClientContent({
         </div>
       </section>
       
-      {/* Edit Text Dialog */}
-       <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Hero Content</DialogTitle>
-            <DialogDescription>
-              Make changes to the main title and description on the home page. Use a new line for the title's second line. The "Digitized & Showcased." part will be automatically highlighted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Title</Label>
-              <Textarea
-                id="title"
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                className="min-h-[100px]"
-                placeholder="Enter title. Use new lines for line breaks."
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={editedDescription}
-                onChange={(e) => setEditedDescription(e.target.value)}
-                className="min-h-[150px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleSaveText} disabled={isSavingText}>
-              {isSavingText && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Image Dialog */}
-      <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Hero Image</DialogTitle>
-            <DialogDescription>
-              Upload a new image for the hero section banner. Recommended size: 1200x600.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-              <div 
-                className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                  {imagePreview ? (
-                     <Image src={imagePreview} alt="New image preview" width={400} height={200} className="w-full h-auto object-contain rounded-md" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <UploadCloud className="h-10 w-10" />
-                      <p>Click or drag to upload an image</p>
-                    </div>
-                  )}
+      {/* Edit How It Works Dialog */}
+      <Dialog open={isHowItWorksDialogOpen} onOpenChange={setIsHowItWorksDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+              <DialogTitle>Edit Step: {editingStep?.title}</DialogTitle>
+              <DialogDescription>
+                  Update the title and description for this step. The icon cannot be changed.
+              </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                  <Label htmlFor="hiw-title">Title</Label>
+                  <Input
+                  id="hiw-title"
+                  value={editingStep?.title || ''}
+                  onChange={(e) => setEditingStep(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  />
               </div>
-              <Input 
-                ref={fileInputRef}
-                type="file" 
-                className="hidden" 
-                accept="image/png, image/jpeg, image/gif, image/webp" 
-                onChange={handleImageSelect}
-              />
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleSaveImage} disabled={isSavingImage || !imageFile}>
-              {isSavingImage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Image
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+              <div className="grid gap-2">
+                  <Label htmlFor="hiw-description">Description</Label>
+                  <Textarea
+                  id="hiw-description"
+                  value={editingStep?.description || ''}
+                  onChange={(e) => setEditingStep(prev => prev ? { ...prev, description: e.target.value } : null)}
+                  className="min-h-[120px]"
+                  />
+              </div>
+              </div>
+              <DialogFooter>
+              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+              <Button onClick={handleSaveHowItWorks} disabled={isSavingHowItWorks}>
+                  {isSavingHowItWorks && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Step
+              </Button>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
-
-    {/* Edit How It Works Dialog */}
-    <Dialog open={isHowItWorksDialogOpen} onOpenChange={setIsHowItWorksDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-            <DialogTitle>Edit Step: {editingStep?.title}</DialogTitle>
-            <DialogDescription>
-                Update the title and description for this step. The icon cannot be changed.
-            </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-                <Label htmlFor="hiw-title">Title</Label>
-                <Input
-                id="hiw-title"
-                value={editingStep?.title || ''}
-                onChange={(e) => setEditingStep(prev => prev ? { ...prev, title: e.target.value } : null)}
-                />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="hiw-description">Description</Label>
-                <Textarea
-                id="hiw-description"
-                value={editingStep?.description || ''}
-                onChange={(e) => setEditingStep(prev => prev ? { ...prev, description: e.target.value } : null)}
-                className="min-h-[120px]"
-                />
-            </div>
-            </div>
-            <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleSaveHowItWorks} disabled={isSavingHowItWorks}>
-                {isSavingHowItWorks && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Step
-            </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
     </>
   );
 }
-
-    
