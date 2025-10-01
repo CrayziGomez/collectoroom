@@ -7,7 +7,7 @@ import { getStorage } from 'firebase-admin/storage';
 
 let adminApp: App | null = null;
 
-export function initializeAdmin() {
+export async function initializeAdmin() {
   if (adminApp) {
     return {
       db: getFirestore(adminApp),
@@ -24,18 +24,24 @@ export function initializeAdmin() {
     };
   }
 
-  // For production (App Hosting), the key is provided as an environment variable.
-  const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  // Check if running in the deployed Firebase App Hosting environment
+  const isProduction = process.env.FIREBASERUN_WEB_APP_ID;
 
-  if (serviceAccountString) {
+  if (isProduction) {
+    // Production: Use the service account key from the environment variable
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set in the production environment. Please ensure it is configured in your hosting environment secrets.');
+    }
+
     let serviceAccount;
     try {
       serviceAccount = JSON.parse(serviceAccountString);
     } catch (error: any) {
-      const preview = serviceAccountString.substring(0, 40);
-      throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Please verify the secret's format. Original error: ${error.message}`);
+      throw new Error(`Failed to parse service account JSON in production. Please verify the secret's format. Original error: ${error.message}`);
     }
 
+    // Correctly handle the private_key format
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
@@ -43,18 +49,17 @@ export function initializeAdmin() {
     try {
       adminApp = initializeApp({
         credential: cert(serviceAccount),
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+        storageBucket: 'studio-7145415565-66e7d.firebaseapp.com',
       });
     } catch (error: any) {
-      throw new Error(`Failed to initialize Firebase Admin SDK with service account: ${error.message}`);
+      throw new Error(`Failed to initialize Firebase Admin SDK in production: ${error.message}`);
     }
   } else {
-    // For local development, it will use Application Default Credentials
-    // This requires the user to be authenticated via `gcloud auth application-default login`
+    // Local Development: Use Application Default Credentials
     console.log("Service account key not found. Attempting to use Application Default Credentials for local development.");
     try {
       adminApp = initializeApp({
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+        storageBucket: 'studio-7145415565-66e7d.firebaseapp.com',
       });
     } catch(error: any) {
         throw new Error(`Failed to initialize with Application Default Credentials. Please run 'gcloud auth application-default login' or ensure your local environment is authenticated. Original error: ${error.message}`);
