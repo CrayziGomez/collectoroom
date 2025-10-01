@@ -50,7 +50,7 @@ export async function initializeAdmin() {
       adminApp = initializeApp({
         credential: cert(serviceAccount),
         projectId: 'studio-7145415565-66e7d',
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+        // By not specifying storageBucket, the Admin SDK will use the default bucket for the project.
       });
     } catch (error: any) {
       throw new Error(`Failed to initialize Firebase Admin SDK in production: ${error.message}`);
@@ -61,7 +61,7 @@ export async function initializeAdmin() {
     try {
       adminApp = initializeApp({
         projectId: 'studio-7145415565-66e7d',
-        storageBucket: 'studio-7145415565-66e7d.appspot.com',
+         // By not specifying storageBucket, the Admin SDK will use the default bucket for the project.
       });
     } catch(error: any) {
         throw new Error(`Failed to initialize with Application Default Credentials. Please run 'gcloud auth application-default login' or ensure your local environment is authenticated. Original error: ${error.message}`);
