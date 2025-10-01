@@ -14,19 +14,22 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+let app;
+
 // This function ensures that we initialize the app only once.
 // It's safe to call on both the server and the client.
 const getClientApp = () => {
-    if (getApps().length) {
-        return getApp();
+    if (!app && getApps().length === 0) {
+        // Explicitly provide the config, including the storage bucket, to ensure consistency.
+        app = initializeApp(firebaseConfig);
+    } else if (!app && getApps().length > 0) {
+        app = getApp();
     }
-    // Explicitly provide the config, including the storage bucket, to ensure consistency.
-    return initializeApp(firebaseConfig);
+    return app;
 }
 
-const app = getClientApp();
-const db = getFirestore(app);
-const storage = getStorage(app);
+const db = getFirestore(getClientApp());
+const storage = getStorage(getClientApp());
 
 // Export client modules
 export { app, db, storage, getClientApp };
