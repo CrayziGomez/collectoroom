@@ -1,5 +1,8 @@
 
+'use server';
+
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import * as fs from 'fs';
@@ -7,22 +10,24 @@ import * as path from 'path';
 
 let adminApp: App | null = null;
 
-// The correct storage bucket name for your project, confirmed from test logs.
 const BUCKET_NAME = 'studio-7145415565-66e7d.firebasestorage.app';
 
 function initializeAdminApp(): App {
-    const existingApps = getApps();
-    if (existingApps.length > 0) {
-        return existingApps[0];
+    if (getApps().length > 0) {
+        return getApps()[0];
     }
 
     // --- Production Environment (App Hosting) ---
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
         try {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
+            const serviceAccount = JSON.parse(serviceAccountString);
+            
+            // Handle escaped newlines in the private key
             if (serviceAccount.private_key) {
                 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
             }
+
             return initializeApp({
                 credential: cert(serviceAccount),
                 storageBucket: BUCKET_NAME,
@@ -43,7 +48,7 @@ function initializeAdminApp(): App {
             });
         }
     } catch (e: any) {
-        throw new Error(`Failed to load or parse local serviceAccountKey.json. Please ensure it is a valid JSON file. Error: ${e.message}`);
+        throw new Error(`Failed to load or parse local serviceAccountKey.json. Error: ${e.message}`);
     }
 
     // --- Fallback / Error State ---
@@ -52,13 +57,16 @@ function initializeAdminApp(): App {
     );
 }
 
-export function initializeAdmin() {
+export async function initializeAdmin() {
   if (!adminApp) {
     adminApp = initializeAdminApp();
   }
 
   return {
+    auth: getAuth(adminApp),
     db: getFirestore(adminApp),
     storage: getStorage(adminApp)
   };
 }
+
+    

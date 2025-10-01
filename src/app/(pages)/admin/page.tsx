@@ -22,7 +22,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -38,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { PRICING_TIERS } from '@/lib/constants';
 import { addCategory } from '@/app/actions/category-actions';
+import { deleteUser } from '@/app/actions/user-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
@@ -60,12 +60,14 @@ export default function AdminPage() {
 
     // Loading states
     const [dataLoading, setDataLoading] = useState(true);
+    const [isDeletingUser, setIsDeletingUser] = useState(false);
 
-    // Dialog state for adding a category
+    // Dialog state
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newCategoryDesc, setNewCategoryDesc] = useState('');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
     // Homepage content editing state
     const [editedTitle, setEditedTitle] = useState('');
@@ -90,7 +92,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (authLoading) return;
-        if (!user) {
+        if (!user?.isAdmin) {
             router.push('/login');
             return;
         }
@@ -219,6 +221,29 @@ export default function AdminPage() {
         } finally {
             setIsSavingContent(false);
         }
+    };
+
+    const handleDeleteUser = async () => {
+        if (!userToDelete) return;
+        setIsDeletingUser(true);
+
+        const result = await deleteUser({ userId: userToDelete.uid });
+
+        if (result.success) {
+            toast({
+                title: 'User Deleted',
+                description: `User ${userToDelete.username} has been permanently deleted.`,
+            });
+        } else {
+            toast({
+                title: 'Deletion Failed',
+                description: result.message || 'An unexpected error occurred.',
+                variant: 'destructive',
+            });
+        }
+
+        setIsDeletingUser(false);
+        setUserToDelete(null);
     };
 
 
@@ -403,38 +428,25 @@ export default function AdminPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <AlertDialog>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/profile/${u.username}`}>
-                                    <View className="mr-2 h-4 w-4" /> View Collections
-                                  </Link>
-                                </DropdownMenuItem>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem className="text-destructive" disabled={u.uid === user.uid}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete User
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the user account
-                                  and remove their data from our servers.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                            <DropdownMenuItem asChild>
+                                <Link href={`/profile/${u.username}`}>
+                                <View className="mr-2 h-4 w-4" /> View Collections
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                                className="text-destructive" 
+                                disabled={u.uid === user.uid}
+                                onSelect={() => setUserToDelete(u)}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                            </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -525,6 +537,33 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+    {/* Delete User Confirmation Dialog */}
+    <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the user <span className="font-bold">{userToDelete?.username}</span>,
+                their authentication record, all of their collections, cards, and uploaded images.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingUser} onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                disabled={isDeletingUser}
+                onClick={handleDeleteUser}
+            >
+                {isDeletingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete User
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </>
   );
 }
+
+    

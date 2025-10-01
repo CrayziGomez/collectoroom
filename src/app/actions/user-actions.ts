@@ -5,6 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { initializeAdmin } from '@/lib/firebase-admin';
+import type { Collection, Card } from '@/lib/types';
 
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
@@ -23,10 +24,8 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
         const followingRef = currentUserRef.collection('following').doc(targetUserId);
         const followerRef = targetUserRef.collection('followers').doc(currentUserId);
         
-        const [currentUserSnap, followingSnap] = await Promise.all([
-            transaction.get(currentUserRef),
-            transaction.get(followingSnap)
-        ]);
+        const followingSnap = await transaction.get(followingRef);
+        const currentUserSnap = await transaction.get(currentUserRef);
 
         if (!currentUserSnap.exists) {
             throw new Error('Current user does not exist.');
@@ -139,3 +138,63 @@ export async function updateAvatar(formData: FormData) {
         return { success: false, message: `Upload Failed: {"code":"${errorCode}","message":"${errorMessage}"}`, avatarUrl: null };
     }
 }
+
+export async function deleteUser(input: { userId: string }): Promise<{ success: boolean; message?: string }> {
+    const { db, storage, auth } = await initializeAdmin();
+    const { userId } = input;
+
+    try {
+        const bucket = storage.bucket();
+        const batch = db.batch();
+
+        // 1. Delete all collections and cards belonging to the user
+        const collectionsQuery = db.collection('collections').where('userId', '==', userId);
+        const collectionsSnapshot = await collectionsQuery.get();
+
+        for (const collectionDoc of collectionsSnapshot.docs) {
+            const cardsQuery = db.collection('cards').where('collectionId', '==', collectionDoc.id);
+            const cardsSnapshot = await cardsQuery.get();
+
+            for (const cardDoc of cardsSnapshot.docs) {
+                // Delete card images from storage
+                const cardData = cardDoc.data() as Card;
+                if (cardData.images && cardData.images.length > 0) {
+                    const deletePromises = cardData.images.map(image => 
+                        bucket.file(image.path).delete({ ignoreNotFound: true })
+                    );
+                    await Promise.all(deletePromises);
+                }
+                // Batch delete card document
+                batch.delete(cardDoc.ref);
+            }
+            // Batch delete collection document
+            batch.delete(collectionDoc.ref);
+        }
+
+        // 2. Delete user's profile picture from Storage
+        // This is a best-effort attempt to clean up the profile folder.
+        await bucket.deleteFiles({ prefix: `users/${userId}/profile/` });
+        
+        // 3. Delete user document from 'users' collection
+        const userRef = db.collection('users').doc(userId);
+        batch.delete(userRef);
+
+        // Commit all Firestore deletions
+        await batch.commit();
+
+        // 4. Delete user from Firebase Authentication
+        await auth.deleteUser(userId);
+
+        revalidatePath('/admin');
+        return { success: true, message: 'User and all associated data deleted.' };
+
+    } catch (error: any) {
+        console.error(`Failed to delete user ${userId}:`, error);
+        return {
+            success: false,
+            message: `An error occurred: ${error.message}. Check server logs for details.`
+        };
+    }
+}
+
+    
