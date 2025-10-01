@@ -7,8 +7,8 @@ import * as path from 'path';
 
 let adminApp: App | null = null;
 
-// The correct storage bucket name for your project.
-const BUCKET_NAME = 'studio-7145415565-66e7d.appspot.com';
+// The correct storage bucket name for your project, confirmed from test logs.
+const BUCKET_NAME = 'studio-7145415565-66e7d.firebasestorage.app';
 
 function initializeAdminApp(): App {
     const existingApps = getApps();
