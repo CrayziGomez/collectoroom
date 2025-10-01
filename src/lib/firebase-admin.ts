@@ -29,9 +29,7 @@ export function initializeAdmin() {
 
   let serviceAccount;
   try {
-    // Replace literal newlines with escaped newlines for JSON parsing
-    const repairedString = serviceAccountString.replace(/\\n/g, '\\\\n');
-    serviceAccount = JSON.parse(repairedString);
+    serviceAccount = JSON.parse(serviceAccountString);
   } catch (error: any) {
     const preview = serviceAccountString.substring(0, 40);
     throw new Error(`Failed to parse service account JSON. The string starts with: "${preview}". Please verify the secret's format. Original error: ${error.message}`);
