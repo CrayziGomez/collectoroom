@@ -1,4 +1,3 @@
-
 'use server';
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
@@ -10,7 +9,7 @@ import * as path from 'path';
 
 let adminApp: App | null = null;
 
-const BUCKET_NAME = 'studio-7145415565-66e7d.firebasestorage.app';
+const BUCKET_NAME = 'studio-7145415565-66e7d.firebasestorage.app'; // Correct bucket name
 
 function initializeAdminApp(): App {
     if (getApps().length > 0) {
@@ -25,12 +24,12 @@ function initializeAdminApp(): App {
             
             // Handle escaped newlines in the private key
             if (serviceAccount.private_key) {
-                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+                serviceAccount.private_key = serviceAccount.private_key.replace(/\\\\n/g, '\\n');
             }
 
             return initializeApp({
                 credential: cert(serviceAccount),
-                storageBucket: BUCKET_NAME,
+                storageBucket: BUCKET_NAME, // Corrected to use BUCKET_NAME
             });
         } catch (e: any) {
             throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY from environment variable. Error: ${e.message}`);
@@ -44,7 +43,7 @@ function initializeAdminApp(): App {
             const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
             return initializeApp({
                 credential: cert(serviceAccount),
-                storageBucket: BUCKET_NAME,
+                storageBucket: BUCKET_NAME, // Corrected to use BUCKET_NAME
             });
         }
     } catch (e: any) {

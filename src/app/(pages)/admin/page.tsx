@@ -36,7 +36,7 @@ import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { PRICING_TIERS } from '@/lib/constants';
-import { addCategory } from '@/app/actions/category-actions';
+import { addCategory, deleteCategory } from '@/app/actions/category-actions';
 import { deleteUser } from '@/app/actions/user-actions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +61,8 @@ export default function AdminPage() {
     // Loading states
     const [dataLoading, setDataLoading] = useState(true);
     const [isDeletingUser, setIsDeletingUser] = useState(false);
+    const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
 
     // Dialog state
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -68,6 +70,8 @@ export default function AdminPage() {
     const [newCategoryDesc, setNewCategoryDesc] = useState('');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+
 
     // Homepage content editing state
     const [editedTitle, setEditedTitle] = useState('');
@@ -244,6 +248,19 @@ export default function AdminPage() {
 
         setIsDeletingUser(false);
         setUserToDelete(null);
+    };
+
+    const handleDeleteCategory = async () => {
+        if (!categoryToDelete) return;
+        setIsDeletingCategory(true);
+        const result = await deleteCategory({ categoryId: categoryToDelete.id });
+        if (result.success) {
+            toast({ title: 'Success', description: result.message });
+        } else {
+            toast({ title: 'Error', description: result.message, variant: 'destructive' });
+        }
+        setIsDeletingCategory(false);
+        setCategoryToDelete(null);
     };
 
 
@@ -485,7 +502,7 @@ export default function AdminPage() {
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell>{category.description}</TableCell>
                       <TableCell className="text-right">
-                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setCategoryToDelete(category)}>
                            <Trash2 className="h-4 w-4" />
                          </Button>
                       </TableCell>
@@ -562,8 +579,34 @@ export default function AdminPage() {
         </AlertDialogContent>
     </AlertDialog>
 
+    {/* Delete Category Confirmation Dialog */}
+    <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the category <span className="font-bold">{categoryToDelete?.name}</span>.
+                This does not delete collections using this category.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingCategory} onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                disabled={isDeletingCategory}
+                onClick={handleDeleteCategory}
+            >
+                {isDeletingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete Category
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </>
   );
 }
+
+    
 
     
