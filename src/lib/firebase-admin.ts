@@ -59,6 +59,7 @@ export async function initializeAdmin() {
     console.log("Service account key not found. Attempting to use Application Default Credentials for local development.");
     try {
       adminApp = initializeApp({
+        projectId: 'studio-7145415565-66e7d',
         storageBucket: 'studio-7145415565-66e7d.firebasestorage.app',
       });
     } catch(error: any) {
