@@ -1,4 +1,3 @@
-
 import { initializeApp, getApps, getApp, FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -14,11 +13,14 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// This function ensures that we initialize the app only once.
+// It's safe to call on both the server and the client.
 const getClientApp = () => {
     const apps = getApps();
     if (apps.length > 0) {
         return getApp();
     } else {
+        // Initialize the app ONLY ONCE using the firebaseConfig
         return initializeApp(firebaseConfig);
     }
 }
