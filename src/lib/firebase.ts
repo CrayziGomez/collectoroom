@@ -20,6 +20,7 @@ const getClientApp = () => {
     if (getApps().length) {
         return getApp();
     }
+    // Explicitly provide the config, including the storage bucket, to ensure consistency.
     return initializeApp(firebaseConfig);
 }
 
