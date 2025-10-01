@@ -11,38 +11,34 @@ function initializeAdminApp(): App {
         return existingApps[0];
     }
 
-    let serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    // This logic now assumes the service account key is always available as an environment variable.
+    // This is true in the deployed App Hosting environment (via secrets)
+    // and should be true locally if .env.local is set up correctly.
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-    if (serviceAccountString) {
-        try {
-            // Most common issue: .env file has quotes around the JSON string.
-            // This removes them if they exist.
-            if (serviceAccountString.startsWith("'") && serviceAccountString.endsWith("'")) {
-                serviceAccountString = serviceAccountString.substring(1, serviceAccountString.length - 1);
-            }
+    if (!serviceAccountString) {
+        // This is a critical failure. The app cannot run without server-side authentication.
+        throw new Error(
+            'CRITICAL_ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. ' +
+            'For local development, ensure the key is correctly set in your .env.local file. ' +
+            'For production, ensure the secret is configured in your App Hosting backend.'
+        );
+    }
 
-            const serviceAccount = JSON.parse(serviceAccountString);
-            
-            // Handle escaped newlines in the private key, a common issue with env vars.
-            if (serviceAccount.private_key) {
-                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-            }
-
-            return initializeApp({
-                credential: cert(serviceAccount)
-            });
-
-        } catch (e: any) {
-            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Check .env.local format. Error: ${e.message}`);
+    try {
+        const serviceAccount = JSON.parse(serviceAccountString);
+        
+        // Ensure private_key format is correct, replacing escaped newlines.
+        if (serviceAccount.private_key) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
         }
-    } else {
-        // Fallback for local development when the service account key is not in .env.local
-        console.warn("FIREBASE_SERVICE_ACCOUNT_KEY not found in .env.local. Falling back to Application Default Credentials. This may cause issues with services like URL signing.");
-        try {
-            return initializeApp();
-        } catch(error: any) {
-            throw new Error(`Failed to initialize with ADC. Run 'gcloud auth application-default login' or set FIREBASE_SERVICE_ACCOUNT_KEY in .env.local. Error: ${error.message}`);
-        }
+
+        return initializeApp({
+            credential: cert(serviceAccount)
+        });
+
+    } catch (e: any) {
+        throw new Error(`Failed to parse or use FIREBASE_SERVICE_ACCOUNT_KEY. Please verify its format. Error: ${e.message}`);
     }
 }
 
