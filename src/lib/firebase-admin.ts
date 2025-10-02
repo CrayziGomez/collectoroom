@@ -1,95 +1,96 @@
-'use server';
+// This file is NOT a 'use server' file. It is a server-side utility module.
+// It is safe to run on the server because it is only imported by server actions.
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Firestore } from 'firebase-admin/firestore'; // Import Firestore type
-import { getStorage } from 'firebase-admin/storage';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getAuth, Auth } from 'firebase-admin/auth';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
 
-let adminApp: App | null = null;
-let cachedFirestoreDb: Firestore | null = null; // Cache for Firestore instance
+// Define a type for our singleton object
+interface FirebaseAdminServices {
+  app: App;
+  auth: Auth;
+  db: Firestore;
+  storage: Storage;
+}
 
-const BUCKET_NAME = 'studio-7145415565-66e7d.firebasestorage.app'; // Correct bucket name
+// Use a global symbol to store the singleton instance to ensure it's unique across reloads in development.
+const ADMIN_APP_SYMBOL = Symbol.for('firebase.admin.app');
 
-function initializeAdminApp(): App {
+// Extend the NodeJS.Global interface to declare our global variable
+declare global {
+  var __firebase_admin_app__: FirebaseAdminServices | undefined;
+}
+
+function initializeAdminApp(): FirebaseAdminServices {
+    // In development, hot-reloading can cause this file to be re-evaluated.
+    // We use a global symbol to preserve the initialized app across reloads.
+    if (process.env.NODE_ENV === 'development' && global.__firebase_admin_app__) {
+        return global.__firebase_admin_app__;
+    }
+
+    // Check if the app is already initialized. This is the standard way to handle this.
     if (getApps().length > 0) {
-        return getApps()[0];
-    }
-
-    // --- Production Environment (App Hosting) ---\n
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        try {
-            const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
-            const serviceAccount = JSON.parse(serviceAccountString);
-            
-            // Handle escaped newlines in the private key
-            if (serviceAccount.private_key) {
-                serviceAccount.private_key = serviceAccount.private_key.replace(/\\\\n/g, '\\n');
-            }
-
-            return initializeApp({
-                credential: cert(serviceAccount),
-                storageBucket: BUCKET_NAME, // Corrected to use BUCKET_NAME
-            });
-        } catch (e: any) {
-            throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY from environment variable. Error: ${e.message}`);
+        const existingApp = getApps()[0];
+        const services: FirebaseAdminServices = {
+            app: existingApp,
+            auth: getAuth(existingApp),
+            db: getFirestore(existingApp),
+            storage: getStorage(existingApp),
+        };
+        // Also store it on the global for subsequent dev reloads
+        if (process.env.NODE_ENV === 'development') {
+            global.__firebase_admin_app__ = services;
         }
+        return services;
     }
-    
-    // --- Local Development Environment ---\n
+
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please check your .env.local file and hosting provider configuration.');
+    }
+
+    // Use the reliable client-side environment variable for the bucket name.
+    const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!storageBucket) {
+        throw new Error('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set in .env.local file');
+    }
+
     try {
-        const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-        if (fs.existsSync(serviceAccountPath)) {
-            const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-            return initializeApp({
-                credential: cert(serviceAccount),
-                storageBucket: BUCKET_NAME, // Corrected to use BUCKET_NAME
-            });
+        const serviceAccount = JSON.parse(
+            Buffer.from(serviceAccountString, 'base64').toString('utf8')
+        );
+
+        const newApp = initializeApp({
+            credential: cert(serviceAccount),
+            storageBucket: storageBucket,
+        });
+
+        const services: FirebaseAdminServices = {
+            app: newApp,
+            auth: getAuth(newApp),
+            db: getFirestore(newApp),
+            storage: getStorage(newApp),
+        };
+        
+        // Store the initialized services on the global for subsequent dev reloads
+        if (process.env.NODE_ENV === 'development') {
+            global.__firebase_admin_app__ = services;
         }
-    } catch (e: any) {
-        throw new Error(`Failed to load or parse local serviceAccountKey.json. Error: ${e.message}`);
+        
+        return services;
+
+    } catch (error: any) {
+        if (error instanceof SyntaxError) {
+            console.error('Firebase Admin SDK initialization failed: The service account key is not valid JSON. Please ensure FIREBASE_SERVICE_ACCOUNT_KEY in your hosting environment is a correctly Base64-encoded service account JSON file.', error);
+            throw new Error('Firebase Admin SDK initialization failed: Malformed service account key.');
+        }
+        console.error('Firebase Admin SDK initialization failed.', error);
+        throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
     }
-
-    // --- Fallback / Error State ---\n
-    throw new Error(
-        'Firebase Admin SDK initialization failed. For production, set the FIREBASE_SERVICE_ACCOUNT_KEY secret. For local development, place a valid `serviceAccountKey.json` file in your project root.'
-    );
 }
 
-export async function initializeAdmin() {
-  if (!adminApp) {
-    adminApp = initializeAdminApp();
-  }
+// Initialize and export the services. This will be a singleton.
+const { app: adminApp, auth: adminAuth, db: adminDb, storage: adminStorage } = initializeAdminApp();
 
-  // --- VERY AGGRESSIVE WORKAROUND: Prevent Firestore init during build/prerender ---
-  // We check for any environment variable that might indicate a build-time context.
-  // This is a more generalized approach to prevent the Firestore Admin SDK from
-  // being fully initialized, thereby avoiding the 'CreateDatabase' call.
-  // Common build-time env vars include NEXT_BUILD_ID, CI, VERCEL_ENV, etc.
-  // For Firebase App Hosting, NEXT_PHASE might still be the most relevant,
-  // but adding a broader check might catch other build contexts.
-  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' ||
-                      process.env.CI === 'true' ||
-                      !!process.env.NEXT_BUILD_ID; // Check if any of these are present
-
-  if (isBuildTime) {
-      console.warn("WARNING: Detected build-time environment. Firestore Admin SDK will return a dummy instance to avoid database creation attempts.");
-      return {
-          auth: getAuth(adminApp),
-          db: {} as Firestore, // Provide an empty object that matches Firestore type for type safety
-          storage: getStorage(adminApp)
-      };
-  }
-
-  // For runtime or other phases, initialize Firestore normally
-  if (!cachedFirestoreDb) {
-      cachedFirestoreDb = getFirestore(adminApp);
-  }
-
-  return {
-    auth: getAuth(adminApp),
-    db: cachedFirestoreDb,
-    storage: getStorage(adminApp)
-  };
-}
+export { adminApp, adminAuth, adminDb, adminStorage };
