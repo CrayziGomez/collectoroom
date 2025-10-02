@@ -143,3 +143,5 @@ This is the final phase to make your site live on a custom domain.
 - **Objective:** Your site is now live and deployed.
 - **Action:**
   - After pushing to your `main` branch and a successful build, your site will be available at your custom domain. Congratulations!
+
+deleted the 3 backends..
