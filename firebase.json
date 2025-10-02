@@ -2,14 +2,6 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "hosting": {
-    "public": ".next/static",  // <--- UPDATED THIS LINE for Next.js SSR output
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
-  },
   "storage": {
     "rules": "storage.rules"
   }
