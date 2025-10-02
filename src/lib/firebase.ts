@@ -4,26 +4,55 @@ import { getStorage } from 'firebase/storage';
 
 // --- Universal Firebase Initialization (Client & Server) ---
 
-// In this version, we are explicitly NOT calling initializeApp from our code.
-// We are assuming the Firebase App Hosting environment (or Next.js adapter)
-// has ALREADY initialized the default Firebase App.
+const getFirebaseConfig = (): FirebaseOptions => {
+  if (process.env.FIREBASE_WEBAPP_CONFIG) {
+    try {
+      const config = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
+      // Ensure the storageBucket from FIREBASE_WEBAPP_CONFIG is correct if projectId is present
+      if (config.projectId && (!config.storageBucket || !config.storageBucket.includes('firebasestorage.app'))) {
+          config.storageBucket = `${config.projectId}.firebasestorage.app`;
+      }
+      return config;
+    } catch (e) {
+      console.error("Failed to parse FIREBASE_WEBAPP_CONFIG:", e);
+      // Fallback to individual env vars if parsing fails
+    }
+  }
+
+  // Fallback to individual NEXT_PUBLIC_FIREBASE_* environment variables (for local dev)
+  return {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  };
+};
+
+// Use a module-scoped variable to hold the initialized app instance
+let initializedAppInstance: any = null;
+
 const getClientApp = () => {
+    // If an app is already initialized in this module scope, return it
+    if (initializedAppInstance) {
+        return initializedAppInstance;
+    }
+
+    // Check if any app is already initialized globally by Firebase SDK
     const apps = getApps();
     if (apps.length > 0) {
-        return getApp(); // Always attempt to get the already initialized default app
+        initializedAppInstance = getApp(); // Use the existing app
+        return initializedAppInstance;
     } else {
-        // This scenario should ideally not be reached in Firebase App Hosting
-        // if it's auto-initializing. If it is reached, it means NO app
-        // has been initialized, which would imply a different problem.
-        console.error("WARNING: No Firebase app found initialized by the environment. This might indicate an issue with Firebase App Hosting's auto-initialization or local development setup.");
-        // If we reach here, it means the environment hasn't initialized an app,
-        // which contradicts the 'duplicate-app' error. This would lead to a new type of error.
-        throw new Error("Critical: No default Firebase app initialized by the environment. Cannot proceed.");
+        // Only initialize if no app exists globally or in this module scope
+        const firebaseConfig = getFirebaseConfig(); // Get config with logic
+        initializedAppInstance = initializeApp(firebaseConfig);
+        return initializedAppInstance;
     }
 }
 
 // Initialize on module load, but using the guarded function
-// This 'app' will be the default app initialized by the environment.
 const app = getClientApp();
 const db = getFirestore(app);
 const storage = getStorage(app);
