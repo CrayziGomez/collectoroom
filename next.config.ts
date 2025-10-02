@@ -43,7 +43,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'export', // <--- ADD THIS LINE to enable static HTML export
 };
 
 export default nextConfig;
