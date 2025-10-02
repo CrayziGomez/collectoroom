@@ -1,0 +1,4 @@
+constraint: constraints/gcp.restrictCmekCryptoKeyProjects
+listPolicy:
+  allValues: ALLOW
+  inheritFromParent: false
