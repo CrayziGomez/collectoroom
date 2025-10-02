@@ -59,3 +59,4 @@ const storage = getStorage(app);
 
 // Export client modules
 export { app, db, storage, getClientApp };
+
