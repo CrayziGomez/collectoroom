@@ -1,5 +1,4 @@
 
-
 import type { LucideIcon } from 'lucide-react';
 
 export interface User {
@@ -20,7 +19,7 @@ export interface Category {
   name: string;
   icon: string;
   description: string;
-  createdAt?: any; // Can be a Firestore Timestamp or a string after serialization
+  createdAt?: string;
 }
 
 export interface PricingTier {

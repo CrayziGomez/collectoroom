@@ -5,11 +5,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import type { ImageRecord } from '@/lib/types';
-import { initializeAdmin } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const { storage } = await initializeAdmin();
-    const bucket = storage.bucket();
+    const bucket = adminStorage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
     const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
     const fileRef = bucket.file(imagePath);
@@ -31,8 +30,6 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
 
 
 export async function createCard(formData: FormData) {
-    const { db } = await initializeAdmin();
-
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
     const title = formData.get('title') as string;
@@ -46,14 +43,14 @@ export async function createCard(formData: FormData) {
     }
 
     try {
-        const cardId = db.collection('cards').doc().id;
+        const cardId = adminDb.collection('cards').doc().id;
 
         const imageRecords = await Promise.all(
             images.map(image => uploadImage(image, userId, collectionId, cardId))
         );
 
-        const cardRef = db.collection('cards').doc(cardId);
-        const collectionRef = db.collection('collections').doc(collectionId);
+        const cardRef = adminDb.collection('cards').doc(cardId);
+        const collectionRef = adminDb.collection('collections').doc(collectionId);
         
         const collectionDoc = await collectionRef.get();
         if (!collectionDoc.exists) {
@@ -62,7 +59,7 @@ export async function createCard(formData: FormData) {
         const collectionData = collectionDoc.data();
         const isFirstCard = (collectionData?.cardCount || 0) === 0;
 
-        const batch = db.batch();
+        const batch = adminDb.batch();
 
         batch.set(cardRef, {
             userId,
@@ -99,8 +96,6 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(formData: FormData) {
-    const { db } = await initializeAdmin();
-
     const userId = formData.get('userId') as string;
     const cardId = formData.get('cardId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -115,7 +110,7 @@ export async function updateCard(formData: FormData) {
     }
 
     try {
-        const cardRef = db.collection('cards').doc(cardId);
+        const cardRef = adminDb.collection('cards').doc(cardId);
         const cardDoc = await cardRef.get();
         const cardData = cardDoc.data();
 
@@ -128,8 +123,7 @@ export async function updateCard(formData: FormData) {
             !existingImages.some(existImg => existImg.path === origImg.path)
         );
 
-        const { storage } = await initializeAdmin();
-        const bucket = storage.bucket();
+        const bucket = adminStorage.bucket();
         await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         
         const newImageRecords = await Promise.all(
@@ -158,19 +152,18 @@ export async function updateCard(formData: FormData) {
 
 
 export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
-    const { db, storage } = await initializeAdmin();
     const { cardId, collectionId, images } = input;
     
     try {
-        const cardRef = db.collection('cards').doc(cardId);
-        const collectionRef = db.collection('collections').doc(collectionId);
+        const cardRef = adminDb.collection('cards').doc(cardId);
+        const collectionRef = adminDb.collection('collections').doc(collectionId);
 
-        const bucket = storage.bucket();
+        const bucket = adminStorage.bucket();
         if (images && images.length > 0) {
             await Promise.all(images.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         }
 
-        const batch = db.batch();
+        const batch = adminDb.batch();
         batch.delete(cardRef);
         batch.update(collectionRef, { cardCount: FieldValue.increment(-1) });
         await batch.commit();

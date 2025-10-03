@@ -1,8 +1,8 @@
 'use client';
 
-import { initializeApp, getApps, getApp, FirebaseOptions } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { initializeApp, getApps, getApp, FirebaseOptions, FirebaseApp } from 'firebase/app';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // --- Client-side Firebase Initialization ---
 
@@ -15,10 +15,39 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
+interface FirebaseServices {
+    app: FirebaseApp;
+    db: Firestore;
+    storage: FirebaseStorage;
+}
 
+// Use a global symbol to store the singleton instance to ensure it's unique across reloads in development.
+const FIREBASE_APP_SYMBOL = Symbol.for('firebase.app');
+
+declare global {
+    var __firebase_app__: FirebaseServices | undefined;
+}
+
+function initializeWebApp(): FirebaseServices {
+    if (process.env.NODE_ENV === 'development' && globalThis.__firebase_app__) {
+        return globalThis.__firebase_app__;
+    }
+
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    const services: FirebaseServices = {
+        app,
+        db: getFirestore(app),
+        storage: getStorage(app),
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+        globalThis.__firebase_app__ = services;
+    }
+
+    return services;
+}
+
+const { app, db, storage } = initializeWebApp();
 
 // Export client modules
 export { app, db, storage };

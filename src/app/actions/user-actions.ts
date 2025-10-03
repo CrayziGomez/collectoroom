@@ -4,13 +4,11 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { initializeAdmin } from '@/lib/firebase-admin';
+import { adminDb, adminStorage, adminAuth } from '@/lib/firebase-admin';
 import type { Collection, Card } from '@/lib/types';
 
 
 export async function toggleFollow(input: { targetUserId: string, currentUserId: string }) {
-    const { db } = await initializeAdmin();
-    
     const { targetUserId, currentUserId } = input;
 
     if (currentUserId === targetUserId) {
@@ -18,9 +16,9 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
     }
 
     try {
-      const newState = await db.runTransaction(async (transaction) => {
-        const currentUserRef = db.collection('users').doc(currentUserId);
-        const targetUserRef = db.collection('users').doc(targetUserId);
+      const newState = await adminDb.runTransaction(async (transaction) => {
+        const currentUserRef = adminDb.collection('users').doc(currentUserId);
+        const targetUserRef = adminDb.collection('users').doc(targetUserId);
         const followingRef = currentUserRef.collection('following').doc(targetUserId);
         const followerRef = targetUserRef.collection('followers').doc(currentUserId);
         
@@ -54,7 +52,7 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
           transaction.update(targetUserRef, { followerCount: FieldValue.increment(1) });
           
           // --- Notification Logic ---
-          const notificationRef = db.collection('notifications').doc();
+          const notificationRef = adminDb.collection('notifications').doc();
           transaction.set(notificationRef, {
             recipientId: targetUserId,
             senderId: currentUserId,
@@ -81,8 +79,6 @@ export async function toggleFollow(input: { targetUserId: string, currentUserId:
 
 
 export async function updateAvatar(formData: FormData) {
-    const { db, storage } = await initializeAdmin();
-
     const userId = formData.get('userId') as string;
     const file = formData.get('file') as File;
 
@@ -91,8 +87,8 @@ export async function updateAvatar(formData: FormData) {
     }
         
     try {
-        const bucket = storage.bucket();
-        const userDocRef = db.collection('users').doc(userId);
+        const bucket = adminStorage.bucket();
+        const userDocRef = adminDb.collection('users').doc(userId);
 
         const userDoc = await userDocRef.get();
         const userData = userDoc.data();
@@ -141,61 +137,66 @@ export async function updateAvatar(formData: FormData) {
 
 
 export async function deleteUser(input: { userId: string }): Promise<{ success: boolean; message?: string }> {
-    const { db, storage, auth } = await initializeAdmin();
     const { userId } = input;
+    console.log(`--- Starting deletion process for user: ${userId} ---`);
 
     try {
-        const bucket = storage.bucket();
-        const batch = db.batch();
+        const bucket = adminStorage.bucket();
+        const batch = adminDb.batch();
 
-        // 1. Delete all collections and cards belonging to the user
-        const collectionsQuery = db.collection('collections').where('userId', '==', userId);
+        const collectionsQuery = adminDb.collection('collections').where('userId', '==', userId);
         const collectionsSnapshot = await collectionsQuery.get();
+        console.log(`Found ${collectionsSnapshot.size} collection(s) for user ${userId}.`);
 
         for (const collectionDoc of collectionsSnapshot.docs) {
-            const cardsQuery = db.collection('cards').where('collectionId', '==', collectionDoc.id);
+            console.log(`Processing collection: ${collectionDoc.id}`);
+            const cardsQuery = adminDb.collection('cards').where('collectionId', '==', collectionDoc.id);
             const cardsSnapshot = await cardsQuery.get();
+            console.log(`Found ${cardsSnapshot.size} card(s) in collection ${collectionDoc.id}.`);
 
             for (const cardDoc of cardsSnapshot.docs) {
-                // Delete card images from storage
+                console.log(`Processing card: ${cardDoc.id}`);
                 const cardData = cardDoc.data() as Card;
                 if (cardData.images && cardData.images.length > 0) {
-                    const deletePromises = cardData.images.map(image => 
-                        bucket.file(image.path).delete({ ignoreNotFound: true })
-                    );
+                    console.log(`Found ${cardData.images.length} image(s) for card ${cardDoc.id}.`);
+                    const deletePromises = cardData.images.map(image => {
+                        console.log(`Deleting image from storage: ${image.path}`);
+                        return bucket.file(image.path).delete({ ignoreNotFound: true });
+                    });
                     await Promise.all(deletePromises);
+                    console.log(`Finished deleting images for card ${cardDoc.id}.`);
                 }
-                // Batch delete card document
                 batch.delete(cardDoc.ref);
+                console.log(`Batched delete for card document: ${cardDoc.id}`);
             }
-            // Batch delete collection document
             batch.delete(collectionDoc.ref);
+            console.log(`Batched delete for collection document: ${collectionDoc.id}`);
         }
 
-        // 2. Delete user's profile picture from Storage
-        // This is a best-effort attempt to clean up the profile folder.
+        console.log(`Deleting profile picture folder for user: users/${userId}/profile/`);
         await bucket.deleteFiles({ prefix: `users/${userId}/profile/` });
+        console.log('Profile picture folder deletion command issued.');
         
-        // 3. Delete user document from 'users' collection
-        const userRef = db.collection('users').doc(userId);
+        const userRef = adminDb.collection('users').doc(userId);
         batch.delete(userRef);
+        console.log(`Batched delete for user document: ${userId}`);
 
-        // Commit all Firestore deletions
         await batch.commit();
+        console.log('Firestore batch commit successful.');
 
-        // 4. Delete user from Firebase Authentication
-        await auth.deleteUser(userId);
+        await adminAuth.deleteUser(userId);
+        console.log(`Successfully deleted user from Firebase Authentication: ${userId}`);
 
         revalidatePath('/admin');
+        console.log('--- Deletion process complete --- ');
         return { success: true, message: 'User and all associated data deleted.' };
 
     } catch (error: any) {
         console.error(`Failed to delete user ${userId}:`, error);
+        console.log('--- Deletion process failed --- ');
         return {
             success: false,
             message: `An error occurred: ${error.message}. Check server logs for details.`
         };
     }
 }
-
-    

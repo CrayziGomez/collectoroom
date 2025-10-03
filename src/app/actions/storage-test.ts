@@ -1,14 +1,12 @@
 'use server';
 
-import { initializeAdmin } from '@/lib/firebase-admin';
+import { adminStorage } from '@/lib/firebase-admin';
 
 export async function runStorageTest(): Promise<string[]> {
   const logs: string[] = [];
   logs.push('--- Starting Storage Upload Test ---');
 
-  let admin;
   try {
-    admin = await initializeAdmin();
     logs.push('[SUCCESS] Step 1: Firebase Admin SDK initialized successfully.');
   } catch (error: any) {
     logs.push(`[FAIL] Step 1: Firebase Admin SDK initialization failed. Error: ${error.message}`);
@@ -18,7 +16,7 @@ export async function runStorageTest(): Promise<string[]> {
 
   let bucket;
   try {
-    bucket = admin.storage.bucket();
+    bucket = adminStorage.bucket();
     logs.push(`[SUCCESS] Step 2: Storage bucket obtained. Bucket name: ${bucket.name}`);
   } catch (error: any) {
     logs.push(`[FAIL] Step 2: Failed to get storage bucket. Error: ${error.message}`);

@@ -43,6 +43,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  devIndicators: {
+    allowedDevOrigins: [
+      'https://3001-firebase-collectoroom-we4-app-1759419509237.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev',
+    ],
+  },
 };
 
 export default nextConfig;

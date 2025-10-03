@@ -3,10 +3,9 @@
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
-import { initializeAdmin } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function createCollection(formData: FormData) {
-    const { db } = await initializeAdmin();
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
@@ -23,9 +22,9 @@ export async function createCollection(formData: FormData) {
     }
 
     try {
-        const collectionId = db.collection('collections').doc().id;
+        const collectionId = adminDb.collection('collections').doc().id;
 
-        await db.collection('collections').doc(collectionId).set({
+        await adminDb.collection('collections').doc(collectionId).set({
             userId,
             name,
             description,

@@ -1,16 +1,10 @@
 
 'use server';
 
-import { getFirestore as getClientFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { getClientApp } from '@/lib/firebase';
 import type { SiteContent, HowItWorksStep } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { initializeAdmin } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 
-// --- Client-side DB for reads ---
-function getDb() {
-  return getClientFirestore(getClientApp());
-}
 
 // --- Default Content Definitions ---
 const defaultHowItWorksSteps: HowItWorksStep[] = [
@@ -43,19 +37,18 @@ const defaultContent: SiteContent = {
 // --- Public Read Action ---
 export async function getSiteContent(input: { pageId: string }): Promise<SiteContent> {
     try {
-        const db = getDb();
-        const docRef = doc(db, 'siteContent', input.pageId);
-        const docSnap = await getDoc(docRef);
+        const docRef = adminDb.collection('siteContent').doc(input.pageId);
+        const docSnap = await docRef.get();
 
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
             const data = docSnap.data() as SiteContent;
             if (!data.howItWorksSteps || data.howItWorksSteps.length === 0) {
-                 await setDoc(docRef, { howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
+                 await docRef.set({ howItWorksSteps: defaultHowItWorksSteps }, { merge: true });
                  return { id: docSnap.id, ...data, howItWorksSteps: defaultHowItWorksSteps };
             }
             return { id: docSnap.id, ...data } as SiteContent;
         } else {
-            await setDoc(doc(db, 'siteContent', input.pageId), defaultContent);
+            await docRef.set(defaultContent);
             return defaultContent;
         }
     } catch (error: any) {
@@ -71,11 +64,10 @@ export async function getSiteContent(input: { pageId: string }): Promise<SiteCon
 // --- Admin Write Actions using Admin SDK ---
 export async function updateSiteContent(formData: FormData): Promise<{ success: boolean; message: string; imageUrl?: string; }> {
   try {
-    const { db, storage } = await initializeAdmin();
     const id = formData.get('id') as string;
-    const docRef = db.collection('siteContent').doc(id);
+    const docRef = adminDb.collection('siteContent').doc(id);
 
-    const updates: { [key: string]: any } = {};
+    const updates: { [key:string]: any } = {};
 
     if (formData.has('title')) updates.title = formData.get('title');
     if (formData.has('description')) updates.description = formData.get('description');
@@ -87,7 +79,7 @@ export async function updateSiteContent(formData: FormData): Promise<{ success: 
     let imageUrl: string | undefined;
     if (formData.has('imageFile')) {
       const imageFile = formData.get('imageFile') as File;
-      const bucket = storage.bucket();
+      const bucket = adminStorage.bucket();
       const imagePath = `site-content/homePage-hero-${Date.now()}`;
       const fileRef = bucket.file(imagePath);
       
