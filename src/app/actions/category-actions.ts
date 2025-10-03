@@ -4,23 +4,40 @@ import { revalidatePath } from 'next/cache';
 
 import { adminDb } from '@/lib/firebase-admin';
 
+// Helper to map icon string to a static path
+function getIconPath(iconName: string): string {
+    const iconMap = {
+        'Layers3': '/icons/layers.svg',
+        'Gem': '/icons/gem.svg',
+        'Trophy': '/icons/trophy.svg',
+        'Ticket': '/icons/ticket.svg',
+        'Palette': '/icons/palette.svg',
+        'BookOpen': '/icons/book-open.svg',
+        'Music': '/icons/music.svg',
+        'Camera': '/icons/camera.svg',
+    };
+    return iconMap[iconName] || '/icons/default.svg';
+}
+
 export async function createCategory(formData: FormData) {
     const name = formData.get('name') as string;
-    const userId = formData.get('userId') as string;
+    const description = formData.get('description') as string;
 
-    if (!name || !userId) {
+    if (!name) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        const categoryRef = adminDb.collection('users').doc(userId).collection('categories').doc();
+        const categoryRef = adminDb.collection('categories').doc();
         await categoryRef.set({
             name,
-            cardCount: 0,
+            description: description || '',
+            icon: 'Layers3', // default icon name
             createdAt: FieldValue.serverTimestamp(),
         });
 
-        revalidatePath('/'); // Revalidate the home page to show the new category
+        revalidatePath('/');
+        revalidatePath('/admin');
 
         return { success: true, categoryId: categoryRef.id };
 
@@ -30,10 +47,18 @@ export async function createCategory(formData: FormData) {
     }
 }
 
-export async function getCategories(userId: string) {
+export async function getCategories() {
     try {
-        const categoriesSnapshot = await adminDb.collection('users').doc(userId).collection('categories').orderBy('createdAt', 'asc').get();
-        const categories = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const categoriesSnapshot = await adminDb.collection('categories').orderBy('name').get();
+        const categories = categoriesSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name,
+                description: data.description,
+                icon: getIconPath(data.icon), // Map icon name to path
+            };
+        });
         return { success: true, categories };
     } catch (error: any) {
         console.error('Error getting categories:', error);
@@ -66,16 +91,14 @@ export async function updateCategory(formData: FormData) {
 
 export async function deleteCategory(formData: FormData) {
     const categoryId = formData.get('categoryId') as string;
-    const userId = formData.get('userId') as string;
 
-    if (!categoryId || !userId) {
+    if (!categoryId) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        // First, check if there are any collections associated with this category
+        // Check if any collection is using this category
         const collectionsSnapshot = await adminDb.collection('collections')
-            .where('userId', '==', userId)
             .where('category', '==', categoryId)
             .limit(1)
             .get();
@@ -84,10 +107,11 @@ export async function deleteCategory(formData: FormData) {
             return { success: false, message: 'Cannot delete category with active collections. Please reassign them first.' };
         }
 
-        const categoryRef = adminDb.collection('users').doc(userId).collection('categories').doc(categoryId);
+        const categoryRef = adminDb.collection('categories').doc(categoryId);
         await categoryRef.delete();
 
         revalidatePath('/');
+        revalidatePath('/admin');
 
         return { success: true };
 

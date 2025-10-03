@@ -1,6 +1,6 @@
 
 import {
-  addCategory,
+  createCategory, // Corrected from addCategory
   deleteCategory,
 } from '@/app/actions/category-actions';
 import { deleteUser } from '@/app/actions/user-actions';
@@ -14,7 +14,7 @@ export default function AdminPage() {
   // This is the correct pattern for using server actions in client components.
   return (
     <AdminPageClient
-      addCategoryAction={addCategory}
+      addCategoryAction={createCategory} // Corrected prop assignment
       deleteCategoryAction={deleteCategory}
       deleteUserAction={deleteUser}
       getSiteContentAction={getSiteContent}

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb, adminStorage } from '@/lib/firebase-admin';
@@ -6,12 +7,21 @@ import { v4 as uuidv4 } from 'uuid';
 
 
 export async function getSiteContent() {
+    const contentRef = adminDb.collection('siteContent').doc('content');
     try {
-        const contentRef = adminDb.collection('siteContent').doc('content');
-        const doc = await contentRef.get();
+        let doc = await contentRef.get();
 
         if (!doc.exists) {
-            return { success: false, message: "Content not found" };
+            console.log("Site content not found, creating default document.");
+            const defaultContent = {
+                title: "Welcome to Your Collection!",
+                subtitle: "This is a brief description of your collection. You can edit this in the admin dashboard.",
+                heroImageUrl: "", // Default image URL can be set here
+                heroImagePath: "",
+                howItWorksSteps: [],
+            };
+            await contentRef.set(defaultContent);
+            doc = await contentRef.get(); // Re-fetch the document after creation
         }
 
         return { success: true, data: doc.data() };
@@ -41,7 +51,8 @@ export async function updateSiteContent(formData: FormData) {
     const heroImageFile = formData.get('heroImage') as File;
     const existingHeroImagePath = formData.get('existingHeroImagePath') as string;
 
-    let heroImageUrl = formData.get('heroImageUrl') as string;
+    // Correctly initialize heroImageUrl from the form, but it will be overwritten if a new file is uploaded.
+    let heroImageUrl = formData.get('heroImageUrl') as string | null;
     let heroImagePath = existingHeroImagePath;
 
     const contentRef = adminDb.collection('siteContent').doc('content');
@@ -69,12 +80,16 @@ export async function updateSiteContent(formData: FormData) {
         if (heroImageUrl) updateData.heroImageUrl = heroImageUrl;
         if (heroImagePath) updateData.heroImagePath = heroImagePath;
 
-
         await contentRef.set(updateData, { merge: true });
 
-        revalidatePath('/');
+        revalidatePath('/'); // Revalidate the homepage to show changes
 
-        return { success: true, message: "Content updated successfully." };
+        // Return the potentially new image URL so the client can update its state
+        return { 
+            success: true, 
+            message: "Content updated successfully.",
+            imageUrl: heroImageUrl
+        };
 
     } catch (error: any) {
         console.error("Error updating site content:", error);

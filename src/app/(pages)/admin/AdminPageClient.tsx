@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,9 +40,10 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
+import { createCategory } from '@/app/actions/category-actions';
+import { Separator } from '@/components/ui/separator';
 
 interface AdminPageClientProps {
-    addCategoryAction: (formData: FormData) => Promise<any>;
     deleteCategoryAction: (formData: FormData) => Promise<any>;
     deleteUserAction: (userId: string) => Promise<any>;
     getSiteContentAction: () => Promise<any>;
@@ -51,7 +51,6 @@ interface AdminPageClientProps {
 }
 
 export function AdminPageClient({ 
-    addCategoryAction, 
     deleteCategoryAction, 
     deleteUserAction, 
     getSiteContentAction, 
@@ -86,7 +85,7 @@ export function AdminPageClient({
 
     // Homepage content editing state
     const [editedTitle, setEditedTitle] = useState('');
-    const [editedDescription, setEditedDescription] = useState('');
+    const [editedSubtitle, setEditedSubtitle] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isSavingContent, setIsSavingContent] = useState(false);
@@ -144,8 +143,8 @@ export function AdminPageClient({
                 const content = result.data;
                 setHomePageContent(content);
                 setEditedTitle(content.title.replace(/<br \/>/g, '\n').replace(/<\/?span[^>]*>/g, ''));
-                setEditedDescription(content.description);
-                setImagePreview(content.imageUrl || null);
+                setEditedSubtitle(content.subtitle);
+                setImagePreview(content.heroImageUrl || null);
             } else {
                 toast({ title: 'Error', description: 'Could not load site content.', variant: 'destructive' });
             }
@@ -190,9 +189,9 @@ export function AdminPageClient({
         const formData = new FormData();
         formData.append('name', newCategoryName);
         formData.append('description', newCategoryDesc);
-        formData.append('userId', user.uid); // Assuming userId is needed
+        formData.append('userId', user.uid);
 
-        const result = await addCategoryAction(formData);
+        const result = await createCategory(formData);
         if (result.success) {
             toast({ title: 'Success', description: "Category added" });
             setIsAddCategoryOpen(false);
@@ -223,7 +222,7 @@ export function AdminPageClient({
 
             const formData = new FormData();
             formData.append('title', formattedTitle);
-            formData.append('subtitle', editedDescription);
+            formData.append('subtitle', editedSubtitle);
             if (imageFile) {
                  formData.append('heroImage', imageFile);
             }
@@ -235,6 +234,7 @@ export function AdminPageClient({
 
             if (result.success) {
                 toast({ title: 'Success', description: 'Homepage content updated!' });
+                setHomePageContent(prev => ({...prev, title: formattedTitle, subtitle: editedSubtitle, heroImageUrl: result.imageUrl || prev.heroImageUrl }));
                 if (result.imageUrl) {
                     setImagePreview(result.imageUrl);
                     setImageFile(null);
@@ -363,66 +363,97 @@ export function AdminPageClient({
       </div>
 
       {/* Homepage Content Management */}
-      <Card>
-          <CardHeader>
-            <CardTitle>Homepage Content</CardTitle>
-            <CardDescription>Manage the hero section of the public homepage.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-                 <div className="space-y-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="hero-title">Hero Title</Label>
-                        <Textarea
-                            id="hero-title"
-                            value={editedTitle}
-                            onChange={(e) => setEditedTitle(e.target.value)}
-                            className="min-h-[80px]"
-                            placeholder="Enter title. Use new lines for line breaks."
-                        />
-                        <p className="text-xs text-muted-foreground">"Digitized & Showcased." will be automatically highlighted.</p>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="hero-description">Hero Description</Label>
-                        <Textarea
-                            id="hero-description"
-                            value={editedDescription}
-                            onChange={(e) => setEditedDescription(e.target.value)}
-                            className="min-h-[120px]"
-                        />
-                    </div>
-                 </div>
-                 <div className="space-y-2">
-                     <Label>Hero Image</Label>
-                     <div 
-                        className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted aspect-video flex items-center justify-center"
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        {imagePreview ? (
-                            <Image src={imagePreview} alt="New image preview" width={400} height={200} className="w-full h-auto object-contain rounded-md" />
-                        ) : (
-                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <UploadCloud className="h-10 w-10" />
-                                <p>Click or drag to upload an image</p>
+        <Card>
+            <CardHeader>
+                <CardTitle>Homepage Content</CardTitle>
+                <CardDescription>Manage the hero section of the public homepage.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {/* Current Content Display */}
+                <div>
+                    <h3 className="text-lg font-semibold mb-4">Current Content</h3>
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                        <div>
+                            <Label className="text-sm text-muted-foreground">Current Title</Label>
+                            <div className="p-2 border rounded-md bg-background text-sm" dangerouslySetInnerHTML={{ __html: homePageContent?.title || 'Not set' }} />
+                        </div>
+                        <div>
+                            <Label className="text-sm text-muted-foreground">Current Subtitle</Label>
+                            <p className="p-2 border rounded-md bg-background text-sm">{homePageContent?.subtitle || 'Not set'}</p>
+                        </div>
+                        <div>
+                            <Label className="text-sm text-muted-foreground">Current Image</Label>
+                            <div className="p-2 border rounded-md bg-background">
+                            {homePageContent?.heroImageUrl ? (
+                                <Image src={homePageContent.heroImageUrl} alt="Current hero image" width={200} height={100} className="rounded-md object-contain" />
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No image set.</p>
+                            )}
                             </div>
-                        )}
+                        </div>
                     </div>
-                    <Input 
-                        ref={fileInputRef}
-                        type="file" 
-                        className="hidden" 
-                        accept="image/png, image/jpeg, image/gif, image/webp" 
-                        onChange={handleImageSelect}
-                    />
-                 </div>
-            </div>
-             <div className="flex justify-end">
-                <Button onClick={handleSaveContent} disabled={isSavingContent}>
-                  {isSavingContent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Content
-                </Button>
-            </div>
-          </CardContent>
+                </div>
+
+                <Separator />
+
+                {/* Editing Form */}
+                <div>
+                     <h3 className="text-lg font-semibold mb-4">Edit Content</h3>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="hero-title">Hero Title</Label>
+                                <Textarea
+                                    id="hero-title"
+                                    value={editedTitle}
+                                    onChange={(e) => setEditedTitle(e.target.value)}
+                                    className="min-h-[80px]"
+                                    placeholder="Enter title. Use new lines for line breaks."
+                                />
+                                <p className="text-xs text-muted-foreground">"Digitized & Showcased." will be automatically highlighted.</p>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="hero-subtitle">Hero Subtitle</Label>
+                                <Textarea
+                                    id="hero-subtitle"
+                                    value={editedSubtitle}
+                                    onChange={(e) => setEditedSubtitle(e.target.value)}
+                                    className="min-h-[120px]"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Hero Image</Label>
+                            <div 
+                                className="relative border-2 border-dashed border-muted-foreground rounded-lg p-4 text-center cursor-pointer hover:bg-muted aspect-video flex items-center justify-center"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                {imagePreview ? (
+                                    <Image src={imagePreview} alt="New image preview" layout="fill" className="w-full h-full object-contain rounded-md" />
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                        <UploadCloud className="h-10 w-10" />
+                                        <p>Click or drag to upload an image</p>
+                                    </div>
+                                )}
+                            </div>
+                            <Input 
+                                ref={fileInputRef}
+                                type="file" 
+                                className="hidden" 
+                                accept="image/png, image/jpeg, image/gif, image/webp" 
+                                onChange={handleImageSelect}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex justify-end">
+                    <Button onClick={handleSaveContent} disabled={isSavingContent}>
+                        {isSavingContent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Content
+                    </Button>
+                </div>
+            </CardContent>
         </Card>
 
 

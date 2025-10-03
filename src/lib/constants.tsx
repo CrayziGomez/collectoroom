@@ -17,7 +17,10 @@ import {
   Plane,
   Car,
   Clock,
-  Layers3
+  Layers3,
+  Search,
+  Upload,
+  Zap
 } from 'lucide-react';
 
 export const ICONS = {
@@ -41,6 +44,27 @@ export const SEED_CATEGORIES: Omit<Category, 'id'>[] = [
   { name: 'Travel Souvenirs', icon: 'Plane', description: 'Mementos from around the globe' },
   { name: 'Vehicles', icon: 'Car', description: 'Classic cars, motorcycles, and boats' },
   { name: 'Watches & Clocks', icon: 'Clock', description: 'Timepieces with character and history' },
+];
+
+export const HOW_IT_WORKS = [
+    {
+        title: 'Discover & Search',
+        description: 'Find and explore unique collections from enthusiasts around the world.',
+        image: 'https://picsum.photos/seed/discover/800/600',
+        icon: <Search />,
+    },
+    {
+        title: 'Upload & Digitize',
+        description: 'Easily upload photos and details of your items to create a digital version of your collection.',
+        image: 'https://picsum.photos/seed/upload/800/600',
+        icon: <Upload />,
+    },
+    {
+        title: 'Showcase & Share',
+        description: 'Share your collection with the world, or keep it private. You are in control.',
+        image: 'https://picsum.photos/seed/showcase/800/600',
+        icon: <Zap />,
+    },
 ];
 
 
