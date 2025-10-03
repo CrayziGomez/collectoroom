@@ -2,7 +2,7 @@
 import { HomePageClientContent } from './HomePageClientContent';
 import { getSiteContent } from '@/app/actions/site-content';
 import { getCategories } from '@/app/actions/category-actions';
-import { auth } from '@/lib/firebase-client'; // Using client auth to get user
+import { auth } from '@/lib/firebase/client'; // Corrected import path
 
 // This is a Server Component that fetches data and passes it to a Client Component.
 export default async function HomePage() {
