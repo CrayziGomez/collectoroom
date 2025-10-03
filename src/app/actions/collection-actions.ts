@@ -1,49 +1,34 @@
-
 'use server';
-
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { adminDb } from '@/lib/firebase-admin';
 
 export async function createCollection(formData: FormData) {
-
-    const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    const keywords = formData.get('keywords') as string;
+    const userId = formData.get('userId') as string;
     const category = formData.get('category') as string;
-    const isPublic = formData.get('isPublic') === 'true';
 
-    const coverImage = '/images/CR_Logo_Gry.png';
-    const coverImageHint = 'CollectoRoom logo';
-
-    if (!userId || !name || !category) {
+    if (!name || !userId || !category) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        const collectionId = adminDb.collection('collections').doc().id;
-
-        await adminDb.collection('collections').doc(collectionId).set({
-            userId,
+        const collectionRef = adminDb.collection('collections').doc();
+        await collectionRef.set({
             name,
-            description,
-            keywords,
+            userId,
             category,
-            isPublic,
-            coverImage: coverImage,
-            coverImageHint,
             cardCount: 0,
+            coverImage: '', // Default cover image
             createdAt: FieldValue.serverTimestamp(),
         });
-        
-        revalidatePath('/my-collectoroom');
-        revalidatePath('/gallery');
-        
-        return { success: true, message: 'Collection created!', collectionId };
+
+        revalidatePath('/'); // Revalidate the home page to show the new collection
+
+        return { success: true, collectionId: collectionRef.id };
 
     } catch (error: any) {
-        console.error("Error creating collection:", error);
-        return { success: false, message: error.message || 'Failed to create collection.' };
+        console.error('Error creating collection:', error);
+        return { success: false, message: error.message || 'An unknown error occurred while creating the collection.' };
     }
 }

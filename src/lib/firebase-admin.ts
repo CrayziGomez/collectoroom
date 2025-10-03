@@ -1,21 +1,26 @@
 import * as admin from 'firebase-admin';
-import { getApps, getApp, App } from 'firebase-admin/app';
+import { App, getApp, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 // IMPORTANT: This file is used on the server-side only.
-// It uses Application Default Credentials for authentication,
-// which is the standard and secure way for Google Cloud services to authenticate.
-// It no longer relies on a FIREBASE_SERVICE_ACCOUNT_KEY secret.
 
-function getAdminApp(): App {
+// This is a professional and robust way to initialize the Firebase Admin SDK.
+// It ensures that the app is only initialized once, preventing the 'duplicate-app' error.
+const getAdminApp = (): App => {
+  // If the app is already initialized, return it.
   if (getApps().length > 0) {
     return getApp();
   }
 
-  // When running on App Hosting, the app is automatically initialized
-  // with the environment's credentials.
-  return admin.initializeApp();
-}
+  // Otherwise, initialize the app with Application Default Credentials.
+  // This is the standard and secure way for Google Cloud services to authenticate.
+  return initializeApp();
+};
 
-export const adminDb = admin.firestore(getAdminApp());
-export const adminAuth = admin.auth(getAdminApp());
-export const adminStorage = admin.storage(getAdminApp());
+// Export the admin services.
+export const adminApp = getAdminApp();
+export const adminAuth = getAuth(adminApp);
+export const adminDb = getFirestore(adminApp);
+export const adminStorage = getStorage(adminApp);
