@@ -6,9 +6,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from './use-toast';
-import { toggleFollow as toggleFollowAction } from '@/app/actions/user-actions';
 
-export function useFollow(targetUserId: string, onSuccess?: () => void) {
+// The hook now accepts the server action as an argument.
+export function useFollow(
+    targetUserId: string, 
+    toggleFollowAction: (params: { targetUserId: string, currentUserId: string }) => Promise<any>,
+    onSuccess?: () => void
+) {
     const { user, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const [isFollowing, setIsFollowing] = useState(false);
@@ -54,6 +58,7 @@ export function useFollow(targetUserId: string, onSuccess?: () => void) {
         setIsFollowing(!originalFollowState);
 
         try {
+            // Use the passed-in server action
             const result = await toggleFollowAction({ targetUserId, currentUserId: user.uid });
 
             // Confirm the final state from the server
@@ -78,7 +83,7 @@ export function useFollow(targetUserId: string, onSuccess?: () => void) {
         } finally {
             setIsProcessing(false);
         }
-    }, [user, authLoading, targetUserId, isFollowing, isProcessing, toast, onSuccess]);
+    }, [user, authLoading, targetUserId, isFollowing, isProcessing, toast, onSuccess, toggleFollowAction]);
 
     return { isFollowing, toggleFollow: performToggleFollow, isLoading, isProcessing };
 }
