@@ -69,17 +69,18 @@ export async function getCategories() {
 export async function updateCategory(formData: FormData) {
     const categoryId = formData.get('categoryId') as string;
     const name = formData.get('name') as string;
-    const userId = formData.get('userId') as string;
+    // userId is no longer needed as categories are global
 
-    if (!categoryId || !name || !userId) {
+    if (!categoryId || !name) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        const categoryRef = adminDb.collection('users').doc(userId).collection('categories').doc(categoryId);
+        const categoryRef = adminDb.collection('categories').doc(categoryId);
         await categoryRef.update({ name });
 
         revalidatePath('/');
+        revalidatePath('/admin');
 
         return { success: true };
 
@@ -91,6 +92,7 @@ export async function updateCategory(formData: FormData) {
 
 export async function deleteCategory(formData: FormData) {
     const categoryId = formData.get('categoryId') as string;
+    // userId is no longer needed as categories are global
 
     if (!categoryId) {
         return { success: false, message: 'Missing required fields.' };
