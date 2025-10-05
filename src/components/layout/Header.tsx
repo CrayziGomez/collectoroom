@@ -28,7 +28,7 @@ import { Separator } from '../ui/separator';
   Please create the index by visiting the following URL in your browser. It will
   pre-fill the index creation form in your Firebase console with the correct settings.
 
-  https://console.firebase.google.com/v1/r/project/studio-7145415565-66e7d/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARosCih1bnJlYWRDb3VudC5hRjQwMUszUVFCTTJVN1BtOVVadjNrT0JqT24xEAEaDAoIX19uYW1lX18QAQ
+  https://console.firebase.google.com/v1/r/project/collectoroom-proj-we4/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARosCih1bnJlYWRDb3VudC5hRjQwMUszUVFCTTJVN1BtOVVadjNrT0JqT24xEAEaDAoIX19uYW1lX18QAQ
 
   After creating the index, it may take a few minutes to build. Once it's enabled, 
   the error will be resolved. The user-specific ID in the index path is just a

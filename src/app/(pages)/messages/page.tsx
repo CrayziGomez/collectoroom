@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
   Please create the index by visiting the following URL in your browser. It will
   pre-fill the index creation form with the correct settings.
 
-  https://console.firebase.google.com/v1/r/project/studio-7145415565-66e7d/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARoZChVsYXN0TWVzc2FnZS50aW1lc3RhbXAQAhoMCghfX25hbWVfXxAC
+  https://console.firebase.google.com/v1/r/project/collectoroom-proj-we4/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARoZChVsYXN0TWVzc2FnZS50aW1lc3RhbXAQAhoMCghfX25hbWVfXxAC
 
   After creating the index, it may take a few minutes to build. Once it's enabled,
   the error will be resolved.

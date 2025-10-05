@@ -35,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 
   Please create the index by visiting the following URL in your browser.
 
-  https://console.firebase.google.com/v1/r/project/studio-7145415565-66e7d/firestore/indexes?create_composite=Cltwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY29sbGVjdGlvbnMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+  https://console.firebase.google.com/v1/r/project/collectoroom-proj-we4/firestore/indexes?create_composite=Cltwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY29sbGVjdGlvbnMvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
 
   After creating the index, it may take a few minutes to build. Once it's enabled,
   the error will be resolved.

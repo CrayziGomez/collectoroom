@@ -79,9 +79,9 @@ This phase integrates Firebase Storage, ensures the correct permissions are set,
 - **Action:**
   - Run the following command in your terminal. This grants the Admin SDK the roles it needs to manage users, data, and files.
   ```bash
-  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/firebase.admin"
-  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/iam.serviceAccountTokenCreator"
-  gcloud projects add-iam-policy-binding studio-7145415565-66e7d --member="serviceAccount:firebase-adminsdk-fbsvc@studio-7145415565-66e7d.iam.gserviceaccount.com" --role="roles/storage.admin"
+  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/firebase.admin"
+  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/iam.serviceAccountTokenCreator"
+  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/storage.admin"
   ```
 
 ### 2.3: Implement Profile Photo Uploads
@@ -107,7 +107,7 @@ This phase connects your project to a GitHub repository for version control and 
   - Create a `.gitignore` file (if one doesn't exist) and add `node_modules`, `.next`, and `.env.local` to it.
   - Run `git add .` and `git commit -m "Initial commit"`.
 
-### 3.2: Create a GitHub Repository
+### 3.2:. Create a GitHub Repository
 - **Objective:** Host your code on GitHub.
 - **Action:**
   - Go to your GitHub account.
