@@ -1,98 +1,76 @@
-
 'use client';
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Share2, UserCheck, UserPlus, X } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { notFound, useRouter, useParams } from "next/navigation";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/auth-context";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import type { Card as CardType, Collection, User as UserType } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useFollow } from "@/hooks/use-follow";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, notFound } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
+import { Card as CardType, Collection } from '@/lib/types';
 
-export default function CardDetailPage() {
-    const params = useParams();
-    const collectionId = Array.isArray(params.id) ? params.id[0] : params.id;
-    const cardId = Array.isArray(params.cardId) ? params.cardId[0] : params.cardId;
+import { Button } from '@/components/ui/button';
+import { Share2, Edit, Trash2, ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import Image from 'next/image';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast'; // Corrected import path
+import Link from 'next/link';
+
+interface CardPageProps {
+    params: {
+        id: string;
+        cardId: string;
+    };
+}
+
+export default function CardPage({ params }: CardPageProps) {
+    const { id: collectionId, cardId } = params;
+    const [cardData, setCardData] = useState<CardType | null>(null);
+    const [collectionData, setCollectionData] = useState<Collection | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
 
-    const [cardData, setCardData] = useState<CardType | null>(null);
-    const [collectionData, setCollectionData] = useState<Collection | null>(null);
-    const [collectionOwner, setCollectionOwner] = useState<UserType | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const { isFollowing, toggleFollow, isLoading: isFollowLoading, isProcessing: isFollowProcessing } = useFollow(collectionOwner?.uid || '');
-    
-    const [isViewerOpen, setIsViewerOpen] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-    const openImageViewer = (imageUrl: string) => {
-        setSelectedImage(imageUrl);
-        setIsViewerOpen(true);
-    };
-
-
     useEffect(() => {
-        if (authLoading) return;
-        
         const fetchCardAndCollection = async () => {
-            if (!collectionId || !cardId) return;
+            if (authLoading) return;
             setIsLoading(true);
 
             try {
-                // Fetch card
-                const cardRef = doc(db, 'cards', cardId);
-                const cardSnap = await getDoc(cardRef);
-
-                if (!cardSnap.exists() || cardSnap.data().collectionId !== collectionId) {
-                    notFound();
-                    return;
-                }
-                const card = { ...cardSnap.data(), id: cardSnap.id } as CardType;
-                setCardData(card);
-
-                // Fetch collection
+                // Fetch collection first to check for public status
                 const collectionRef = doc(db, 'collections', collectionId);
                 const collectionSnap = await getDoc(collectionRef);
-                
-                if (!collectionSnap.exists()) {
-                     notFound();
-                     return;
-                }
-                const collection = { ...collectionSnap.data(), id: collectionSnap.id } as Collection;
-                setCollectionData(collection);
 
-                // Fetch collection owner
-                if (collection.userId) {
-                    const ownerRef = doc(db, 'users', collection.userId);
-                    const ownerSnap = await getDoc(ownerRef);
-                    if (ownerSnap.exists()) {
-                        setCollectionOwner({...(ownerSnap.data() as UserType), uid: ownerSnap.id});
+                if (collectionSnap.exists()) {
+                    const collection = { id: collectionSnap.id, ...collectionSnap.data() } as Collection;
+                    setCollectionData(collection);
+
+                    // Check permissions before fetching the card
+                    const isOwner = user?.uid === collection.userId;
+                    if (!collection.isPublic && !isOwner) {
+                        toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
+                        router.push('/gallery');
+                        return;
                     }
-                }
 
-                // Check permissions
-                const isOwner = user?.uid === collection.userId;
-                if (!collection.isPublic && !isOwner) {
-                    router.push('/gallery');
-                    return;
+                    // Now fetch the card
+                    const cardRef = doc(db, 'cards', cardId);
+                    const cardSnap = await getDoc(cardRef);
+
+                    if (cardSnap.exists() && cardSnap.data().collectionId === collectionId) {
+                        setCardData({ id: cardSnap.id, ...cardSnap.data() } as CardType);
+                    } else {
+                        notFound();
+                    }
+                } else {
+                    notFound();
                 }
-                
             } catch (error) {
                 console.error("Error fetching data:", error);
-                notFound();
+                toast({ title: "Error", description: "Could not fetch card data. You may not have permission.", variant: "destructive" });
+                // If there's any error (e.g. permission denied), redirect
+                router.push('/gallery');
             } finally {
                 setIsLoading(false);
             }
@@ -100,16 +78,26 @@ export default function CardDetailPage() {
 
         fetchCardAndCollection();
 
-    }, [user, authLoading, collectionId, cardId, router]);
+    }, [user, authLoading, collectionId, cardId, router, toast]);
 
-    const handleShare = () => {
-        navigator.clipboard.writeText(window.location.href);
-        toast({
-            title: "Link Copied!",
-            description: "The card link has been copied to your clipboard.",
-        });
+    const handleShare = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            toast({
+                title: "Link Copied!",
+                description: "The card link has been copied to your clipboard.",
+            });
+        } catch (error) {
+            console.error("Failed to copy to clipboard:", error);
+            toast({
+                title: "Copy Failed",
+                description: "Could not copy link to clipboard. Please copy it manually.",
+                variant: "destructive",
+            });
+        }
     };
 
+    const isOwner = useMemo(() => user?.uid === collectionData?.userId, [user, collectionData]);
 
     if (isLoading || authLoading) {
         return (
@@ -118,125 +106,74 @@ export default function CardDetailPage() {
             </div>
         )
     }
-    
+
     if (!cardData || !collectionData) {
-        return null;
+        return null; 
     }
 
-    const isOwner = user?.uid === cardData.userId;
-    const FollowButtonIcon = isFollowing ? UserCheck : UserPlus;
-
     return (
-        <>
         <div className="container py-8">
-            <div className="mb-6">
-                <Button variant="ghost" asChild>
-                    <Link href={`/collections/${collectionId}`}>
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to "{collectionData.name}"
-                    </Link>
-                </Button>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-                <div className="md:col-span-1">
-                     {cardData.images && cardData.images.length > 0 ? (
-                        <Carousel className="w-full max-w-xs mx-auto">
-                            <CarouselContent>
-                                {cardData.images.map((image, index) => (
-                                    <CarouselItem key={index} onClick={() => openImageViewer(image.url)} className="cursor-pointer">
-                                        <Card className="overflow-hidden">
-                                            <Image
-                                                src={image.url}
-                                                alt={`${cardData.title} - Image ${index + 1}`}
-                                                width={600}
-                                                height={400}
-                                                className="w-full aspect-[3/2] object-cover"
-                                                data-ai-hint={image.hint}
-                                            />
-                                        </Card>
-                                    </CarouselItem>
-                                ))}
-                            </CarouselContent>
-                            <CarouselPrevious className="left-2" />
-                            <CarouselNext className="right-2" />
-                        </Carousel>
-                    ) : (
-                         <Card className="overflow-hidden sticky top-24">
-                             <div className="w-full aspect-[3/2] bg-muted flex items-center justify-center">
-                                <p className="text-muted-foreground">No Image</p>
-                            </div>
-                         </Card>
-                    )}
-                </div>
-                <div className="md:col-span-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-4xl font-headline">{cardData.title}</CardTitle>
-                            {collectionOwner && (
-                                <div className="flex items-center flex-wrap gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                        <Avatar className="h-6 w-6">
-                                            {collectionOwner.avatarUrl && <AvatarImage src={collectionOwner.avatarUrl} alt={collectionOwner.username} />}
-                                            <AvatarFallback>{collectionOwner.username?.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                        <span>By {collectionOwner.username}</span>
-                                    </div>
-                                    {!isOwner && user && (
-                                        <Button variant="outline" size="sm" onClick={toggleFollow} disabled={isFollowLoading || isFollowProcessing} className="h-7 text-xs">
-                                            {isFollowProcessing ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <FollowButtonIcon className="mr-2 h-3 w-3" />}
-                                            {isFollowing ? 'Following' : 'Follow'}
-                                        </Button>
-                                    )}
-                                </div>
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="text-3xl font-bold">{cardData.title}</CardTitle>
+                            <Link href={`/collections/${collectionId}`} className="text-sm text-muted-foreground hover:underline">
+                                Part of {collectionData.name}
+                            </Link>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            {isOwner && (
+                                <Link href={`/collections/${collectionId}/cards/${cardId}/edit`}>
+                                    <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
+                                </Link>
                             )}
-                            <CardDescription className="text-lg pt-4">{cardData.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-6">
-                            <Separator />
-                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="font-semibold text-muted-foreground">Category</div>
-                                <div>{cardData.category}</div>
-
-                                <div className="font-semibold text-muted-foreground">Status</div>
-                                <div><Badge variant="outline">{cardData.status}</Badge></div>
-                             </div>
-                             <Separator />
-                             <div className="flex flex-wrap gap-2">
-                              {isOwner && (
-                                <Button asChild>
-                                    <Link href={`/collections/${collectionId}/cards/${cardId}/edit`}>Edit Card Details</Link>
-                                </Button>
-                             )}
-                              <Button variant="outline" onClick={handleShare}>
-                                <Share2 className="mr-2 h-4 w-4" /> Share
-                              </Button>
-                             </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                            <Button variant="outline" size="icon" onClick={handleShare}><Share2 className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2 pt-2">
+                         <Badge variant={cardData.status === 'Mint' ? 'success' : 'secondary'}>{cardData.status}</Badge>
+                        {collectionData.isPublic ? (
+                            <Badge variant="outline"><Eye className="h-4 w-4 mr-1"/>Public</Badge>
+                        ) : (
+                            <Badge variant="outline"><EyeOff className="h-4 w-4 mr-1"/>Private</Badge>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                           <p className="text-muted-foreground whitespace-pre-wrap">{cardData.description}</p>
+                        </div>
+                        <div>
+                            {cardData.images && cardData.images.length > 0 ? (
+                               <Carousel className="w-full max-w-md mx-auto">
+                                   <CarouselContent>
+                                       {cardData.images.map((image, index) => (
+                                            <CarouselItem key={index}>
+                                               <div className="aspect-square relative">
+                                                    <Image src={image.url} alt={`Card image ${index + 1}`} layout="fill" className="rounded-md object-cover"/>
+                                                </div>
+                                           </CarouselItem>
+                                       ))}
+                                   </CarouselContent>
+                                   {cardData.images.length > 1 && (
+                                        <>
+                                            <CarouselPrevious />
+                                            <CarouselNext />
+                                        </>
+                                    )}
+                               </Carousel>
+                            ) : (
+                                <div className="text-center text-muted-foreground py-12">No images for this card.</div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="text-xs text-muted-foreground">
+                    Added on {new Date(cardData.createdAt).toLocaleDateString()}
+                </CardFooter>
+            </Card>
         </div>
-         <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
-            <DialogContent className="max-w-4xl p-2 bg-transparent border-0">
-                 <DialogHeader className="sr-only">
-                    <DialogTitle>Image Viewer</DialogTitle>
-                    <DialogDescription>A larger view of the selected card image.</DialogDescription>
-                </DialogHeader>
-                <button onClick={() => setIsViewerOpen(false)} className="absolute top-2 right-2 z-50 text-white bg-black/50 rounded-full p-1">
-                    <X className="h-6 w-6" />
-                </button>
-                {selectedImage && (
-                    <Image
-                        src={selectedImage}
-                        alt="Full size view"
-                        width={1920}
-                        height={1080}
-                        className="w-full h-auto object-contain rounded-lg"
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-        </>
     );
 }

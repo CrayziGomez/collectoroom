@@ -5,7 +5,7 @@ import {
 } from '@/app/actions/category-actions';
 import { deleteUser } from '@/app/actions/user-actions';
 import { getSiteContent, updateSiteContent } from '@/app/actions/site-content';
-import { AdminPageClient } from './AdminPageClient';
+import AdminPageClient from './AdminPageClient'; // Corrected import
 
 // This is the new SERVER component for the Admin Page.
 export default function AdminPage() {

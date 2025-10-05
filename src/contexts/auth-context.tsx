@@ -2,11 +2,11 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { onAuthStateChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
+import { onIdTokenChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
 import { db, app } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
-
+import { useRouter } from 'next/navigation';
 
 interface EnrichedFirebaseUser extends FirebaseUser {
     isAdmin?: boolean;
@@ -15,7 +15,6 @@ interface EnrichedFirebaseUser extends FirebaseUser {
 interface AppUserWithFirebase extends AppUser {
     firebaseUser: EnrichedFirebaseUser | null;
 }
-
 
 interface AuthContextType {
   user: AppUserWithFirebase | null;
@@ -35,7 +34,6 @@ async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
 
     if (docSnap.exists()) {
         const existingData = docSnap.data() as AppUser;
-        // Sync avatarUrl on login if it's different
         if (user.photoURL && existingData.avatarUrl !== user.photoURL) {
             try {
                 await updateDoc(userDocRef, { avatarUrl: user.photoURL });
@@ -47,7 +45,6 @@ async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
         }
         return existingData;
     } else {
-        // Document doesn't exist, create it
         const username = sessionStorage.getItem('pendingUsername') || user.email?.split('@')[0] || 'New User';
         const tier = sessionStorage.getItem('pendingTier') || 'Hobbyist';
         const isAdmin = user.email === 'admin@collectoroom.com';
@@ -68,7 +65,6 @@ async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
             await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
         } catch (error) {
             console.error("Error creating user document:", error);
-            // We throw here because subsequent operations will fail
             throw new Error("Failed to create user profile.");
         } finally {
             sessionStorage.removeItem('pendingUsername');
@@ -78,18 +74,15 @@ async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
     }
 }
 
-
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUserWithFirebase | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const updateUser = useCallback((data: Partial<AppUser>) => {
     setUser(currentUser => {
         if (!currentUser) return null;
-        return {
-            ...currentUser,
-            ...data
-        };
+        return { ...currentUser, ...data };
     });
   }, []);
 
@@ -97,40 +90,50 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
     const auth = getAuth(app);
     let unsubscribeDoc: (() => void) | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onIdTokenChanged(auth, async (firebaseUser) => {
       setLoading(true);
-      // Clean up previous listener if it exists
       if (unsubscribeDoc) unsubscribeDoc();
 
       if (firebaseUser) {
-        try {
-          // Ensure user document exists before attaching a listener
-          await createUserDocument(firebaseUser);
-          
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          
-          unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-              const appUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
-              setUser({ ...appUser, firebaseUser });
+        try{
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            const appUser = await createUserDocument(firebaseUser);
+            const isAdmin = idTokenResult.claims.isAdmin === true;
+            setUser({ ...appUser, isAdmin, firebaseUser});
+
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const updatedUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
+                    setUser(currentUser => currentUser ? { ...currentUser, ...updatedUser, isAdmin } : null);
+                }
+            });
+
+            if (isAdmin) {
+                router.push('/admin');
             } else {
-              console.error("User document disappeared after creation.");
-              setUser(null);
+                router.push('/my-collectoroom');
             }
+        } catch (error: any) {
+            if (error.code === 'auth/id-token-revoked') {
+                // Token has been revoked, force a refresh.
+                await firebaseUser.getIdToken(true);
+            } else {
+                console.error("Auth context error:", error);
+                setUser(null);
+            }
+        } finally {
             setLoading(false);
-          }, (error) => {
-            console.error("Error listening to user document:", error);
-            setUser(null);
-            setLoading(false);
-          });
-        } catch (error) {
-          console.error("Failed to setup user profile:", error);
-          setUser(null);
-          setLoading(false);
         }
+
       } else {
         setUser(null);
         setLoading(false);
+        try {
+          await fetch('/api/auth', { method: 'DELETE' });
+        } catch (error) {
+          console.error('Failed to clear session:', error);
+        }
       }
     });
 
@@ -138,7 +141,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
       unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
     };
-  }, []);
+  }, [router]);
 
   const contextValue = { user, loading, updateUser };
 

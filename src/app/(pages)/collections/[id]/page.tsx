@@ -1,18 +1,17 @@
-
 'use client';
 
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2, UserPlus, UserCheck } from 'lucide-react';
+import { PlusCircle, Edit, Loader2, Crown, MessageSquare, Pencil, Share2, UserPlus, UserCheck, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import type { Collection, Card as CardType, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { tierLimits } from '@/lib/constants';
@@ -20,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useChat } from '@/hooks/use-chat';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useFollow } from '@/hooks/use-follow';
+import { toggleCollectionPrivacy } from '@/lib/actions/collection-actions';
 
 export default function CollectionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -33,67 +33,84 @@ export default function CollectionPage() {
   const [collectionOwner, setCollectionOwner] = useState<User | null>(null);
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPrivacyLoading, setIsPrivacyLoading] = useState(false);
 
+  const isOwner = useMemo(() => user?.uid === collectionData?.userId, [user, collectionData]);
   const { isFollowing, toggleFollow, isLoading: isFollowLoading, isProcessing: isFollowProcessing } = useFollow(collectionOwner?.uid || '');
 
-  const fetchCards = useCallback(async (collectionId: string) => {
-    try {
+   useEffect(() => {
+    if (!collectionId || authLoading) return;
+
+    const fetchInitialData = async () => {
+        setLoading(true);
+        try {
+            const collectionRef = doc(db, 'collections', collectionId);
+            const docSnap = await getDoc(collectionRef);
+
+            if (!docSnap.exists()) {
+                notFound();
+                return;
+            }
+
+            const data = { ...docSnap.data(), id: docSnap.id } as Collection;
+            const isUserOwner = user?.uid === data.userId;
+            const isUserAdmin = user?.isAdmin === true;
+
+            if (!data.isPublic && !isUserOwner && !isUserAdmin) {
+                toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
+                router.push('/gallery');
+                return;
+            }
+
+            setCollectionData(data);
+
+            if (data.userId) {
+                const ownerRef = doc(db, 'users', data.userId);
+                const ownerSnap = await getDoc(ownerRef);
+                if (ownerSnap.exists()) {
+                    setCollectionOwner({ ...(ownerSnap.data() as User), uid: ownerSnap.id });
+                }
+            }
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching collection:", error);
+            toast({ title: "Error", description: "Could not load the collection. You may not have permission.", variant: "destructive" });
+            router.push('/gallery');
+        }
+    };
+
+    fetchInitialData();
+
+  }, [collectionId, user, authLoading, router, toast]);
+
+  // Real-time updates for cards and collection after initial load and permission check
+   useEffect(() => {
+        if (!collectionId || !collectionData) return;
+
         const cardsQuery = query(collection(db, 'cards'), where('collectionId', '==', collectionId));
-        const cardsSnapshot = await getDocs(cardsQuery);
-        const cardsData = cardsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
-        setCards(cardsData);
-    } catch (error) {
-        console.error("Error fetching cards:", error);
-        toast({ title: "Could not load cards", description: "There was an error loading this collection's cards.", variant: "destructive"});
-    }
-  }, [toast]);
+        const unsubscribeCards = onSnapshot(cardsQuery, (snapshot) => {
+            const cardsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CardType);
+            setCards(cardsData);
+        }, (error) => {
+            console.error("Error fetching cards in real-time:", error);
+            toast({ title: "Could not update cards", variant: "destructive"});
+        });
 
+        const collectionRef = doc(db, 'collections', collectionId);
+        const unsubscribeCollection = onSnapshot(collectionRef, (docSnap) => {
+            if (docSnap.exists()) {
+                 setCollectionData({ ...docSnap.data(), id: docSnap.id } as Collection);
+            } else {
+                router.push('/gallery');
+            }
+        });
 
-  useEffect(() => {
-    if (!collectionId) return;
+        return () => {
+            unsubscribeCards();
+            unsubscribeCollection();
+        };
 
-    setLoading(true);
-
-    const collectionRef = doc(db, 'collections', collectionId);
-
-    const unsubscribe = onSnapshot(collectionRef, async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = { ...docSnap.data(), id: docSnap.id } as Collection;
-        const isOwner = user?.uid === data.userId;
-        const isAdmin = user?.isAdmin === true;
-
-        if (!data.isPublic && !isOwner && !isAdmin) {
-          toast({ title: "Access Denied", description: "This collection is private.", variant: "destructive" });
-          router.push('/gallery');
-          return;
-        }
-
-        setCollectionData(data);
-
-        if (data.userId) {
-          const ownerRef = doc(db, 'users', data.userId);
-          const ownerSnap = await getDoc(ownerRef);
-          if (ownerSnap.exists()) {
-            setCollectionOwner({ ...(ownerSnap.data() as User), uid: ownerSnap.id });
-          }
-        }
-        
-        // Fetch cards after confirming access
-        await fetchCards(collectionId);
-
-        setLoading(false);
-      } else {
-        toast({ title: "Not Found", description: "This collection does not exist.", variant: "destructive" });
-        router.push('/gallery');
-      }
-    }, (error) => {
-      console.error("Error fetching collection:", error);
-      toast({ title: "Error", description: "Could not load the collection.", variant: "destructive" });
-      router.push('/gallery');
-    });
-
-    return () => unsubscribe();
-  }, [collectionId, user, authLoading, router, toast, fetchCards]);
+    }, [collectionId, collectionData, router, toast]);
 
    const handleStartChat = async () => {
     if (authLoading || !user || !collectionOwner || user.uid === collectionOwner.uid) return;
@@ -104,13 +121,38 @@ export default function CollectionPage() {
     }
   };
   
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({
-        title: "Link Copied!",
-        description: "The collection link has been copied to your clipboard.",
-    });
+  const handleShare = async () => {
+    try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+            title: "Link Copied!",
+            description: "The collection link has been copied to your clipboard.",
+        });
+    } catch (err) {
+        console.error("Clipboard write failed:", err);
+        toast({
+            title: "Copy Failed",
+            description: "Could not copy link. Please copy it manually.",
+            variant: "destructive"
+        });
+    }
   };
+
+  const handleTogglePrivacy = async () => {
+    if (!collectionData) return;
+    setIsPrivacyLoading(true);
+    try {
+        await toggleCollectionPrivacy(collectionData.id, !collectionData.isPublic);
+        toast({
+            title: `Collection is now ${!collectionData.isPublic ? 'Public' : 'Private'}`,
+        });
+    } catch (error) {
+        console.error("Failed to toggle privacy:", error);
+        toast({ title: "Error", description: "Could not change collection privacy.", variant: "destructive"});
+    } finally {
+        setIsPrivacyLoading(false);
+    }
+  }
 
   if (loading || authLoading) {
       return (
@@ -124,7 +166,6 @@ export default function CollectionPage() {
     return null;
   }
 
-  const isOwner = user?.uid === collectionData.userId;
   const cardLimit = user ? tierLimits[user.tier].cards : 0;
   const hasReachedCardLimit = user ? (collectionData.cardCount || 0) >= cardLimit : true;
 
@@ -136,7 +177,14 @@ export default function CollectionPage() {
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
-            <Badge variant="secondary" className="mb-2">{collectionData.category}</Badge>
+            <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">{collectionData.category}</Badge>
+                {collectionData.isPublic ? (
+                    <Badge variant="outline"><Eye className="h-4 w-4 mr-1"/>Public</Badge>
+                ) : (
+                    <Badge variant="outline"><EyeOff className="h-4 w-4 mr-1"/>Private</Badge>
+                )}
+            </div>
             <h1 className="text-4xl font-bold font-headline">{collectionData.name}</h1>
             <p className="text-lg text-muted-foreground mt-2 max-w-2xl">{collectionData.description}</p>
             <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
@@ -146,12 +194,16 @@ export default function CollectionPage() {
               </Avatar>
               <span>By {collectionOwner?.username || 'Unknown User'}</span>
               <span>·</span>
-              <span>{collectionData.cardCount || 0} cards</span>
+              {/* Step 4: Stabilized UI to use the single source of truth from the live-updated cards array */}
+              <span>{cards.length} cards</span>
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
             {isOwner ? (
                 <>
+                <Button variant="outline" onClick={handleTogglePrivacy} disabled={isPrivacyLoading}>
+                    {isPrivacyLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : (collectionData.isPublic ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>)}
+                </Button>
                 <Button variant="outline" asChild>
                   <Link href={`/collections/${collectionData.id}/edit`}>
                     <Edit className="mr-2 h-4 w-4" /> Edit
@@ -192,7 +244,7 @@ export default function CollectionPage() {
           )}
       </div>
 
-      {/* Cards Grid */}
+      {/* Cards Grid - The logic here is already correct, relying on cards.length */}
        {cards.length === 0 && !loading ? (
          <div className="text-center py-12 text-muted-foreground">
             <p>This collection is empty.</p>

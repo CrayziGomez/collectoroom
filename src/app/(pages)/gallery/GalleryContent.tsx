@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -7,33 +6,37 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Layers, User as UserIcon } from 'lucide-react';
-import { useEffect, useState, useMemo, Suspense } from 'react';
+import { Layers, User as UserIcon, Eye, EyeOff } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Query, DocumentData, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { Collection, User, Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 export const dynamic = 'force-dynamic';
 
+// Fetches owner details for the given collections
 async function fetchCollectionOwners(collections: Collection[]): Promise<Record<string, User>> {
     const userIds = [...new Set(collections.map(c => c.userId))];
     if (userIds.length === 0) return {};
-    
+
     const owners: Record<string, User> = {};
-    const userPromises = userIds.map(async (userId) => {
-        const userRef = doc(db, 'users', userId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-            return { id: userSnap.id, data: userSnap.data() as User };
-        }
-        return null;
+    const userBatches: string[][] = [];
+    for (let i = 0; i < userIds.length; i += 10) {
+        userBatches.push(userIds.slice(i, i + 10));
+    }
+
+    const fetchPromises = userBatches.map(async batch => {
+        const userQuery = query(collection(db, 'users'), where('__name__', 'in', batch));
+        const userSnap = await getDocs(userQuery);
+        return userSnap.docs.map(d => ({ id: d.id, data: d.data() as User }));
     });
 
-    const results = await Promise.all(userPromises);
+    const results = await Promise.all(fetchPromises);
     
-    results.forEach(result => {
+    results.flat().forEach(result => {
         if (result) {
             owners[result.id] = result.data;
         }
@@ -42,7 +45,6 @@ async function fetchCollectionOwners(collections: Collection[]): Promise<Record<
     return owners;
 }
 
-
 export default function GalleryContent() {
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [owners, setOwners] = useState<Record<string, User>>({});
@@ -50,6 +52,7 @@ export default function GalleryContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const categoryParam = searchParams.get('category');
@@ -57,38 +60,57 @@ export default function GalleryContent() {
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'all');
 
   useEffect(() => {
-    const fetchPublicData = async () => {
+    const fetchData = async () => {
+        if (authLoading) return; 
+
         setLoading(true);
         try {
-            // Fetch categories
             const catQuerySnapshot = await getDocs(collection(db, 'categories'));
             const categoriesData = catQuerySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
             setCategories(categoriesData);
 
-            // Fetch collections
-            let q: Query<DocumentData> = query(collection(db, 'collections'), where('isPublic', '==', true));
+            const publicCollectionsQuery = query(collection(db, 'collections'), where('isPublic', '==', true));
             
-            const queryCategory = searchParams.get('category');
-            if (queryCategory) {
-                 q = query(q, where('category', '==', queryCategory));
-            }
+            const queriesToRun = [getDocs(publicCollectionsQuery)];
 
-            const querySnapshot = await getDocs(q);
-            const collectionsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Collection);
-            setAllCollections(collectionsData);
+            if (user) {
+                const privateCollectionsQuery = query(
+                    collection(db, 'collections'),
+                    where('userId', '==', user.uid),
+                    where('isPublic', '==', false)
+                );
+                queriesToRun.push(getDocs(privateCollectionsQuery));
+            }
             
-            const ownerData = await fetchCollectionOwners(collectionsData);
+            const [publicSnapshot, privateSnapshot] = await Promise.all(queriesToRun);
+
+            const collectionsMap = new Map<string, Collection>();
+
+            publicSnapshot.forEach(doc => {
+                 collectionsMap.set(doc.id, { ...doc.data(), id: doc.id } as Collection);
+            });
+
+            if (privateSnapshot) {
+                privateSnapshot.forEach(doc => {
+                    collectionsMap.set(doc.id, { ...doc.data(), id: doc.id } as Collection);
+                });
+            }
+            
+            const allFetchedCollections = Array.from(collectionsMap.values());
+
+            const ownerData = await fetchCollectionOwners(allFetchedCollections);
             setOwners(ownerData);
+            setAllCollections(allFetchedCollections);
 
         } catch (error) {
-            console.error("Error fetching public data:", error);
+            console.error("Error fetching gallery data:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    fetchPublicData();
-  }, [searchParams]);
+    fetchData();
+  }, [user, authLoading]);
   
   useEffect(() => {
     setSelectedCategory(categoryParam || 'all');
@@ -105,25 +127,46 @@ export default function GalleryContent() {
   }
 
   const filteredCollections = useMemo(() => {
-    // Search term filtering is now done on the client side after the initial query
     return allCollections.filter(collection => {
+      const matchesCategory = selectedCategory === 'all' || collection.category === selectedCategory;
       const matchesSearch = searchTerm === '' || 
         collection.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        collection.keywords?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
+        collection.keywords?.some(kw => kw.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesCategory && matchesSearch;
     });
-  }, [allCollections, searchTerm]);
+  }, [allCollections, searchTerm, selectedCategory]);
+
+  if (loading || authLoading) {
+      return (
+        <div className="container py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold font-headline">Collection Gallery</h1>
+            <p className="text-lg text-muted-foreground mt-2">Exploring collections...</p>
+          </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <Skeleton className="h-10 md:col-span-2" />
+              <Skeleton className="h-10" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <Skeleton className="h-[320px] w-full" />
+                <Skeleton className="h-[320px] w-full" />
+                <Skeleton className="h-[320px] w-full" />
+                <Skeleton className="h-[320px] w-full" />
+            </div>
+        </div>
+      )
+  }
 
   return (
     <div className="container py-8">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold font-headline">Collection Gallery</h1>
-        <p className="text-lg text-muted-foreground mt-2">Explore the amazing collections shared by our community.</p>
+        <p className="text-lg text-muted-foreground mt-2">Explore amazing collections or see your own private work.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <Input 
-          placeholder="Search by name or keyword..." 
+          placeholder="Search collections..." 
           className="md:col-span-2" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -141,16 +184,9 @@ export default function GalleryContent() {
         </Select>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <Skeleton className="h-[320px] w-full" />
-            <Skeleton className="h-[320px] w-full" />
-            <Skeleton className="h-[320px] w-full" />
-            <Skeleton className="h-[320px] w-full" />
-        </div>
-      ) : filteredCollections.length === 0 ? (
+      {filteredCollections.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-            <p>No public collections found matching your criteria.</p>
+            <p>No collections found matching your criteria.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -170,7 +206,13 @@ export default function GalleryContent() {
                         data-ai-hint={collection.coverImageHint}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      <Badge variant="secondary" className="absolute top-2 right-2">{collection.category}</Badge>
+                       <div className="absolute top-2 right-2 flex gap-1">
+                         {collection.isPublic ? (
+                            <Badge variant="secondary"><Eye className="h-3 w-3 mr-1" />Public</Badge>
+                         ) : (
+                            <Badge variant="default"><EyeOff className="h-3 w-3 mr-1" />Private</Badge>
+                         )}
+                      </div>
                     </div>
                     <div className="p-4">
                       <h3 className="font-semibold text-lg truncate group-hover:text-primary">{collection.name}</h3>
