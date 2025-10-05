@@ -21,5 +21,15 @@ run:
 
 # Environment variables for your backend.
 env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyCXIPjPVxlP4xTnkMC7uePbxDkfR5QGW0g"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "collectoroom-proj-we4.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "collectoroom-proj-we4"
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     value: "collectoroom-proj-we4.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "205807917953"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:205807917953:web:3e7594557cbd0e7f59e680"
