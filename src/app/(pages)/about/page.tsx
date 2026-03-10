@@ -30,9 +30,11 @@ export default function AboutPage() {
              <Button asChild size="lg">
                <Link href="/pricing">Join Now Free</Link>
              </Button>
+             // ... your other page content
            </div>
         </div>
       </div>
     </div>
   );
 }
+

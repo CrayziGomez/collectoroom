@@ -1,67 +1,126 @@
 
 'use server';
 
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { UserProfile } from "@/lib/types";
+import { adminDb } from '@/lib/firebase-admin';
+import { User } from '@/lib/types';
+import { FieldValue } from 'firebase-admin/firestore';
 
-/**
- * Creates a new user profile in Firestore.
- * @param userId The UID of the user.
- * @param email The email of the user.
- * @param username The chosen username.
- * @returns A promise that resolves when the profile is created.
- */
-export async function createUserProfile(userId: string, email: string, username: string) {
+
+const FREE_PLAN = {
+  planId: 'free',
+  name: 'Free',
+  cardLimit: 5,
+  collectionLimit: 1,
+};
+
+const PRO_PLAN = {
+  planId: 'plan_pro',
+  name: 'Pro',
+  cardLimit: 100,
+  collectionLimit: 10,
+};
+
+// Gets a user's data, merging from Clerk and Firestore
+export async function getUser(userId: string): Promise<User | null> {
     try {
-        const userRef = adminDb.collection('users').doc(userId);
+        const { clerkClient } = await import('@clerk/nextjs/server');
 
-        // Check for username uniqueness
-        const usernameSnapshot = await adminDb.collection('users').where('username', '==', username).get();
-        if (!usernameSnapshot.isEmpty) {
-            throw new Error('Username is already taken.');
-        }
+        const [clerkUser, userDoc] = await Promise.all([
+            clerkClient.users.getUser(userId),
+            adminDb.collection('users').doc(userId).get(),
+        ]);
 
-        const newUserProfile: UserProfile = {
-            uid: userId,
-            email,
-            username,
-            displayName: username,
-            photoURL: '', // Default or placeholder photo URL
-            isAdmin: false, // Default isAdmin to false
-            createdAt: new Date(),
-            updatedAt: new Date(),
+        if (!clerkUser) return null;
+
+        const user: User = {
+            id: clerkUser.id,
+            email: clerkUser.emailAddresses[0]?.emailAddress || 'No email',
+            username: clerkUser.username || 'User',
+            avatar: clerkUser.imageUrl,
+            planId: FREE_PLAN.planId, // Default to free plan
+            cardCount: 0,
+            collectionCount: 0,
+            plan: FREE_PLAN,
         };
 
-        await userRef.set(newUserProfile);
-        console.log(`User profile created for ${username}`);
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            user.planId = userData?.planId || FREE_PLAN.planId;
+            user.cardCount = userData?.cardCount || 0;
+            user.collectionCount = userData?.collectionCount || 0;
 
-        return { success: true, message: "User profile created successfully" };
+            if (user.planId === PRO_PLAN.planId) {
+                user.plan = PRO_PLAN;
+            }
+        }
+
+        return user;
 
     } catch (error) {
-        console.error("Error creating user profile:", error);
-        // It's better to throw the error or return a specific error message
-        // to be handled by the calling function (e.g., in the signup page).
-        return { success: false, message: error instanceof Error ? error.message : 'An unknown error occurred.' };
+        console.error("Error fetching user:", error);
+        return null;
     }
 }
 
-/**
- * Deletes a user from Firebase Authentication and Firestore.
- * @param uid The user ID to delete.
- * @returns A promise that resolves when the user is deleted.
- */
-export async function deleteUser(uid: string) {
+// Updates a user's username
+export async function updateUsername(userId: string, username: string) {
     try {
-        // Delete from Firebase Authentication
-        await adminAuth.deleteUser(uid);
+        const { clerkClient } = await import('@clerk/nextjs/server');
+        await clerkClient.users.updateUser(userId, { username });
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating username:', error);
+        return { success: false, message: error.message || 'An unknown error occurred.' };
+    }
+}
 
-        // Delete from Firestore
-        const userRef = adminDb.collection('users').doc(uid);
-        await userRef.delete();
-
-        return { success: true, message: 'User deleted successfully.' };
-    } catch (error) {
+export async function deleteUser(userId: string) {
+    try {
+        const { clerkClient } = await import('@clerk/nextjs/server');
+        await clerkClient.users.deleteUser(userId);
+        await adminDb.collection('users').doc(userId).delete();
+        return { success: true };
+    } catch (error: any) {
         console.error('Error deleting user:', error);
-        return { success: false, message: 'Error deleting user.' };
+        return { success: false, message: error.message || 'An unknown error occurred.' };
+    }
+}
+
+export async function toggleFollow({ targetUserId, currentUserId }: { targetUserId: string; currentUserId: string }) {
+    const currentUserRef = adminDb.collection('users').doc(currentUserId);
+    const targetUserRef = adminDb.collection('users').doc(targetUserId);
+    const followingRef = currentUserRef.collection('following').doc(targetUserId);
+
+    try {
+        const isFollowing = (await followingRef.get()).exists;
+
+        if (isFollowing) {
+            await followingRef.delete();
+            await targetUserRef.collection('followers').doc(currentUserId).delete();
+            await currentUserRef.update({ followingCount: FieldValue.increment(-1) });
+            await targetUserRef.update({ followersCount: FieldValue.increment(-1) });
+        } else {
+            await followingRef.set({ followedAt: FieldValue.serverTimestamp() });
+            await targetUserRef.collection('followers').doc(currentUserId).set({ followedAt: FieldValue.serverTimestamp() });
+            await currentUserRef.update({ followingCount: FieldValue.increment(1) });
+            await targetUserRef.update({ followersCount: FieldValue.increment(1) });
+        }
+
+        return { success: true, isFollowing: !isFollowing };
+    } catch (error: any) {
+        console.error('Error toggling follow:', error);
+        return { success: false, message: error.message || 'An unknown error occurred.' };
+    }
+}
+
+export async function updateAvatar(userId: string, avatarUrl: string) {
+    try {
+        const { clerkClient } = await import('@clerk/nextjs/server');
+        await clerkClient.users.updateUser(userId, { imageUrl: avatarUrl });
+        await adminDb.collection('users').doc(userId).update({ avatar: avatarUrl });
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating avatar:', error);
+        return { success: false, message: error.message || 'An unknown error occurred.' };
     }
 }

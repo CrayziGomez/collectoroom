@@ -38,3 +38,6 @@ next-env.d.ts
 
 # Firebase
 serviceAccountKey.json
+
+# clerk configuration (can include secrets)
+/.clerk/

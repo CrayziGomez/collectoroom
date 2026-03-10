@@ -6,8 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import type { ImageRecord } from '@/lib/types';
 import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { getUser } from './user-actions'; // Import the user-actions
 
-// This helper function remains the same.
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
     const bucket = adminStorage.bucket();
     const imageFileName = `${uuidv4()}-${file.name}`;
@@ -29,7 +29,6 @@ async function uploadImage(file: File, userId: string, collectionId: string, car
     };
 }
 
-// Step 1: Rewriting createCard to use a secure and atomic transaction.
 export async function createCard(formData: FormData) {
     const userId = formData.get('userId') as string;
     const collectionId = formData.get('collectionId') as string;
@@ -43,18 +42,31 @@ export async function createCard(formData: FormData) {
         return { success: false, message: 'Missing required fields.' };
     }
 
+    let imageRecords: ImageRecord[] = [];
+
     try {
+        const user = await getUser(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (user.cardCount >= user.plan.cardLimit) {
+            return { 
+                success: false, 
+                message: `You\'ve reached your limit of ${user.plan.cardLimit} cards. Please upgrade your plan.` 
+            };
+        }
+
         const cardId = adminDb.collection('cards').doc().id;
         
-        // Image uploads still happen first, as they are separate from the Firestore transaction.
-        const imageRecords = await Promise.all(
+        imageRecords = await Promise.all(
             images.map(image => uploadImage(image, userId, collectionId, cardId))
         );
 
         const cardRef = adminDb.collection('cards').doc(cardId);
         const collectionRef = adminDb.collection('collections').doc(collectionId);
-        
-        // The core logic is now wrapped in a transaction.
+        const userRef = adminDb.collection('users').doc(userId);
+
         await adminDb.runTransaction(async (transaction) => {
             const collectionDoc = await transaction.get(collectionRef);
             if (!collectionDoc.exists) {
@@ -64,7 +76,6 @@ export async function createCard(formData: FormData) {
             const collectionData = collectionDoc.data();
             const isFirstCard = (collectionData?.cardCount || 0) === 0;
 
-            // 1. Create the new card.
             transaction.set(cardRef, {
                 userId,
                 collectionId,
@@ -76,31 +87,32 @@ export async function createCard(formData: FormData) {
                 createdAt: FieldValue.serverTimestamp(),
             });
             
-            // 2. Prepare the update for the collection.
             const collectionUpdate: { [key: string]: any } = { 
                 cardCount: FieldValue.increment(1) 
             };
 
-            // If this is the first card, set the collection's cover image.
             if (isFirstCard && imageRecords.length > 0) {
                 collectionUpdate.coverImage = imageRecords[0].url;
                 collectionUpdate.coverImageHint = imageRecords[0].hint;
             }
 
-            // 3. Atomically update the collection.
             transaction.update(collectionRef, collectionUpdate);
+            transaction.update(userRef, { cardCount: FieldValue.increment(1) });
         });
 
         revalidatePath(`/collections/${collectionId}`);
-        revalidatePath('/gallery'); // Also revalidate the gallery
+        revalidatePath('/gallery');
 
         return { success: true, cardId };
 
     } catch (error: any) {
         console.error('Error creating card:', error);
-        // Clean up uploaded images if the transaction fails
-        const bucket = adminStorage.bucket();
-        await Promise.all(images.map(image => bucket.file(`users/${userId}/cards/${cardId}/${uuidv4()}-${image.name}`).delete({ ignoreNotFound: true })));
+        
+        if (imageRecords.length > 0) {
+            const bucket = adminStorage.bucket();
+            await Promise.all(imageRecords.map(record => bucket.file(record.path).delete({ ignoreNotFound: true })));
+        }
+
         return { success: false, message: error.message || 'An unknown error occurred while creating the card.' };
     }
 }
@@ -112,10 +124,11 @@ export async function updateCard(formData: FormData) {
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const status = formData.get('status') as string;
+    const category = formData.get('category') as string;
     const existingImages: ImageRecord[] = JSON.parse(formData.get('existingImages') as string);
     const newImages = formData.getAll('newImages') as File[];
 
-    if (!userId || !cardId || !collectionId || !title || !status) {
+    if (!userId || !cardId || !collectionId || !title || !status || !category) {
         return { success: false, message: 'Missing required fields.' };
     }
 
@@ -146,6 +159,7 @@ export async function updateCard(formData: FormData) {
             title,
             description,
             status,
+            category,
             images: finalImages,
         });
 
@@ -160,36 +174,32 @@ export async function updateCard(formData: FormData) {
     }
 }
 
-
-// Step 2: Rewriting deleteCard to also use a transaction for safety.
-export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[] }) {
-    const { cardId, collectionId, images } = input;
+// **FIXED: Now correctly decrements user's card count**
+export async function deleteCard(input: { cardId: string, collectionId: string, images: ImageRecord[], userId: string }) {
+    const { cardId, collectionId, images, userId } = input;
     
-    if (!cardId || !collectionId) {
-        return { success: false, message: 'Missing card or collection ID.' };
+    if (!cardId || !collectionId || !userId) {
+        return { success: false, message: 'Missing card, collection, or user ID.' };
     }
 
     try {
         const cardRef = adminDb.collection('cards').doc(cardId);
         const collectionRef = adminDb.collection('collections').doc(collectionId);
+        const userRef = adminDb.collection('users').doc(userId);
 
-        // Delete associated images from storage first.
         const bucket = adminStorage.bucket();
         if (images && images.length > 0) {
             await Promise.all(images.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
         }
 
-        // Atomically delete the card and decrement the count.
         await adminDb.runTransaction(async (transaction) => {
-            // Verify collection exists before trying to update it.
             const collectionDoc = await transaction.get(collectionRef);
-            if (!collectionDoc.exists) {
-                // If the collection doesn't exist, we can't decrement the count,
-                // but we should still attempt to delete the orphaned card.
-                console.warn(`Collection ${collectionId} not found, but attempting to delete card ${cardId}.`);
-            } else {
+            if (collectionDoc.exists) {
                  transaction.update(collectionRef, { cardCount: FieldValue.increment(-1) });
             }
+            
+            // Also decrement the user's card count
+            transaction.update(userRef, { cardCount: FieldValue.increment(-1) });
             transaction.delete(cardRef);
         });
 

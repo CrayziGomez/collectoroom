@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { useAuth } from '@/contexts/auth-context';
+import { useUser } from '@clerk/nextjs'; 
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
@@ -17,38 +17,24 @@ import { Bell, Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { Separator } from '../ui/separator';
 
-/*
-  [DEVELOPER NOTE] Firestore Index Required for Unread Chat Count:
-  
-  To fix the "The query requires an index" error that appears for logged-in users,
-  a composite index must be created. This query, which checks for unread messages,
-  combines an 'array-contains' filter with another 'where' clause, which
-  requires a custom index in Firestore.
-
-  Please create the index by visiting the following URL in your browser. It will
-  pre-fill the index creation form in your Firebase console with the correct settings.
-
-  https://console.firebase.google.com/v1/r/project/collectoroom-proj-we4/firestore/indexes?create_composite=ClVwcm9qZWN0cy9zdHVkaW8tNzE0NTQxNTU2NS02NmU3ZC9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvY2hhdHMvaW5kZXhlcy9fEAEaEgoOcGFydGljaXBhbnRJZHMYARosCih1bnJlYWRDb3VudC5hRjQwMUszUVFCTTJVN1BtOVVadjNrT0JqT24xEAEaDAoIX19uYW1lX18QAQ
-
-  After creating the index, it may take a few minutes to build. Once it's enabled, 
-  the error will be resolved. The user-specific ID in the index path is just a
-  placeholder; Firestore will correctly apply the index to all users.
-*/
-
-
 export function Header() {
-  const { user, loading } = useAuth();
+  const { user, isLoaded } = useUser(); 
   const pathname = usePathname();
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (loading || !user) {
+    if (!isLoaded || !user) {
       setUnreadChatsCount(0);
       setUnreadNotificationsCount(0);
       return;
@@ -60,8 +46,8 @@ export function Header() {
     try {
       const chatsQuery = query(
         collection(db, 'chats'),
-        where('participantIds', 'array-contains', user.uid),
-        where(`unreadCount.${user.uid}`, '>', 0)
+        where('participantIds', 'array-contains', user.id),
+        where(`unreadCount.${user.id}`, '>', 0)
       );
       unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
         setUnreadChatsCount(querySnapshot.size);
@@ -71,7 +57,7 @@ export function Header() {
       
       const notificationsQuery = query(
         collection(db, 'notifications'),
-        where('recipientId', '==', user.uid),
+        where('recipientId', '==', user.id),
         where('isRead', '==', false)
       );
       unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
@@ -92,7 +78,7 @@ export function Header() {
             unsubscribeNotifications();
         }
     };
-  }, [user, loading]);
+  }, [user, isLoaded]);
   
   const totalUnread = unreadChatsCount + unreadNotificationsCount;
 
@@ -106,7 +92,7 @@ export function Header() {
   
   const navLinks = allNavLinks.filter(link => {
       if (link.auth === 'always') return true;
-      if (link.auth === 'required' && !loading && user) return true;
+      if (link.auth === 'required' && isLoaded && user) return true;
       return false;
   });
 
@@ -115,59 +101,60 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         
-        {/* Mobile Menu */}
-        <div className="md:hidden">
-           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="flex flex-col">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Main Menu</SheetTitle>
-                  <SheetDescription>
-                    Navigate through the CollectoRoom application.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="mb-4">
-                  <Logo />
-                </div>
-                <Separator />
-                <nav className="flex-grow flex flex-col gap-4 text-lg font-medium mt-4">
-                  {navLinks.map((link) => (
-                     <Link
-                      key={link.href}
-                      href={link.href}
-                      className={cn(
-                        "flex items-center justify-between transition-colors hover:text-foreground",
-                        pathname === link.href ? "text-foreground" : "text-muted-foreground"
-                      )}
-                    >
-                      <span>{link.label}</span>
-                      {link.badge && link.badge > 0 ? (
-                         <Badge variant="destructive">{link.badge}</Badge>
-                      ) : null}
-                    </Link>
-                  ))}
-                </nav>
-                {!loading && !user && (
-                    <div className="mt-auto">
-                        <Separator className="my-4" />
-                        <div className="flex flex-col gap-2">
-                             <Button asChild>
-                                <Link href="/signup">Sign Up</Link>
-                             </Button>
-                             <Button variant="outline" asChild>
-                                <Link href="/login">Log in</Link>
-                             </Button>
-                        </div>
-                    </div>
-                )}
-              </SheetContent>
-            </Sheet>
-        </div>
+        {isClient && (
+          <div className="md:hidden">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="flex flex-col">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Main Menu</SheetTitle>
+                    <SheetDescription>
+                      Navigate through the CollectoRoom application.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="mb-4">
+                    <Logo />
+                  </div>
+                  <Separator />
+                  <nav className="flex-grow flex flex-col gap-4 text-lg font-medium mt-4">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={cn(
+                          "flex items-center justify-between transition-colors hover:text-foreground",
+                          pathname === link.href ? "text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        <span>{link.label}</span>
+                        {link.badge && link.badge > 0 ? (
+                          <Badge variant="destructive">{link.badge}</Badge>
+                        ) : null}
+                      </Link>
+                    ))}
+                  </nav>
+                  {isLoaded && !user && (
+                      <div className="mt-auto">
+                          <Separator className="my-4" />
+                          <div className="flex flex-col gap-2">
+                              <Button asChild>
+                                  <Link href="/signup">Sign Up</Link>
+                              </Button>
+                              <Button variant="outline" asChild>
+                                  <Link href="/login">Log in</Link>
+                              </Button>
+                          </div>
+                      </div>
+                  )}
+                </SheetContent>
+              </Sheet>
+          </div>
+        )}
 
         {/* Desktop Logo & Nav */}
         <div className="hidden md:flex md:items-center md:gap-6">
@@ -200,33 +187,37 @@ export function Header() {
 
         {/* Right side actions */}
         <div className="flex flex-1 items-center justify-end space-x-2">
-           {!loading && !user && (
-            <div className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" asChild>
-                <Link href="/login">Log in</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/signup">Sign Up</Link>
-              </Button>
-            </div>
-          )}
-          {user && (
-            <div className="relative">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/notifications">
-                  <Bell className="h-5 w-5" />
-                   <span className="sr-only">Notifications</span>
-                </Link>
-              </Button>
-               {totalUnread > 0 && (
-                <div className="absolute top-0 right-0 h-4 w-4 transform translate-x-1/2 -translate-y-1/2">
-                  <Badge variant="destructive" className="h-5 w-5 justify-center p-0">{totalUnread}</Badge>
+          {isClient && (
+            <>
+              {isLoaded && !user && (
+                <div className="hidden md:flex items-center gap-2">
+                  <Button variant="ghost" asChild>
+                    <Link href="/login">Log in</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/signup">Sign Up</Link>
+                  </Button>
                 </div>
               )}
-            </div>
+              {user && (
+                <div className="relative">
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href="/notifications">
+                      <Bell className="h-5 w-5" />
+                      <span className="sr-only">Notifications</span>
+                    </Link>
+                  </Button>
+                  {totalUnread > 0 && (
+                    <div className="absolute top-0 right-0 h-4 w-4 transform translate-x-1/2 -translate-y-1/2">
+                      <Badge variant="destructive" className="h-5 w-5 justify-center p-0">{totalUnread}</Badge>
+                    </div>
+                  )}
+                </div>
+              )}
+              <ThemeToggle />
+              <UserNav />
+            </>
           )}
-          <ThemeToggle />
-          <UserNav />
         </div>
       </div>
     </header>
