@@ -3,10 +3,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from './use-toast';
-import { User } from '@/lib/types';
 
 export function useChat() {
     const { user } = useAuth();
@@ -25,57 +22,14 @@ export function useChat() {
         }
 
         setIsCreatingChat(true);
-
-        const chatId = [user.uid, otherUserId].sort().join('_');
-        const chatRef = doc(db, 'chats', chatId);
-
         try {
-            const chatSnap = await getDoc(chatRef);
-            
-            if (!chatSnap.exists()) {
-                const otherUserDoc = await getDoc(doc(db, 'users', otherUserId));
-                if (!otherUserDoc.exists()) {
-                    throw new Error("The user you're trying to chat with doesn't exist.");
-                }
-                const otherUserData = otherUserDoc.data() as User;
-
-                const batch = writeBatch(db);
-
-                batch.set(chatRef, {
-                    participantIds: [user.uid, otherUserId],
-                    participants: {
-                        [user.uid]: {
-                            username: user.username,
-                            avatarUrl: user.avatarUrl || ''
-                        },
-                        [otherUserId]: {
-                            username: otherUserData.username,
-                            avatarUrl: otherUserData.avatarUrl || ''
-                        }
-                    },
-                    lastMessage: {
-                        text: 'Chat started',
-                        timestamp: serverTimestamp()
-                    },
-                    unreadCount: {
-                        [user.uid]: 0,
-                        [otherUserId]: 0, // Start with 0 unread for both
-                    }
-                });
-
-                // Commit the batch
-                await batch.commit();
-            }
-
-            return chatId;
-            
+            const res = await fetch('/api/chats', { method: 'POST', body: JSON.stringify({ otherUserId }), headers: { 'Content-Type': 'application/json' } });
+            if (!res.ok) throw new Error('Failed to create chat');
+            const data = await res.json();
+            return data.chatId || null;
         } catch (error: any) {
-            console.error("Error creating or finding chat:", error);
-            toast({
-                title: 'Error',
-                description: error.message || 'Could not start the chat. Please try again.',
-                variant: 'destructive',
-            });
+            console.error('Error creating or finding chat:', error);
+            toast({ title: 'Error', description: error.message || 'Could not start the chat. Please try again.', variant: 'destructive' });
             return null;
         } finally {
             setIsCreatingChat(false);

@@ -1,62 +1,15 @@
-'use client';
+// Compatibility shim for legacy Firebase imports.
+// Temporary: provides minimal exports so existing imports don't break the build.
+// NOTE: This does NOT connect to Firebase or emulate realtime behavior.
+// Migrate callers to Prisma/Clerk/S3 and remove this file when ready.
 
-import { initializeApp, getApps, getApp, FirebaseOptions, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+// Intentionally permissive placeholders for `app` and `db` so imports succeed.
+export const app: any = {};
+export const db: any = {};
 
-// --- Client-side Firebase Initialization ---
-
-let firebaseConfig: FirebaseOptions;
-
-// In a deployed App Hosting environment, the config is provided as a JSON string.
-if (process.env.FIREBASE_WEBAPP_CONFIG) {
-  firebaseConfig = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
-} else {
-  // Otherwise, we're in a local environment, so use the .env.local file.
-  firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  };
+// Helper that throws a clear error for operations that require Firebase runtime.
+export function unsupportedFirebaseCall(name = 'Firebase API') {
+  throw new Error(`${name} was called but Firebase has been removed from this build. Migrate this caller to Prisma/Clerk/S3.`);
 }
 
-
-interface FirebaseServices {
-    app: FirebaseApp;
-    db: Firestore;
-    storage: FirebaseStorage;
-}
-
-// Use a global symbol to store the singleton instance to ensure it's unique across reloads in development.
-const FIREBASE_APP_SYMBOL = Symbol.for('firebase.app');
-
-declare global {
-    var __firebase_app__: FirebaseServices | undefined;
-}
-
-function initializeWebApp(): FirebaseServices {
-    if (process.env.NODE_ENV === 'development' && globalThis.__firebase_app__) {
-        return globalThis.__firebase_app__;
-    }
-
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const services: FirebaseServices = {
-        app,
-        db: getFirestore(app),
-        storage: getStorage(app),
-    };
-
-    if (process.env.NODE_ENV === 'development') {
-        globalThis.__firebase_app__ = services;
-    }
-
-    return services;
-}
-
-const { app, db, storage } = initializeWebApp();
-
-// Export client modules
-export { app, db, storage };
+export default { app, db };

@@ -1,27 +1,16 @@
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { adminAuth } from '@/lib/firebase-admin';
 
+// Firebase session creation endpoint replaced by Clerk-managed sessions.
+// Keep a compatible endpoint for clients that expect it; POST is a noop here.
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('Authorization');
-    if (authorization?.startsWith('Bearer ')) {
-      const idToken = authorization.split('Bearer ')[1];
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-
-      if (decodedToken) {
-        const expiresIn = 60 * 60 * 24 * 14 * 1000; // 14 days
-        const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
-        const options = { name: '__session', value: sessionCookie, maxAge: expiresIn, httpOnly: true, secure: true };
-
-        cookies().set(options);
-      }
-    }
+    // Clerk handles sessions separately; nothing to do here.
     return NextResponse.json({ status: 'success' }, { status: 200 });
   } catch (error) {
-    console.error('Session creation failed:', error);
-    return NextResponse.json({ error: 'Failed to create session' }, { status: 401 });
+    console.error('Session creation noop failed:', error);
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
 

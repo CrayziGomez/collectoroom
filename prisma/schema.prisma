@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Prisma models derived from `db/init.sql` (introspected and adjusted)
+
+model User {
+  id             String     @id
+  plan_id        String?    @map("plan_id")
+  card_count     Int        @default(0) @map("card_count")
+  collection_count Int      @default(0) @map("collection_count")
+  is_admin       Boolean    @default(false) @map("is_admin")
+  following_count Int       @default(0) @map("following_count")
+  followers_count Int       @default(0) @map("followers_count")
+  avatar         String?    
+  created_at     DateTime   @default(now()) @map("created_at")
+  updated_at     DateTime   @default(now()) @map("updated_at")
+
+  collections    Collection[]
+  cards          Card[]
+  followerLinks  UserFollow[] @relation("follower")
+  followingLinks UserFollow[] @relation("following")
+
+  @@map("users")
+}
+
+model UserFollow {
+  follower_id  String
+  following_id String
+  followed_at  DateTime  @default(now())
+
+  follower  User @relation("follower", fields: [follower_id], references: [id])
+  following User @relation("following", fields: [following_id], references: [id])
+
+  @@id([follower_id, following_id])
+  @@map("user_follows")
+}
+
+model Category {
+  id         String   @id @default(uuid())
+  name       String
+  description String?
+  icon       String?  @default("Layers3")
+  created_at DateTime @default(now()) @map("created_at")
+
+  collections Collection[]
+  @@map("categories")
+}
+
+model Collection {
+  id             String   @id @default(uuid())
+  user_id        String   @map("user_id")
+  name           String
+  description    String?
+  is_public      Boolean  @default(true) @map("is_public")
+  category_id    String?  @map("category_id")
+  card_count     Int      @default(0) @map("card_count")
+  cover_image    String?  @map("cover_image")
+  cover_image_hint String? @map("cover_image_hint")
+  keywords       String?
+  created_at     DateTime @default(now()) @map("created_at")
+  updated_at     DateTime @default(now()) @map("updated_at")
+
+  user  User @relation(fields: [user_id], references: [id])
+  cards Card[]
+  category Category? @relation(fields: [category_id], references: [id])
+
+  @@map("collections")
+  @@index([user_id], name: "idx_collections_user")
+  @@index([category_id], name: "idx_collections_category")
+}
+
+model Card {
+  id          String   @id @default(uuid())
+  collection_id String @map("collection_id")
+  user_id     String   @map("user_id")
+  title       String
+  description String?
+  status      String?
+  category_id String?  @map("category_id")
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @default(now()) @map("updated_at")
+
+  collection Collection @relation(fields: [collection_id], references: [id])
+  user       User @relation(fields: [user_id], references: [id])
+  images     CardImage[]
+
+  @@map("cards")
+  @@index([collection_id], name: "idx_cards_collection")
+  @@index([user_id], name: "idx_cards_user")
+}
+
+model CardImage {
+  id         String   @id @default(uuid())
+  card_id    String   @map("card_id")
+  url        String
+  path       String
+  hint       String?
+  position   Int      @default(0)
+  created_at DateTime @default(now()) @map("created_at")
+
+  card Card @relation(fields: [card_id], references: [id])
+  @@map("card_images")
+  @@index([card_id], name: "idx_card_images_card")
+}
+
+model SiteContent {
+  id               String   @id @default("content")
+  title            String?
+  subtitle         String?
+  hero_image_url   String?  @map("hero_image_url")
+  hero_image_path  String?  @map("hero_image_path")
+  how_it_works_steps Json   @default("[]")
+  updated_at       DateTime @default(now()) @map("updated_at")
+
+  @@map("site_content")
+}
+
+model Chat {
+  id              String   @id @default(uuid())
+  participant_ids String[] @map("participant_ids")
+  participants    Json?
+  last_message    Json?
+  unread_count    Json?
+  created_at      DateTime @default(now()) @map("created_at")
+  updated_at      DateTime @default(now()) @map("updated_at")
+
+  messages Message[]
+  @@map("chats")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  chat_id    String   @map("chat_id")
+  sender_id  String   @map("sender_id")
+  text       String
+  created_at DateTime @default(now()) @map("created_at")
+
+  chat Chat @relation(fields: [chat_id], references: [id])
+  @@map("messages")
+  @@index([chat_id], name: "idx_messages_chat")
+  @@index([chat_id, created_at], name: "idx_messages_chat_time")
+}
+
+model Notification {
+  id           String   @id @default(uuid())
+  recipient_id String   @map("recipient_id")
+  sender_id    String   @map("sender_id")
+  sender_name  String?  @map("sender_name")
+  type         String
+  message      String?
+  link         String?
+  is_read      Boolean  @default(false) @map("is_read")
+  created_at   DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+  @@index([recipient_id], name: "idx_notifications_recipient")
+  @@index([recipient_id, is_read], name: "idx_notifications_unread")
+}

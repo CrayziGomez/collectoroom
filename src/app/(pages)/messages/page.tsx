@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import type { Chat } from '@/lib/types';
 import { Loader2, MessageSquarePlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -46,22 +44,26 @@ export default function MessagesPage() {
         }
 
         setLoading(true);
-        const chatsQuery = query(
-            collection(db, 'chats'),
-            where('participantIds', 'array-contains', user.uid),
-            orderBy('lastMessage.timestamp', 'desc')
-        );
 
-        const unsubscribe = onSnapshot(chatsQuery, (querySnapshot) => {
-            const chatsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Chat);
-            setChats(chatsData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching chats:", error);
-            setLoading(false);
-        });
+        let mounted = true;
+        const fetchChats = async () => {
+            try {
+                const res = await fetch('/api/chats');
+                if (!res.ok) throw new Error('Failed to load chats');
+                const data = await res.json();
+                if (!mounted) return;
+                setChats(data as Chat[]);
+                setLoading(false);
+            } catch (e) {
+                console.error('Error fetching chats:', e);
+                setLoading(false);
+            }
+        };
 
-        return () => unsubscribe();
+        fetchChats();
+        const handle = window.setInterval(fetchChats, 15000);
+
+        return () => { mounted = false; clearInterval(handle); };
     }, [user, authLoading, router]);
 
     if (authLoading || loading) {

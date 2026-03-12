@@ -1,32 +1,16 @@
 
-'use server';
+"use server";
 
-import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import type { ImageRecord } from '@/lib/types';
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import prisma from '@/lib/prisma';
+import { uploadCardImage, deleteFile } from '@/lib/storage';
 import { getUser } from './user-actions'; // Import the user-actions
 
 async function uploadImage(file: File, userId: string, collectionId: string, cardId: string): Promise<ImageRecord> {
-    const bucket = adminStorage.bucket();
-    const imageFileName = `${uuidv4()}-${file.name}`;
-    const imagePath = `users/${userId}/cards/${cardId}/${imageFileName}`;
-    const fileRef = bucket.file(imagePath);
-    
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
-
-    const [signedUrl] = await fileRef.getSignedUrl({
-      action: 'read',
-      expires: '01-01-2100',
-    });
-
-    return {
-        url: signedUrl,
-        path: imagePath,
-        hint: 'custom upload'
-    };
+    const res = await uploadCardImage(file, userId, collectionId, cardId);
+    return { url: res.url, path: res.path, hint: 's3' } as ImageRecord;
 }
 
 export async function createCard(formData: FormData) {
@@ -57,47 +41,48 @@ export async function createCard(formData: FormData) {
             };
         }
 
-        const cardId = adminDb.collection('cards').doc().id;
-        
+        const cardId = uuidv4();
+
         imageRecords = await Promise.all(
             images.map(image => uploadImage(image, userId, collectionId, cardId))
         );
 
-        const cardRef = adminDb.collection('cards').doc(cardId);
-        const collectionRef = adminDb.collection('collections').doc(collectionId);
-        const userRef = adminDb.collection('users').doc(userId);
+        // Use a Prisma transaction to create card, images, and update counts
+        await prisma.$transaction(async (tx) => {
+            const collection = await tx.collection.findUnique({ where: { id: collectionId } });
+            if (!collection) throw new Error('Collection not found. Cannot add card.');
 
-        await adminDb.runTransaction(async (transaction) => {
-            const collectionDoc = await transaction.get(collectionRef);
-            if (!collectionDoc.exists) {
-                throw new Error("Collection not found. Cannot add card.");
-            }
+            const isFirstCard = (collection.card_count || 0) === 0;
 
-            const collectionData = collectionDoc.data();
-            const isFirstCard = (collectionData?.cardCount || 0) === 0;
-
-            transaction.set(cardRef, {
-                userId,
-                collectionId,
-                title,
-                description,
-                status,
-                category,
-                images: imageRecords,
-                createdAt: FieldValue.serverTimestamp(),
+            await tx.card.create({
+                data: {
+                    id: cardId,
+                    collection_id: collectionId,
+                    user_id: userId,
+                    title,
+                    description,
+                    status,
+                    category_id: category,
+                },
             });
-            
-            const collectionUpdate: { [key: string]: any } = { 
-                cardCount: FieldValue.increment(1) 
-            };
 
+            await Promise.all(imageRecords.map(rec => tx.cardImage.create({ data: {
+                id: uuidv4(),
+                card_id: cardId,
+                url: rec.url,
+                path: rec.path,
+                hint: rec.hint,
+                position: 0,
+            }})));
+
+            const collectionUpdate: any = { card_count: { increment: 1 } };
             if (isFirstCard && imageRecords.length > 0) {
-                collectionUpdate.coverImage = imageRecords[0].url;
-                collectionUpdate.coverImageHint = imageRecords[0].hint;
+                collectionUpdate.cover_image = imageRecords[0].url;
+                collectionUpdate.cover_image_hint = imageRecords[0].hint;
             }
 
-            transaction.update(collectionRef, collectionUpdate);
-            transaction.update(userRef, { cardCount: FieldValue.increment(1) });
+            await tx.collection.update({ where: { id: collectionId }, data: collectionUpdate });
+            await tx.user.update({ where: { id: userId }, data: { card_count: { increment: 1 } } });
         });
 
         revalidatePath(`/collections/${collectionId}`);
@@ -109,8 +94,7 @@ export async function createCard(formData: FormData) {
         console.error('Error creating card:', error);
         
         if (imageRecords.length > 0) {
-            const bucket = adminStorage.bucket();
-            await Promise.all(imageRecords.map(record => bucket.file(record.path).delete({ ignoreNotFound: true })));
+            await Promise.all(imageRecords.map(record => deleteFile(record.path).catch(() => {})));
         }
 
         return { success: false, message: error.message || 'An unknown error occurred while creating the card.' };
@@ -133,34 +117,29 @@ export async function updateCard(formData: FormData) {
     }
 
     try {
-        const cardRef = adminDb.collection('cards').doc(cardId);
-        const cardDoc = await cardRef.get();
-        const cardData = cardDoc.data();
+        const card = await prisma.card.findUnique({ where: { id: cardId }, include: { images: true } });
+        if (!card) throw new Error('Card not found.');
 
-        if (!cardDoc.exists) {
-            throw new Error("Card not found.");
-        }
-        
-        const originalImages: ImageRecord[] = cardData?.images || [];
-        const imagesToDelete = originalImages.filter(origImg => 
-            !existingImages.some(existImg => existImg.path === origImg.path)
-        );
+        const originalImages = card.images || [];
+        const imagesToDelete = originalImages.filter(origImg => !existingImages.some(existImg => existImg.path === origImg.path));
 
-        const bucket = adminStorage.bucket();
-        await Promise.all(imagesToDelete.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
-        
-        const newImageRecords = await Promise.all(
-            newImages.map(image => uploadImage(image, userId, collectionId, cardId))
-        );
+        // delete files
+        await Promise.all(imagesToDelete.map(img => deleteFile(img.path)));
 
-        const finalImages = [...existingImages, ...newImageRecords];
+        const newImageRecords = await Promise.all(newImages.map(image => uploadImage(image, userId, collectionId, cardId)));
 
-        await cardRef.update({
-            title,
-            description,
-            status,
-            category,
-            images: finalImages,
+        // Insert new images and remove deleted images from DB
+        await prisma.$transaction(async (tx) => {
+            if (imagesToDelete.length > 0) {
+                const idsToDelete = imagesToDelete.map(i => i.id);
+                await tx.cardImage.deleteMany({ where: { id: { in: idsToDelete } } });
+            }
+
+            await Promise.all(newImageRecords.map(rec => tx.cardImage.create({ data: {
+                id: uuidv4(), card_id: cardId, url: rec.url, path: rec.path, hint: rec.hint, position: 0
+            }})));
+
+            await tx.card.update({ where: { id: cardId }, data: { title, description, status, category_id: category } });
         });
 
         revalidatePath(`/collections/${collectionId}`);
@@ -183,24 +162,16 @@ export async function deleteCard(input: { cardId: string, collectionId: string, 
     }
 
     try {
-        const cardRef = adminDb.collection('cards').doc(cardId);
-        const collectionRef = adminDb.collection('collections').doc(collectionId);
-        const userRef = adminDb.collection('users').doc(userId);
-
-        const bucket = adminStorage.bucket();
+        // delete files from storage
         if (images && images.length > 0) {
-            await Promise.all(images.map(image => bucket.file(image.path).delete({ ignoreNotFound: true })));
+            await Promise.all(images.map(image => deleteFile(image.path)));
         }
 
-        await adminDb.runTransaction(async (transaction) => {
-            const collectionDoc = await transaction.get(collectionRef);
-            if (collectionDoc.exists) {
-                 transaction.update(collectionRef, { cardCount: FieldValue.increment(-1) });
-            }
-            
-            // Also decrement the user's card count
-            transaction.update(userRef, { cardCount: FieldValue.increment(-1) });
-            transaction.delete(cardRef);
+        // remove card and decrement counts
+        await prisma.$transaction(async (tx) => {
+            await tx.card.delete({ where: { id: cardId } });
+            await tx.collection.updateMany({ where: { id: collectionId }, data: { card_count: { decrement: 1 } } });
+            await tx.user.updateMany({ where: { id: userId }, data: { card_count: { decrement: 1 } } });
         });
 
         revalidatePath(`/collections/${collectionId}`);

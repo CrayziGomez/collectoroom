@@ -1,152 +1,87 @@
 
-'use client';
+"use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { onIdTokenChanged, User as FirebaseUser, getAuth } from 'firebase/auth';
-import { db, app } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser } from '@clerk/nextjs';
 import type { User as AppUser } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
-interface EnrichedFirebaseUser extends FirebaseUser {
-    isAdmin?: boolean;
-}
-
-interface AppUserWithFirebase extends AppUser {
-    firebaseUser: EnrichedFirebaseUser | null;
-}
-
 interface AuthContextType {
-  user: AppUserWithFirebase | null;
+  user: AppUser | null;
   loading: boolean;
-  updateUser: (data: Partial<AppUser>) => void;
+  updateUser: (data: Partial<AppUser>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({ 
-    user: null, 
-    loading: true,
-    updateUser: () => {}
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  updateUser: async () => {}
 });
 
-async function createUserDocument(user: FirebaseUser): Promise<AppUser> {
-    const userDocRef = doc(db, 'users', user.uid);
-    const docSnap = await getDoc(userDocRef);
-
-    if (docSnap.exists()) {
-        const existingData = docSnap.data() as AppUser;
-        if (user.photoURL && existingData.avatarUrl !== user.photoURL) {
-            try {
-                await updateDoc(userDocRef, { avatarUrl: user.photoURL });
-                return { ...existingData, avatarUrl: user.photoURL };
-            } catch (error) {
-                console.error("Error syncing avatar on login:", error);
-                return existingData;
-            }
-        }
-        return existingData;
-    } else {
-        const username = sessionStorage.getItem('pendingUsername') || user.email?.split('@')[0] || 'New User';
-        const tier = sessionStorage.getItem('pendingTier') || 'Hobbyist';
-        const isAdmin = user.email === 'admin@collectoroom.com';
-
-        const newUser: AppUser = {
-            uid: user.uid,
-            id: user.uid,
-            email: user.email || '',
-            username: username,
-            tier: isAdmin ? 'Curator' : (tier as AppUser['tier']),
-            isAdmin: isAdmin,
-            followerCount: 0,
-            followingCount: 0,
-            avatarUrl: user.photoURL || '',
-        };
-        
-        try {
-            await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
-        } catch (error) {
-            console.error("Error creating user document:", error);
-            throw new Error("Failed to create user profile.");
-        } finally {
-            sessionStorage.removeItem('pendingUsername');
-            sessionStorage.removeItem('pendingTier');
-        }
-        return newUser;
-    }
-}
-
 export const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<AppUserWithFirebase | null>(null);
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const updateUser = useCallback((data: Partial<AppUser>) => {
-    setUser(currentUser => {
-        if (!currentUser) return null;
-        return { ...currentUser, ...data };
-    });
-  }, []);
-
   useEffect(() => {
-    const auth = getAuth(app);
-    let unsubscribeDoc: (() => void) | undefined;
-
-    const unsubscribeAuth = onIdTokenChanged(auth, async (firebaseUser) => {
+    const syncUser = async () => {
       setLoading(true);
-      if (unsubscribeDoc) unsubscribeDoc();
+      if (!isLoaded) {
+        console.debug('AuthContext: Clerk not loaded yet', { isLoaded, isSignedIn });
+        setLoading(false);
+        return;
+      }
 
-      if (firebaseUser) {
-        try{
-            const idTokenResult = await firebaseUser.getIdTokenResult();
-            const appUser = await createUserDocument(firebaseUser);
-            const isAdmin = idTokenResult.claims.isAdmin === true;
-            setUser({ ...appUser, isAdmin, firebaseUser});
+      if (isSignedIn && clerkUser) {
+        const mapped: AppUser = {
+          id: clerkUser.id,
+          uid: clerkUser.id,
+          email: clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '',
+          username: (clerkUser.username as string) || clerkUser.firstName || clerkUser.fullName || '',
+          tier: 'Hobbyist',
+          isAdmin: false,
+          followerCount: 0,
+          followingCount: 0,
+          avatarUrl: clerkUser.profileImageUrl || ''
+        };
 
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const updatedUser = { uid: docSnap.id, ...docSnap.data() } as AppUser;
-                    setUser(currentUser => currentUser ? { ...currentUser, ...updatedUser, isAdmin } : null);
-                }
-            });
+        setUser(mapped);
 
-            if (isAdmin) {
-                router.push('/admin');
-            } else {
-                router.push('/my-collectoroom');
-            }
-        } catch (error: any) {
-            if (error.code === 'auth/id-token-revoked') {
-                // Token has been revoked, force a refresh.
-                await firebaseUser.getIdToken(true);
-            } else {
-                console.error("Auth context error:", error);
-                setUser(null);
-            }
-        } finally {
-            setLoading(false);
+        // optional: fetch application profile from backend
+        try {
+          const res = await fetch(`/api/users/${clerkUser.id}`);
+          if (res.ok) {
+            const json = await res.json();
+            setUser(prev => ({ ...(prev || {}), ...json } as AppUser));
+            if (json.isAdmin) router.push('/admin');
+            else router.push('/my-collectoroom');
+          }
+        } catch (e) {
+          // ignore - backend may not exist yet
         }
-
       } else {
         setUser(null);
-        setLoading(false);
-        try {
-          await fetch('/api/auth', { method: 'DELETE' });
-        } catch (error) {
-          console.error('Failed to clear session:', error);
-        }
       }
-    });
-
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeDoc) unsubscribeDoc();
+      setLoading(false);
     };
-  }, [router]);
 
-  const contextValue = { user, loading, updateUser };
+    syncUser();
+  }, [isLoaded, isSignedIn, clerkUser, router]);
+
+  const updateUser = useCallback(async (data: Partial<AppUser>) => {
+    setUser(current => current ? { ...current, ...data } : current);
+    try {
+      if (user?.id) {
+        await fetch(`/api/users/${user.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [user]);
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider value={{ user, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

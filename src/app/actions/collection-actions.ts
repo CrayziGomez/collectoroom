@@ -1,8 +1,7 @@
-'use server';
-import { FieldValue } from 'firebase-admin/firestore';
+"use server";
 import { revalidatePath } from 'next/cache';
-import { adminDb } from '@/lib/firebase-admin';
-import { getUser } from './user-actions'; // Import the user-actions
+import prisma from '@/lib/prisma';
+import { getUser } from './user-actions';
 
 export async function createCollection(formData: FormData) {
     const name = formData.get('name') as string;
@@ -27,27 +26,29 @@ export async function createCollection(formData: FormData) {
             };
         }
 
-        const collectionRef = adminDb.collection('collections').doc();
-        const userRef = adminDb.collection('users').doc(userId);
-
-        // Use a transaction to ensure atomic update
-        await adminDb.runTransaction(async (transaction) => {
-            transaction.set(collectionRef, {
-                name,
-                userId,
-                category,
-                cardCount: 0,
-                coverImage: '', // Default cover image
-                createdAt: FieldValue.serverTimestamp(),
+        // Use a Prisma transaction to create collection and increment user's count
+        const created = await prisma.$transaction(async (tx) => {
+            const col = await tx.collection.create({
+                data: {
+                    name,
+                    user_id: userId,
+                    category_id: category,
+                    card_count: 0,
+                    cover_image: '',
+                },
             });
 
-            // Atomically increment the user's collection count
-            transaction.update(userRef, { collectionCount: FieldValue.increment(1) });
+            await tx.user.update({
+                where: { id: userId },
+                data: { collection_count: { increment: 1 } },
+            });
+
+            return col;
         });
 
-        revalidatePath('/'); // Revalidate the home page to show the new collection
+        revalidatePath('/');
 
-        return { success: true, collectionId: collectionRef.id };
+        return { success: true, collectionId: created.id };
 
     } catch (error: any) {
         console.error('Error creating collection:', error);

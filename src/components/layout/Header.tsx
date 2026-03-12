@@ -4,9 +4,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { useUser } from '@clerk/nextjs'; 
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { useUser } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/badge';
 import { usePathname } from 'next/navigation';
@@ -34,50 +32,27 @@ export function Header() {
   }, [pathname]);
 
   useEffect(() => {
-    if (!isLoaded || !user) {
-      setUnreadChatsCount(0);
-      setUnreadNotificationsCount(0);
-      return;
+    let mounted = true;
+    let handle: number | undefined;
+
+    async function fetchCounts() {
+      if (!user || !isLoaded) return;
+      try {
+        const res = await fetch('/api/notifications/counts');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        setUnreadChatsCount(data.unreadChats || 0);
+        setUnreadNotificationsCount(data.unreadNotifications || 0);
+      } catch (e) {
+        console.error('Error fetching notification counts', e);
+      }
     }
 
-    let unsubscribeChats: Unsubscribe | undefined;
-    let unsubscribeNotifications: Unsubscribe | undefined;
+    fetchCounts();
+    handle = window.setInterval(fetchCounts, 15000);
 
-    try {
-      const chatsQuery = query(
-        collection(db, 'chats'),
-        where('participantIds', 'array-contains', user.id),
-        where(`unreadCount.${user.id}`, '>', 0)
-      );
-      unsubscribeChats = onSnapshot(chatsQuery, (querySnapshot) => {
-        setUnreadChatsCount(querySnapshot.size);
-      }, (error) => {
-        console.error("Error fetching unread chats count:", error);
-      });
-      
-      const notificationsQuery = query(
-        collection(db, 'notifications'),
-        where('recipientId', '==', user.id),
-        where('isRead', '==', false)
-      );
-      unsubscribeNotifications = onSnapshot(notificationsQuery, (querySnapshot) => {
-        setUnreadNotificationsCount(querySnapshot.size);
-      }, (error) => {
-        console.error("Error fetching unread notifications count:", error);
-      });
-
-    } catch (error) {
-      console.error("Error setting up listeners:", error);
-    }
-
-    return () => {
-        if (unsubscribeChats) {
-            unsubscribeChats();
-        }
-        if (unsubscribeNotifications) {
-            unsubscribeNotifications();
-        }
-    };
+    return () => { mounted = false; if (handle) clearInterval(handle); };
   }, [user, isLoaded]);
   
   const totalUnread = unreadChatsCount + unreadNotificationsCount;

@@ -1,9 +1,9 @@
 
-'use server';
+"use server";
 
-import { adminDb } from '@/lib/firebase-admin';
+import prisma from '@/lib/prisma';
 import { User } from '@/lib/types';
-import { FieldValue } from 'firebase-admin/firestore';
+import { clerkClient } from '@clerk/nextjs/server';
 
 
 const FREE_PLAN = {
@@ -23,11 +23,9 @@ const PRO_PLAN = {
 // Gets a user's data, merging from Clerk and Firestore
 export async function getUser(userId: string): Promise<User | null> {
     try {
-        const { clerkClient } = await import('@clerk/nextjs/server');
-
-        const [clerkUser, userDoc] = await Promise.all([
+        const [clerkUser, userRecord] = await Promise.all([
             clerkClient.users.getUser(userId),
-            adminDb.collection('users').doc(userId).get(),
+            prisma.user.findUnique({ where: { id: userId } }),
         ]);
 
         if (!clerkUser) return null;
@@ -37,21 +35,17 @@ export async function getUser(userId: string): Promise<User | null> {
             email: clerkUser.emailAddresses[0]?.emailAddress || 'No email',
             username: clerkUser.username || 'User',
             avatar: clerkUser.imageUrl,
-            planId: FREE_PLAN.planId, // Default to free plan
+            planId: FREE_PLAN.planId,
             cardCount: 0,
             collectionCount: 0,
             plan: FREE_PLAN,
         };
 
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            user.planId = userData?.planId || FREE_PLAN.planId;
-            user.cardCount = userData?.cardCount || 0;
-            user.collectionCount = userData?.collectionCount || 0;
-
-            if (user.planId === PRO_PLAN.planId) {
-                user.plan = PRO_PLAN;
-            }
+        if (userRecord) {
+            user.planId = userRecord.plan_id || FREE_PLAN.planId;
+            user.cardCount = userRecord.card_count || 0;
+            user.collectionCount = userRecord.collection_count || 0;
+            if (user.planId === PRO_PLAN.planId) user.plan = PRO_PLAN;
         }
 
         return user;
@@ -65,7 +59,6 @@ export async function getUser(userId: string): Promise<User | null> {
 // Updates a user's username
 export async function updateUsername(userId: string, username: string) {
     try {
-        const { clerkClient } = await import('@clerk/nextjs/server');
         await clerkClient.users.updateUser(userId, { username });
         return { success: true };
     } catch (error: any) {
@@ -76,9 +69,8 @@ export async function updateUsername(userId: string, username: string) {
 
 export async function deleteUser(userId: string) {
     try {
-        const { clerkClient } = await import('@clerk/nextjs/server');
         await clerkClient.users.deleteUser(userId);
-        await adminDb.collection('users').doc(userId).delete();
+        await prisma.user.deleteMany({ where: { id: userId } });
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting user:', error);
@@ -87,26 +79,24 @@ export async function deleteUser(userId: string) {
 }
 
 export async function toggleFollow({ targetUserId, currentUserId }: { targetUserId: string; currentUserId: string }) {
-    const currentUserRef = adminDb.collection('users').doc(currentUserId);
-    const targetUserRef = adminDb.collection('users').doc(targetUserId);
-    const followingRef = currentUserRef.collection('following').doc(targetUserId);
-
     try {
-        const isFollowing = (await followingRef.get()).exists;
+        const existing = await prisma.userFollow.findUnique({ where: { follower_id_following_id: { follower_id: currentUserId, following_id: targetUserId } } });
 
-        if (isFollowing) {
-            await followingRef.delete();
-            await targetUserRef.collection('followers').doc(currentUserId).delete();
-            await currentUserRef.update({ followingCount: FieldValue.increment(-1) });
-            await targetUserRef.update({ followersCount: FieldValue.increment(-1) });
+        if (existing) {
+            await prisma.$transaction(async (tx) => {
+                await tx.userFollow.delete({ where: { follower_id_following_id: { follower_id: currentUserId, following_id: targetUserId } } });
+                await tx.user.updateMany({ where: { id: currentUserId }, data: { following_count: { decrement: 1 } } });
+                await tx.user.updateMany({ where: { id: targetUserId }, data: { followers_count: { decrement: 1 } } });
+            });
+            return { success: true, isFollowing: false };
         } else {
-            await followingRef.set({ followedAt: FieldValue.serverTimestamp() });
-            await targetUserRef.collection('followers').doc(currentUserId).set({ followedAt: FieldValue.serverTimestamp() });
-            await currentUserRef.update({ followingCount: FieldValue.increment(1) });
-            await targetUserRef.update({ followersCount: FieldValue.increment(1) });
+            await prisma.$transaction(async (tx) => {
+                await tx.userFollow.create({ data: { follower_id: currentUserId, following_id: targetUserId } });
+                await tx.user.updateMany({ where: { id: currentUserId }, data: { following_count: { increment: 1 } } });
+                await tx.user.updateMany({ where: { id: targetUserId }, data: { followers_count: { increment: 1 } } });
+            });
+            return { success: true, isFollowing: true };
         }
-
-        return { success: true, isFollowing: !isFollowing };
     } catch (error: any) {
         console.error('Error toggling follow:', error);
         return { success: false, message: error.message || 'An unknown error occurred.' };
@@ -115,9 +105,8 @@ export async function toggleFollow({ targetUserId, currentUserId }: { targetUser
 
 export async function updateAvatar(userId: string, avatarUrl: string) {
     try {
-        const { clerkClient } = await import('@clerk/nextjs/server');
         await clerkClient.users.updateUser(userId, { imageUrl: avatarUrl });
-        await adminDb.collection('users').doc(userId).update({ avatar: avatarUrl });
+        await prisma.user.updateMany({ where: { id: userId }, data: { avatar: avatarUrl } });
         return { success: true };
     } catch (error: any) {
         console.error('Error updating avatar:', error);

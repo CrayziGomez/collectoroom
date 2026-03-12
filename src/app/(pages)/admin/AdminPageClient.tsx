@@ -19,7 +19,21 @@ const AdminPageClient = () => {
   }, [user, loading, router]);
 
   if (loading || !user) {
-    return <div className="flex justify-center items-center h-screen"><Spinner /></div>;
+    // Show spinner and helpful debug info to diagnose why auth/profile isn't resolving
+    return (
+      <div className="flex flex-col justify-center items-center h-screen gap-4">
+        <div className="flex items-center">
+          <Spinner />
+        </div>
+        <div className="text-sm text-muted-foreground max-w-xl text-center px-4">
+          Loading user profile — if this takes long, check Network → <code>/api/users/&lt;id&gt;</code> and Clerk authentication state in the console.
+        </div>
+        <details className="text-xs text-muted-foreground max-w-xl p-2">
+          <summary className="cursor-pointer">Debug: auth state</summary>
+          <pre className="text-xs max-h-48 overflow-auto">{JSON.stringify({ loading, user }, null, 2)}</pre>
+        </details>
+      </div>
+    );
   }
 
   if (user.isAdmin) {

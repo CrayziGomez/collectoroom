@@ -1,11 +1,9 @@
 
-'use client';
+"use client";
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import type { Chat, Message, User } from '@/lib/types';
 import { Loader2, Send, ArrowLeft } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -37,20 +35,20 @@ export default function ChatPage() {
         scrollToBottom();
     }, [messages]);
 
-     useEffect(() => {
-        if (authLoading || !user) return;
-        if (!chatId || !chat) return;
+        useEffect(() => {
+                if (authLoading || !user) return;
+                if (!chatId || !chat) return;
 
-        // Reset unread count for the current user when they enter the chat.
-        const chatRef = doc(db, 'chats', chatId);
-        const unreadPath = `unreadCount.${user.uid}`;
+                // Reset unread count for the current user when they enter the chat via server endpoint
+                (async () => {
+                    try {
+                        await fetch(`/api/chats/${chatId}?reset=true`);
+                    } catch (e) {
+                        console.error('Failed to reset unread count', e);
+                    }
+                })();
 
-        // We check if the field exists before updating
-        if (chat.unreadCount && chat.unreadCount[user.uid] > 0) {
-            updateDoc(chatRef, { [unreadPath]: 0 });
-        }
-
-    }, [chatId, user, authLoading, chat]);
+        }, [chatId, user, authLoading, chat]);
 
 
     useEffect(() => {
@@ -61,44 +59,33 @@ export default function ChatPage() {
         if (!chatId) return;
 
         setLoading(true);
+        let mounted = true;
 
-        const chatRef = doc(db, 'chats', chatId);
-        const unsubscribeChat = onSnapshot(chatRef, async (docSnap) => {
-            if (docSnap.exists()) {
-                const chatData = { id: docSnap.id, ...docSnap.data() } as Chat;
-                
-                if (!chatData.participantIds.includes(user.uid)) {
-                    router.push('/messages');
-                    return;
-                }
-                
-                setChat(chatData);
-                const otherId = chatData.participantIds.find(id => id !== user.uid);
-                if (otherId && chatData.participants) {
-                    setOtherParticipant(chatData.participants[otherId]);
-                }
-
-            } else {
-                // It might just be creating, so we don't redirect immediately.
-                // We let the messages query handle the final loading state.
-                console.log("Chat document not found, waiting...");
+        const fetchChat = async () => {
+          try {
+            const res = await fetch(`/api/chats/${chatId}`);
+            if (!res.ok) throw new Error('Failed to load chat');
+            const data = await res.json();
+            if (!mounted) return;
+            if (!data.participantIds || !data.participantIds.includes(user.uid)) {
+              router.push('/messages');
+              return;
             }
-        });
-
-        const messagesQuery = query(collection(db, 'chats', chatId, 'messages'), orderBy('timestamp', 'asc'));
-        const unsubscribeMessages = onSnapshot(messagesQuery, (querySnapshot) => {
-            const messagesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Message);
-            setMessages(messagesData);
-            setLoading(false); // Set loading to false once we have messages (or an empty list)
-        }, (error) => {
-            console.error("Error fetching messages:", error);
+            setChat({ id: data.id, participantIds: data.participantIds, participants: data.participants, lastMessage: data.lastMessage, unreadCount: data.unreadCount } as Chat);
+            const otherId = data.participantIds.find((id: string) => id !== user.uid);
+            if (otherId && data.participants) setOtherParticipant(data.participants[otherId]);
+            setMessages((data.messages || []).map((m: any) => ({ id: m.id, chatId: m.chatId, senderId: m.senderId, text: m.text, timestamp: m.timestamp })) as Message[]);
             setLoading(false);
-        });
-
-        return () => {
-            unsubscribeChat();
-            unsubscribeMessages();
+          } catch (e) {
+            console.error('Error fetching chat/messages:', e);
+            setLoading(false);
+          }
         };
+
+        fetchChat();
+        const handle = window.setInterval(fetchChat, 3000);
+
+        return () => { mounted = false; clearInterval(handle); };
 
     }, [chatId, user, authLoading, router]);
 
@@ -111,28 +98,12 @@ export default function ChatPage() {
 
         setIsSending(true);
         try {
-            const messagesColRef = collection(db, 'chats', chat.id, 'messages');
-            await addDoc(messagesColRef, {
-                chatId: chat.id,
-                senderId: user.uid,
-                text: newMessage,
-                timestamp: serverTimestamp(),
-            });
-
-            const chatDocRef = doc(db, 'chats', chat.id);
-            // Update last message and increment unread count for the other user
-            await updateDoc(chatDocRef, {
-                lastMessage: {
-                    text: newMessage,
-                    timestamp: serverTimestamp(),
-                },
-                [`unreadCount.${otherId}`]: increment(1),
-            });
-
-
+            const res = await fetch(`/api/chats/${chat.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: newMessage }) });
+            if (!res.ok) throw new Error('Failed to send message');
+            const json = await res.json();
             setNewMessage('');
         } catch (error) {
-            console.error("Error sending message:", error);
+            console.error('Error sending message:', error);
         } finally {
             setIsSending(false);
         }

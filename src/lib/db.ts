@@ -6,72 +6,46 @@
  * making it easy to swap implementations if needed.
  */
 
-import { Pool, PoolClient } from 'pg';
+import prisma from './prisma';
 
-// Singleton pool instance
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-
-    pool.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+/**
+ * Query helper using Prisma's raw query API.
+ * Note: This keeps the old `query(text, params)` signature for compatibility,
+ * but uses simple parameter escaping for substitution. For new code prefer
+ * using the generated Prisma client methods (e.g. `prisma.user.findMany`).
+ */
+export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
+  let sql = text;
+  if (params && params.length) {
+    // Basic escaping for strings; not intended for untrusted SQL construction.
+    params.forEach((p, i) => {
+      const idx = `$${i + 1}`;
+      const val = p === null || p === undefined ? 'NULL' : (typeof p === 'string' ? `'${String(p).replace(/'/g, "''")}'` : JSON.stringify(p));
+      sql = sql.split(idx).join(val);
     });
   }
-  return pool;
+
+  // Use Prisma's unsafe raw API to run the final SQL string.
+  // Prefer `prisma.$queryRaw` with template literals in new code.
+  // @ts-ignore
+  const res = await prisma.$queryRawUnsafe(sql);
+  return res as T[];
 }
 
 /**
- * Execute a query with automatic connection handling
+ * Return single row or null
  */
-export async function query<T = any>(
-  text: string,
-  params?: any[]
-): Promise<T[]> {
-  const client = await getPool().connect();
-  try {
-    const result = await client.query(text, params);
-    return result.rows as T[];
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Execute a query and return single row or null
- */
-export async function queryOne<T = any>(
-  text: string,
-  params?: any[]
-): Promise<T | null> {
+export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
   const rows = await query<T>(text, params);
-  return rows[0] || null;
+  return rows[0] ?? null;
 }
 
 /**
- * Execute a transaction with automatic rollback on error
+ * Transaction helper using `prisma.$transaction`.
+ * The callback receives a transactional Prisma client.
  */
-export async function transaction<T>(
-  callback: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await getPool().connect();
-  try {
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+export async function transaction<T>(callback: (tx: typeof prisma) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => callback(tx as typeof prisma));
 }
 
 /**

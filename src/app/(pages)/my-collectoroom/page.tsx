@@ -19,8 +19,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+// Collections are now fetched from the Prisma-backed API
 import type { Collection } from '@/lib/types';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -61,18 +60,23 @@ export default function MyCollectoRoomPage() {
     }
 
     setCollectionsLoading(true);
-    const q = query(collection(db, 'collections'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const collectionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Collection);
-      setUserCollections(collectionsData);
-      setCollectionsLoading(false);
-    }, (error) => {
-        console.error("Error fetching collections:", error);
+    fetch('/api/collections/my')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch collections');
+        return res.json();
+      })
+      .then((data: Collection[]) => {
+        setUserCollections(data || []);
         setCollectionsLoading(false);
-    });
+      })
+      .catch((err) => {
+        console.error('Error fetching collections:', err);
+        setCollectionsLoading(false);
+      });
 
-    return () => unsubscribe();
+    return () => {
+      /* no-op cleanup for fetch */
+    };
   }, [user, authLoading, router]);
   
   const handleShare = (collectionId: string) => {
