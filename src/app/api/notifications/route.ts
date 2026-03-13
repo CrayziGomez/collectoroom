@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return NextResponse.json([], { status: 200 });
 
     const notifications = await prisma.notification.findMany({ where: { recipient_id: userId }, orderBy: { created_at: 'desc' } });

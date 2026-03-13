@@ -1,26 +1,43 @@
 import GalleryClient from './GalleryClient';
 import prisma from '@/lib/prisma';
+import { clerkClient } from '@clerk/nextjs/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function GalleryContent() {
-  // Fetch public collections and categories server-side using Prisma
   const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
 
   const collections = await prisma.collection.findMany({
     where: { is_public: true },
     orderBy: { created_at: 'desc' },
-    include: { user: true },
+    include: { user: true, category: true },
   });
 
-  // Build owners map (username may not be stored locally; use id as placeholder)
+  // Batch-fetch Clerk usernames for all unique owners
+  const ownerIds = [...new Set(collections.map(c => c.user_id))];
+  const clerkUsers: Record<string, string> = {};
+  if (ownerIds.length > 0) {
+    try {
+      const client = await clerkClient();
+      await Promise.all(
+        ownerIds.map(async (id) => {
+          const u = await client.users.getUser(id).catch(() => null);
+          clerkUsers[id] = u?.username || u?.firstName || u?.fullName || id;
+        })
+      );
+    } catch {}
+  }
+
   const owners: Record<string, any> = {};
   collections.forEach((c) => {
-    if (c.user) owners[c.user.id] = { id: c.user.id, username: c.user.username ?? c.user.id, avatar: c.user.avatar };
+    owners[c.user_id] = {
+      id: c.user_id,
+      username: clerkUsers[c.user_id] ?? c.user_id,
+      avatar: c.user?.avatar ?? '',
+    };
   });
 
-  // Normalize collections to client-friendly shape
-  const normalized = collections.map((c: any) => ({
+  const normalized = collections.map((c) => ({
     id: c.id,
     name: c.name,
     description: c.description,
@@ -29,7 +46,7 @@ export default async function GalleryContent() {
     isPublic: c.is_public,
     userId: c.user_id,
     cardCount: c.card_count || 0,
-    category: c.category_id,
+    category: c.category?.name ?? '',
     keywords: c.keywords ? (Array.isArray(c.keywords) ? c.keywords : [c.keywords]) : [],
   }));
 

@@ -1,147 +1,143 @@
-# CollectoRoom - Your Digital Collection Space
+# CollectoRoom
 
-This document outlines the key phases required to set up, enhance, and deploy your CollectoRoom application.
-
----
-
-## Phase 1: Initial Setup & Database Configuration
-
-This phase ensures your local development environment is running correctly.
-
-### 1.1: Environment Variables & Service Account
-
-For local development, the application requires two credential files.
-
-**1. Create your Client-Side Configuration (`.env.local`)**
-
-- **Objective:** Provide your Next.js application with the public-facing Firebase configuration.
-- **Action:**
-  - In the root of your project, create a file named `.env.local`.
-  - Add your Firebase project's **client-side configuration** to this file. Find these values in your Firebase project settings under "Your apps".
-
-  - Your final `.env.local` file should look like this:
-
-    ```env
-    # Client-side configuration
-    NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_API_KEY"
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID="YOUR_PROJECT_ID"
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
-    NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"
-    ```
-
-**2. Create your Server-Side Configuration (`serviceAccountKey.json`)**
-
-- **Objective:** Securely provide server-side credentials for the Firebase Admin SDK during local development.
-- **Action:**
-  - Go to your Firebase Project Settings -> Service accounts.
-  - Click "Generate new private key" to download your service account JSON file.
-  - Rename the downloaded file to `serviceAccountKey.json`.
-  - Place this file in the **root directory** of your project.
-  - The `.gitignore` file is already configured to prevent this file from being committed to your repository.
-
-### 1.2: Install Dependencies
-- **Objective:** Install all the necessary Node.js packages.
-- **Action:**
-  - Open your terminal and run `npm install`.
-
-### 1.3: Run the Development Server
-- **Objective:** Start the local Next.js server to view your application.
-- **Action:**
-  - Run `npm run dev`.
-  - Open your browser to `http://localhost:3000`.
-
-### 1.4: Create Firestore Indexes
-- **Objective:** Create the necessary composite indexes in Firestore to enable complex queries for chats and notifications, preventing app crashes for logged-in users.
-- **Action:**
-  - While logged into the app locally, check your Next.js terminal for `FirebaseError` messages containing links to create indexes.
-  - Click on each unique link to open the Firebase Console with the index fields pre-filled.
-  - Click "Create" for each one. The indexes may take a few minutes to build.
-  - **Note:** The key index files are `src/components/layout/Header.tsx` and `src/app/(pages)/messages/page.tsx`, which contain comments with these links.
+A digital collection management platform. Create cards for collectible items, organise them into collections, share publicly in a gallery, and connect with other collectors.
 
 ---
 
-## Phase 2: Firebase Storage, Permissions & Feature Enhancement
+## Stack
 
-This phase integrates Firebase Storage, ensures the correct permissions are set, and enables file uploads.
-
-### 2.1: Enable Firebase Storage
-- **Objective:** Activate the Storage service in your Firebase project.
-- **Action:**
-  - Go to the [Firebase Console](https://console.firebase.google.com/).
-  - Select your project.
-  - In the left-hand menu, go to **Build > Storage**.
-  - Click "Get started" and follow the prompts to enable it. You can use the default security rules for now, as we will override them.
-
-### 2.2: Grant Required IAM Roles
-- **Objective:** Grant the necessary permissions to your service account so the backend can access Firebase services.
-- **Action:**
-  - Run the following command in your terminal. This grants the Admin SDK the roles it needs to manage users, data, and files.
-  ```bash
-  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/firebase.admin"
-  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/iam.serviceAccountTokenCreator"
-  gcloud projects add-iam-policy-binding collectoroom-proj-we4 --member="serviceAccount:firebase-adminsdk-fbsvc@collectoroom-proj-we4.iam.gserviceaccount.com" --role="roles/storage.admin"
-  ```
-
-### 2.3: Implement Profile Photo Uploads
-- **Objective:** Allow users to upload and change their profile avatar.
-- **Status:** **Implemented.** The code for this is now in place. Users can change their avatar from the "Profile Settings" page.
-
-### 2.4: Implement Collection & Card Image Uploads
-- **Objective:** Replace placeholder images with real image uploads for collections and cards.
-- **Action:**
-  - This will involve updating the "Create/Edit Collection" and "Add/Edit Card" pages to include file upload components.
-  - Server actions will be created to handle the image uploads to the correct paths in Firebase Storage (e.g., `users/{userId}/collections/{collectionId}/` and `users/{userId}/cards/{cardId}/`).
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router, Turbopack) |
+| Auth | Clerk |
+| Database | PostgreSQL via Prisma ORM |
+| Storage | S3-compatible (MinIO locally) |
+| UI | Tailwind CSS + Radix UI (shadcn) |
+| Deployment | Docker |
 
 ---
 
-## Phase 3: GitHub Integration & Continuous Deployment
+## Local Development
 
-This phase connects your project to a GitHub repository for version control and automated deployments.
+### Prerequisites
 
-### 3.1: Initialize a Git Repository
-- **Objective:** Set up version control for your project.
-- **Action:**
-  - In your project's root directory, run `git init -b main`.
-  - Create a `.gitignore` file (if one doesn't exist) and add `node_modules`, `.next`, and `.env.local` to it.
-  - Run `git add .` and `git commit -m "Initial commit"`.
+- Node.js 20+
+- Docker + Docker Compose
 
-### 3.2:. Create a GitHub Repository
-- **Objective:** Host your code on GitHub.
-- **Action:**
-  - Go to your GitHub account.
-  - Create a new repository (do not initialize it with a README or license).
-  - Follow the instructions to "push an existing repository from the command line". The commands will look like this:
-    ```bash
-    git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-    git push -u origin main
-    ```
+### 1. Start local services
 
-### 3.3: Set up App Hosting CI/CD
-- **Objective:** Automatically deploy your application when you push changes to GitHub.
-- **Action:**
-  - In the Firebase Console, go to **Build > App Hosting**.
-  - Follow the prompts to connect your GitHub account and select the repository you just created.
-  - This will create a service account and secrets in GitHub to allow deployments. Your `apphosting.yaml` file is already configured.
+```bash
+npm run db:up
+```
+
+This starts:
+- **PostgreSQL** on `localhost:5432`
+- **MinIO** (S3-compatible storage) on `localhost:9000`
+- **MinIO Console** on `localhost:9001` (login: `minioadmin` / `minioadmin123`)
+
+### 2. Configure environment
+
+Copy the example env file and fill in your Clerk keys:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Required variables:
+
+```env
+# Clerk (get from https://dashboard.clerk.com)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Database (pre-configured for local Docker)
+DATABASE_URL=postgresql://collectoroom:dev_password_change_me@localhost:5432/collectoroom
+
+# S3 Storage (pre-configured for local MinIO)
+S3_ENDPOINT=http://localhost:9000
+S3_REGION=us-east-1
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin123
+S3_BUCKET=collectoroom
+S3_PUBLIC_URL=http://localhost:9000/collectoroom
+```
+
+### 3. Install dependencies and run migrations
+
+```bash
+npm install
+npx prisma generate
+npx prisma db push
+```
+
+### 4. Run the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Phase 4: Publishing
+## Scripts
 
-This is the final phase to make your site live on a custom domain.
+```bash
+npm run dev              # Start dev server (Turbopack)
+npm run build            # Production build
+npm run db:up            # Start PostgreSQL + MinIO containers
+npm run db:down          # Stop containers
+npm run db:logs          # Tail container logs
+npm run db:reset         # Wipe and restart containers
+npm run prisma:generate  # Regenerate Prisma client
+npm run prisma:migrate:dev  # Create and apply a new migration
+npm run prisma:dbpush    # Push schema directly (dev only)
+```
 
-### 4.1: Connect a Custom Domain
-- **Objective:** Serve your app from a domain you own.
-- **Action:**
-  - In the Firebase Console, go to **Build > App Hosting**.
-  - Click "Manage" on your backend.
-  - Go to the "Domains" tab and click "Add custom domain".
-  - Follow the wizard to verify your domain ownership and update your DNS records.
+---
 
-### 4.2: Go Live!
-- **Objective:** Your site is now live and deployed.
-- **Action:**
-  - After pushing to your `main` branch and a successful build, your site will be available at your custom domain. Congratulations!
+## Database
 
-deleted the 3 backends..
+Connect directly to the running PostgreSQL instance:
+
+```bash
+docker exec -it collectoroom-db psql -U collectoroom
+```
+
+Prisma schema: [`prisma/schema.prisma`](prisma/schema.prisma)
+
+Key tables: `users`, `collections`, `cards`, `card_images`, `categories`, `site_content`, `chats`, `messages`, `notifications`, `user_follows`
+
+---
+
+## Storage
+
+Files are stored in S3-compatible object storage under the following paths:
+
+```
+collectoroom/
+├── users/{userId}/cards/{cardId}/{uuid}.{ext}
+└── site-content/hero/{uuid}.{ext}
+```
+
+Browse uploaded files via the MinIO console at [http://localhost:9001](http://localhost:9001).
+
+---
+
+## Project Status
+
+See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full phase-by-phase plan, current status, and known bugs.
+
+---
+
+## Auth
+
+Authentication is handled entirely by [Clerk](https://clerk.com). The application stores a minimal `users` record in PostgreSQL keyed by the Clerk user ID, to hold app-specific data (plan, counts, admin flag).
+
+A Clerk webhook at `/api/webhooks/clerk` should auto-create this DB row on sign-up (see PROJECT_PLAN Phase 4.5).
+
+---
+
+## Deployment
+
+For Docker-based deployment, see `docker-compose.collectoroom.yml`. A Next.js `Dockerfile` is planned (Phase 7 of PROJECT_PLAN.md).

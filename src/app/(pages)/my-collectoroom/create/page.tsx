@@ -14,10 +14,9 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import type { Category } from '@/lib/types';
 import { createCollection } from "@/app/actions/collection-actions";
+import { getCategories } from "@/app/actions/category-actions";
 
 
 export default function CreateCollectionPage() {
@@ -39,15 +38,10 @@ export default function CreateCollectionPage() {
             router.push('/login');
         }
         
-        const fetchCategories = async () => {
-            setIsCategoriesLoading(true);
-            const querySnapshot = await getDocs(collection(db, 'categories'));
-            const categoriesData = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Category);
-            setCategories(categoriesData);
+        getCategories().then(res => {
+            if (res.success) setCategories((res.categories || []) as Category[]);
             setIsCategoriesLoading(false);
-        };
-        
-        fetchCategories();
+        });
 
     }, [user, authLoading, router]);
     
@@ -135,7 +129,7 @@ export default function CreateCollectionPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {categories.map(cat => (
-                                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

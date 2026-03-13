@@ -1,12 +1,12 @@
 import CollectionClient from './CollectionClient';
 import prisma from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CollectionPage({ params }: { params: { id: string } }) {
-  const collectionId = params.id;
+export default async function CollectionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: collectionId } = await params;
   if (!collectionId) return notFound();
 
   // Fetch collection, owner and cards from Prisma
@@ -21,12 +21,18 @@ export default async function CollectionPage({ params }: { params: { id: string 
 
   if (!collection) return notFound();
 
-  const { userId } = auth();
+  // Get current user (needed for ownership check and private collection access)
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult.userId;
+  } catch {
+    userId = null;
+  }
 
   // Check permissions for private collections
   if (!collection.is_public) {
     if (!userId || (userId !== collection.user_id)) {
-      // Check admin
       const maybeUser = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
       if (!maybeUser || !maybeUser.is_admin) {
         return redirect('/gallery');
@@ -34,13 +40,20 @@ export default async function CollectionPage({ params }: { params: { id: string 
     }
   }
 
-  // Normalize shapes for the client component
+  // Fetch owner username from Clerk (DB users table has no username column)
+  let ownerUsername = collection.user_id;
+  try {
+    const client = await clerkClient();
+    const clerkUser = await client.users.getUser(collection.user_id);
+    ownerUsername = clerkUser.username || clerkUser.firstName || clerkUser.fullName || collection.user_id;
+  } catch {}
+
   const normalizedCollection = {
     id: collection.id,
     name: collection.name,
     description: collection.description,
     isPublic: collection.is_public,
-    category: collection.category_id || (collection.category?.name ?? ''),
+    category: collection.category?.name ?? collection.category_id ?? '',
     cardCount: collection.card_count ?? collection.cards.length,
     coverImage: collection.cover_image ?? '',
     coverImageHint: collection.cover_image_hint ?? '',
@@ -49,11 +62,11 @@ export default async function CollectionPage({ params }: { params: { id: string 
     createdAt: collection.created_at,
   };
 
-  const owner = collection.user ? {
-    id: collection.user.id,
-    username: (collection.user as any).username ?? collection.user.id,
-    avatarUrl: (collection.user as any).avatar ?? undefined,
-  } : null;
+  const owner = {
+    id: collection.user_id,
+    username: ownerUsername,
+    avatarUrl: collection.user?.avatar ?? undefined,
+  };
 
   const cards = collection.cards.map((c) => ({
     id: c.id,

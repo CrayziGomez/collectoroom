@@ -64,8 +64,8 @@ export async function updateSiteContent(formData: FormData) {
         const updateData: { [key: string]: any } = {};
         if (title) updateData.title = title;
         if (subtitle) updateData.subtitle = subtitle;
-        if (heroImageUrl) updateData.heroImageUrl = heroImageUrl;
-        if (heroImagePath) updateData.heroImagePath = heroImagePath;
+        if (heroImageUrl) updateData.hero_image_url = heroImageUrl;
+        if (heroImagePath) updateData.hero_image_path = heroImagePath;
 
                 const upsert = await prisma.siteContent.upsert({
                     where: { id: 'content' },

@@ -4,7 +4,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return NextResponse.json([]);
 
     const chats = await prisma.chat.findMany({
@@ -37,7 +37,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
@@ -51,9 +51,10 @@ export async function POST(req: NextRequest) {
     if (chat) return NextResponse.json({ chatId: chat.id });
 
     // Build participants info using Clerk where possible
+    const clerkClientInstance = await clerkClient();
     const [me, other] = await Promise.all([
-      clerkClient.users.getUser(userId),
-      clerkClient.users.getUser(otherUserId),
+      clerkClientInstance.users.getUser(userId),
+      clerkClientInstance.users.getUser(otherUserId),
     ]).catch(() => [null, null]);
 
     const participants: Record<string, any> = {};

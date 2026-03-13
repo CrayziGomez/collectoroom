@@ -3,14 +3,14 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import EditCollectionClient from './EditCollectionClient';
 
-export default async function EditCollectionPage({ params }: { params: { id: string } }) {
-  const collectionId = params.id;
+export default async function EditCollectionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: collectionId } = await params;
   if (!collectionId) return notFound();
 
   const collection = await prisma.collection.findUnique({ where: { id: collectionId }, include: { cards: { include: { images: true } } } });
   if (!collection) return notFound();
 
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId || userId !== collection.user_id) return redirect('/my-collectoroom');
 
   const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });

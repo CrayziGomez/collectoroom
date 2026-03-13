@@ -23,8 +23,9 @@ const PRO_PLAN = {
 // Gets a user's data, merging from Clerk and Firestore
 export async function getUser(userId: string): Promise<User | null> {
     try {
+        const client = await clerkClient();
         const [clerkUser, userRecord] = await Promise.all([
-            clerkClient.users.getUser(userId),
+            client.users.getUser(userId),
             prisma.user.findUnique({ where: { id: userId } }),
         ]);
 
@@ -59,7 +60,8 @@ export async function getUser(userId: string): Promise<User | null> {
 // Updates a user's username
 export async function updateUsername(userId: string, username: string) {
     try {
-        await clerkClient.users.updateUser(userId, { username });
+        const client = await clerkClient();
+        await client.users.updateUser(userId, { username });
         return { success: true };
     } catch (error: any) {
         console.error('Error updating username:', error);
@@ -69,7 +71,8 @@ export async function updateUsername(userId: string, username: string) {
 
 export async function deleteUser(userId: string) {
     try {
-        await clerkClient.users.deleteUser(userId);
+        const client = await clerkClient();
+        await client.users.deleteUser(userId);
         await prisma.user.deleteMany({ where: { id: userId } });
         return { success: true };
     } catch (error: any) {
@@ -105,7 +108,8 @@ export async function toggleFollow({ targetUserId, currentUserId }: { targetUser
 
 export async function updateAvatar(userId: string, avatarUrl: string) {
     try {
-        await clerkClient.users.updateUser(userId, { imageUrl: avatarUrl });
+        const client = await clerkClient();
+        await client.users.updateUser(userId, { imageUrl: avatarUrl });
         await prisma.user.updateMany({ where: { id: userId }, data: { avatar: avatarUrl } });
         return { success: true };
     } catch (error: any) {

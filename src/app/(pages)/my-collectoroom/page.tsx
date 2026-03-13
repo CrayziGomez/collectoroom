@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown, Users } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown, Users, Layers } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -252,14 +252,20 @@ export default function MyCollectoRoomPage() {
               </CardHeader>
               <CardContent className="p-0 flex-grow">
                  <Link href={`/collections/${collection.id}`}>
-                   <Image
-                      src={collection.coverImage}
-                      alt={`Cover image for ${collection.name}`}
-                      width={400}
-                      height={300}
-                      className="aspect-[4/3] object-cover w-full group-hover:opacity-90 transition-opacity"
-                      data-ai-hint={collection.coverImageHint}
-                    />
+                   {collection.coverImage ? (
+                     <Image
+                        src={collection.coverImage}
+                        alt={`Cover image for ${collection.name}`}
+                        width={400}
+                        height={300}
+                        className="aspect-[4/3] object-cover w-full group-hover:opacity-90 transition-opacity"
+                        data-ai-hint={collection.coverImageHint}
+                      />
+                   ) : (
+                     <div className="aspect-[4/3] w-full bg-muted flex items-center justify-center">
+                       <Layers className="h-12 w-12 text-muted-foreground/30" />
+                     </div>
+                   )}
                   </Link>
               </CardContent>
               <CardFooter className="p-4">

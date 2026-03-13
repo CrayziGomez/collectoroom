@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { AuthContextProvider } from '@/contexts/auth-context';
 
 // Using system font stack to avoid Turbopack Google font fetch issues in dev
 
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <ClerkProvider>
+          <AuthContextProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -36,6 +38,7 @@ export default function RootLayout({
             </div>
             <Toaster />
           </ThemeProvider>
+          </AuthContextProvider>
         </ClerkProvider>
       </body>
     </html>

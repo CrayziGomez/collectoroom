@@ -5,16 +5,15 @@ import CardClient from './CardClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CardPage({ params }: { params: { id: string; cardId: string } }) {
-  const collectionId = params.id;
-  const cardId = params.cardId;
+export default async function CardPage({ params }: { params: Promise<{ id: string; cardId: string }> }) {
+  const { id: collectionId, cardId } = await params;
   const card = await prisma.card.findUnique({ where: { id: cardId }, include: { images: true } });
   if (!card || card.collection_id !== collectionId) return notFound();
 
   const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
   if (!collection) return notFound();
 
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!collection.is_public) {
     if (!userId || (userId !== collection.user_id)) {
       const maybeUser = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;

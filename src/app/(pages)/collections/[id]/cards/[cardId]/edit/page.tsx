@@ -1,11 +1,10 @@
 import prisma from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import EditCardClient from './EditCardClient';
+import EditCardClient from '../EditCardClient';
 
-export default async function EditCardPage({ params }: { params: { id: string; cardId: string } }) {
-  const collectionId = params.id;
-  const cardId = params.cardId;
+export default async function EditCardPage({ params }: { params: Promise<{ id: string; cardId: string }> }) {
+  const { id: collectionId, cardId } = await params;
 
   const card = await prisma.card.findUnique({ where: { id: cardId }, include: { images: true } });
   if (!card || card.collection_id !== collectionId) return notFound();
@@ -13,7 +12,7 @@ export default async function EditCardPage({ params }: { params: { id: string; c
   const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
   if (!collection) return notFound();
 
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId || userId !== card.user_id) return redirect('/my-collectoroom');
 
   const normalizedCard = {

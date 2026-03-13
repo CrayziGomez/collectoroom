@@ -113,14 +113,20 @@ export default function GalleryClient({ initialCollections = [], initialCategori
                 <Link href={`/collections/${collection.id}`}>
                   <CardContent className="p-0">
                     <div className="relative">
-                      <Image
-                        src={collection.coverImage}
-                        alt={`Cover image for ${collection.name}`}
-                        width={400}
-                        height={300}
-                        className="aspect-[4/3] object-cover w-full group-hover:scale-105 transition-transform duration-300"
-                        data-ai-hint={collection.coverImageHint}
-                      />
+                      {collection.coverImage ? (
+                        <Image
+                          src={collection.coverImage}
+                          alt={`Cover image for ${collection.name}`}
+                          width={400}
+                          height={300}
+                          className="aspect-[4/3] object-cover w-full group-hover:scale-105 transition-transform duration-300"
+                          data-ai-hint={collection.coverImageHint}
+                        />
+                      ) : (
+                        <div className="aspect-[4/3] w-full bg-muted flex items-center justify-center">
+                          <Layers className="h-12 w-12 text-muted-foreground/30" />
+                        </div>
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                        <div className="absolute top-2 right-2 flex gap-1">
                          {collection.isPublic ? (

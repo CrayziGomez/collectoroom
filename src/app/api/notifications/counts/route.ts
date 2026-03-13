@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return NextResponse.json({ unreadChats: 0, unreadNotifications: 0 });
 
     const unreadChats = await prisma.chat.count({ where: { participant_ids: { has: userId }, unread_count: { path: ['' ], not: undefined } } }).catch(() => 0);

@@ -41,6 +41,20 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        // Local MinIO (dev)
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '9002',
+        pathname: '/**',
+      },
+      {
+        // Clerk user avatars
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   devIndicators: {

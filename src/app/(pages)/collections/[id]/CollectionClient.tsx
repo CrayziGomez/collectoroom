@@ -14,7 +14,7 @@ import FollowButton from '../../profile/FollowButton';
 import MessageButton from '../../profile/MessageButton';
 import { useUser } from '@clerk/nextjs';
 import { tierLimits } from '@/lib/constants';
-import { toggleCollectionPrivacy } from '@/lib/actions/collection-actions';
+import { toggleCollectionPrivacy } from '@/app/actions/collection-actions';
 
 export default function CollectionClient({ initialCollection, initialOwner, initialCards }: any) {
   const { isSignedIn, user } = useUser();

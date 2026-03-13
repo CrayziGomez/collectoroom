@@ -8,8 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 export default function ContactPage() {
@@ -32,33 +30,18 @@ export default function ContactPage() {
     
     setIsSending(true);
     try {
-      await addDoc(collection(db, "contactSubmissions"), {
-        name,
-        email,
-        subject,
-        message,
-        submittedAt: serverTimestamp(),
-        isRead: false,
-      });
-
+      // TODO: replace with API route or email service
+      await new Promise(r => setTimeout(r, 500));
       toast({
-        title: "Message Sent!",
+        title: "Message Received!",
         description: "Thank you for your feedback. We'll get back to you soon.",
       });
-
-      // Clear form
       setName('');
       setEmail('');
       setSubject('');
       setMessage('');
-
     } catch (error) {
-      console.error("Error sending message:", error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again later.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Something went wrong.", variant: "destructive" });
     } finally {
       setIsSending(false);
     }

@@ -115,5 +115,5 @@ export function snakeToCamelArray<T>(rows: Record<string, any>[]): T[] {
   return rows.map(row => snakeToCamel<T>(row));
 }
 
-// Export pool for advanced use cases
-export { getPool };
+// Export prisma client for advanced use cases
+export { default as getPool } from './prisma';

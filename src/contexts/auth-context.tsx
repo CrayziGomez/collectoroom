@@ -4,7 +4,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { User as AppUser } from '@/lib/types';
-import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: AppUser | null;
@@ -22,16 +21,15 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     const syncUser = async () => {
-      setLoading(true);
       if (!isLoaded) {
-        console.debug('AuthContext: Clerk not loaded yet', { isLoaded, isSignedIn });
-        setLoading(false);
+        // Clerk is still initialising — keep loading: true so guards don't fire prematurely
+        setLoading(true);
         return;
       }
+      setLoading(true);
 
       if (isSignedIn && clerkUser) {
         const mapped: AppUser = {
@@ -43,22 +41,20 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           isAdmin: false,
           followerCount: 0,
           followingCount: 0,
-          avatarUrl: clerkUser.profileImageUrl || ''
+          avatarUrl: clerkUser.imageUrl || ''
         };
 
         setUser(mapped);
 
-        // optional: fetch application profile from backend
+        // Fetch app-specific profile (admin flag, counters, etc.)
         try {
           const res = await fetch(`/api/users/${clerkUser.id}`);
           if (res.ok) {
             const json = await res.json();
             setUser(prev => ({ ...(prev || {}), ...json } as AppUser));
-            if (json.isAdmin) router.push('/admin');
-            else router.push('/my-collectoroom');
           }
         } catch (e) {
-          // ignore - backend may not exist yet
+          // ignore - backend may not be reachable
         }
       } else {
         setUser(null);
@@ -67,7 +63,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
     };
 
     syncUser();
-  }, [isLoaded, isSignedIn, clerkUser, router]);
+  }, [isLoaded, isSignedIn, clerkUser]);
 
   const updateUser = useCallback(async (data: Partial<AppUser>) => {
     setUser(current => current ? { ...current, ...data } : current);

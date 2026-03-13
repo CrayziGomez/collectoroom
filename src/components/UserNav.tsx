@@ -18,13 +18,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreditCard, LogOut, Settings, User as UserIcon, Shield, Bell } from 'lucide-react';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { useUser, useAuth as useClerkAuth } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from './ui/skeleton';
 
 export function UserNav() {
   const { user, isLoaded } = useUser();
-  const { signOut } = useAuth();
+  const { signOut } = useClerkAuth();
+  const { user: appUser } = useAuth();
   const router = useRouter();
   const handleLogout = async () => {
     await signOut();
@@ -87,7 +89,7 @@ export function UserNav() {
                 <span>Settings</span>
              </Link>
           </DropdownMenuItem>
-           {user.isAdmin && (
+           {appUser?.isAdmin && (
             <DropdownMenuItem asChild>
                <Link href="/admin">
                 <Shield className="mr-2 h-4 w-4" />
