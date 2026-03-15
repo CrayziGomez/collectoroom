@@ -8,18 +8,17 @@ FROM node:20-slim AS deps
 WORKDIR /app
 
 # Upgrade npm to match local dev version (npm 11) so lockfile format is consistent
-RUN npm install -g npm@11
-
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci
+# Use npm install rather than npm ci to handle peer dep resolution gracefully
+# (@clerk/nextjs@7 requires react@19 as peer dep which causes npm ci lockfile errors)
+RUN npm install --legacy-peer-deps
 RUN npx prisma generate
 
 # ── Stage 2: build the Next.js app ──────────────────────────────────────────
 FROM node:20-slim AS builder
 WORKDIR /app
-RUN npm install -g npm@11
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
