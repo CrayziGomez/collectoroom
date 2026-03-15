@@ -55,5 +55,5 @@ jobs:
           # Settings → Secrets and variables → Actions → New repository secret
           build-args: |
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          # Cache disabled until first successful build to avoid stale layer issues
-          # Re-enable after a clean build: cache-from/cache-to: type=gha
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
