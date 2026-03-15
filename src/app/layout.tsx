@@ -13,6 +13,14 @@ import { AuthContextProvider } from '@/contexts/auth-context';
 export const metadata: Metadata = {
   title: 'CollectoRoom - Your Digital Collection Space',
   description: 'Create, manage, and share your collections with the world. From stamps to supercars, showcase your passion.',
+  icons: {
+    icon: [
+      { url: '/images/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/images/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/images/apple-touch-icon.png',
+  },
+  manifest: '/images/site.webmanifest',
 };
 
 export default function RootLayout({

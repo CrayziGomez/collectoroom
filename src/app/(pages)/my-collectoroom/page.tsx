@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { deleteCollection } from '@/app/actions/collection-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 // Collections are now fetched from the Prisma-backed API
 import type { Collection } from '@/lib/types';
@@ -79,6 +80,22 @@ export default function MyCollectoRoomPage() {
     };
   }, [user, authLoading, router]);
   
+  const handleDeleteCollection = async (collectionId: string, collectionName: string) => {
+    if (!user) return;
+    if (!window.confirm(`Delete "${collectionName}" and all its cards? This cannot be undone.`)) return;
+    try {
+      const result = await deleteCollection(collectionId, user.id);
+      if (result.success) {
+        setUserCollections(prev => prev.filter(c => c.id !== collectionId));
+        toast({ title: 'Collection Deleted', description: `"${collectionName}" has been removed.` });
+      } else {
+        toast({ title: 'Error', description: result.message || 'Could not delete collection.', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Could not delete collection.', variant: 'destructive' });
+    }
+  };
+
   const handleShare = (collectionId: string) => {
     const url = `${window.location.origin}/collections/${collectionId}`;
     navigator.clipboard.writeText(url);
@@ -128,6 +145,7 @@ export default function MyCollectoRoomPage() {
 
   const hasReachedCardLimit = totalCards >= cardLimit;
   const hasReachedCollectionLimit = userCollections.length >= collectionLimit;
+  const needsUsername = !user.username || user.username.startsWith('user_');
 
   const cardUsage = cardLimit === Infinity ? 0 : Math.min((totalCards / cardLimit) * 100, 100);
   const collectionUsage = collectionLimit === Infinity ? 0 : Math.min((userCollections.length / collectionLimit) * 100, 100);
@@ -202,7 +220,18 @@ export default function MyCollectoRoomPage() {
           )}
         </CardContent>
       </Card>
-      
+
+      {needsUsername && (
+        <Alert className="mb-6">
+          <Settings className="h-4 w-4" />
+          <AlertTitle>Set a username</AlertTitle>
+          <AlertDescription>
+            Your profile doesn't have a username yet — your user ID is showing on cards and collections.{' '}
+            <Link href="/my-collectoroom/settings" className="font-semibold text-primary underline">Set one now</Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold font-headline">My Collections</h2>
         <Button asChild disabled={hasReachedCollectionLimit}>
@@ -244,7 +273,7 @@ export default function MyCollectoRoomPage() {
                        <DropdownMenuItem onClick={() => handleShare(collection.id)}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCollection(collection.id, collection.name)}>
                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>

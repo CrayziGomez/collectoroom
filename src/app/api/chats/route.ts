@@ -15,9 +15,17 @@ export async function GET() {
     const result = await Promise.all(chats.map(async (c) => {
       let participants = c.participants as any;
       if (!participants) {
-        const users = await prisma.user.findMany({ where: { id: { in: c.participant_ids } } });
+        const [users, clerkClientInst] = await Promise.all([
+          prisma.user.findMany({ where: { id: { in: c.participant_ids } } }),
+          clerkClient(),
+        ]);
         participants = {};
-        users.forEach(u => { participants[u.id] = { username: u.id, avatarUrl: u.avatar || '' }; });
+        await Promise.all(users.map(async (u) => {
+          const cu = await clerkClientInst.users.getUser(u.id).catch(() => null);
+          const email = cu?.emailAddresses?.[0]?.emailAddress;
+          const displayName = u.username || cu?.username || cu?.firstName || cu?.fullName || (email ? email.split('@')[0] : 'User');
+          participants[u.id] = { username: displayName, avatarUrl: u.avatar || cu?.imageUrl || '' };
+        }));
       }
       return {
         id: c.id,
@@ -57,9 +65,14 @@ export async function POST(req: NextRequest) {
       clerkClientInstance.users.getUser(otherUserId),
     ]).catch(() => [null, null]);
 
+    const [meDb, otherDb] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.user.findUnique({ where: { id: otherUserId } }),
+    ]);
     const participants: Record<string, any> = {};
-    if (me) participants[userId] = { username: me.username || me.id, avatarUrl: me.imageUrl };
-    if (other) participants[otherUserId] = { username: other.username || other.id, avatarUrl: other.imageUrl };
+    const emailPrefix = (u: any) => u?.emailAddresses?.[0]?.emailAddress?.split('@')[0];
+    if (me) participants[userId] = { username: meDb?.username || me.username || me.firstName || me.fullName || emailPrefix(me) || 'User', avatarUrl: meDb?.avatar || me.imageUrl };
+    if (other) participants[otherUserId] = { username: otherDb?.username || other.username || other.firstName || other.fullName || emailPrefix(other) || 'User', avatarUrl: otherDb?.avatar || other.imageUrl };
 
     chat = await prisma.chat.create({ data: { id: chatId, participant_ids: [userId, otherUserId], participants } });
 

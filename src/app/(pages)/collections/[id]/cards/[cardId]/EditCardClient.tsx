@@ -76,7 +76,7 @@ export default function EditCardClient({ initialCard, initialCollection }: any) 
   };
 
   const handleSaveChanges = async () => {
-    if (!isSignedIn || !user) return (window.location.href = '/');
+    if (!isSignedIn || !user) { router.push('/'); return; }
     if (!title || !status) { toast({ title: 'Validation Error', description: 'Title and Status are required.', variant: 'destructive' }); return; }
 
     setIsSaving(true);
@@ -87,6 +87,7 @@ export default function EditCardClient({ initialCard, initialCollection }: any) 
     formData.append('title', title);
     formData.append('description', description);
     formData.append('status', status);
+    formData.append('category', initialCard.categoryId || '');
     formData.append('existingImages', JSON.stringify(existingImages));
     newImageFiles.forEach(file => formData.append('newImages', file));
 
@@ -102,7 +103,7 @@ export default function EditCardClient({ initialCard, initialCollection }: any) 
   };
 
   const handleDeleteCard = async () => {
-    if (!isSignedIn || !user) return (window.location.href = '/');
+    if (!isSignedIn || !user) { router.push('/'); return; }
     setIsDeleting(true);
     try {
       const result = await deleteCard({ cardId, collectionId, images: existingImages, userId: user.id });

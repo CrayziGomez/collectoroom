@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { User as AppUser } from '@/lib/types';
 
@@ -21,6 +21,7 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
   const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
     const syncUser = async () => {
@@ -29,10 +30,13 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
         setLoading(true);
         return;
       }
-      setLoading(true);
+      // Only show loading spinner on initial load; token refreshes should be silent
+      if (!initialLoadDone.current) {
+        setLoading(true);
+      }
 
       if (isSignedIn && clerkUser) {
-        const mapped: AppUser = {
+        const base: AppUser = {
           id: clerkUser.id,
           uid: clerkUser.id,
           email: clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '',
@@ -44,22 +48,23 @@ export const AuthContextProvider = ({ children }: { children: React.ReactNode })
           avatarUrl: clerkUser.imageUrl || ''
         };
 
-        setUser(mapped);
-
-        // Fetch app-specific profile (admin flag, counters, etc.)
+        // Fetch DB profile before setting user so isAdmin is never transiently false
         try {
           const res = await fetch(`/api/users/${clerkUser.id}`);
           if (res.ok) {
             const json = await res.json();
-            setUser(prev => ({ ...(prev || {}), ...json } as AppUser));
+            setUser({ ...base, ...json } as AppUser);
+          } else {
+            setUser(base);
           }
         } catch (e) {
-          // ignore - backend may not be reachable
+          setUser(base);
         }
       } else {
         setUser(null);
       }
       setLoading(false);
+      initialLoadDone.current = true;
     };
 
     syncUser();

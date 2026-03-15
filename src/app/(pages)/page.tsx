@@ -1,6 +1,8 @@
 
 import { currentUser } from '@clerk/nextjs/server';
 import { HomePageClientContent } from './HomePageClientContent';
+
+export const dynamic = 'force-dynamic';
 import { getSiteContent } from '@/app/actions/site-content';
 import { getCategories } from '@/app/actions/category-actions';
 

@@ -2,6 +2,7 @@ import CollectionClient from './CollectionClient';
 import prisma from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { resolveDisplayName } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,13 +41,15 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
     }
   }
 
-  // Fetch owner username from Clerk (DB users table has no username column)
-  let ownerUsername = collection.user_id;
+  // Fetch owner display name: DB username first, Clerk fallback
+  let ownerUsername: string;
   try {
     const client = await clerkClient();
-    const clerkUser = await client.users.getUser(collection.user_id);
-    ownerUsername = clerkUser.username || clerkUser.firstName || clerkUser.fullName || collection.user_id;
-  } catch {}
+    const clerkUser = await client.users.getUser(collection.user_id).catch(() => null);
+    ownerUsername = resolveDisplayName(collection.user?.username, clerkUser);
+  } catch {
+    ownerUsername = collection.user?.username || 'User';
+  }
 
   const normalizedCollection = {
     id: collection.id,

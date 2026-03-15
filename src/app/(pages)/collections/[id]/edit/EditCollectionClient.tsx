@@ -96,7 +96,7 @@ export default function EditCollectionClient({ initialCollection, initialCategor
                     <SelectValue placeholder={!initialCategories ? 'Loading...' : 'Select a category'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {initialCategories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
+                    {initialCategories.map((cat: any) => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

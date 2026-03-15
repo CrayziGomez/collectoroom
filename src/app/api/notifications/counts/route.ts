@@ -7,7 +7,7 @@ export async function GET() {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ unreadChats: 0, unreadNotifications: 0 });
 
-    const unreadChats = await prisma.chat.count({ where: { participant_ids: { has: userId }, unread_count: { path: ['' ], not: undefined } } }).catch(() => 0);
+    const unreadChats = await prisma.chat.count({ where: { participant_ids: { has: userId } } }).catch(() => 0);
 
     // Simple notifications unread count
     const unreadNotifications = await prisma.notification.count({ where: { recipient_id: userId, is_read: false } }).catch(() => 0);

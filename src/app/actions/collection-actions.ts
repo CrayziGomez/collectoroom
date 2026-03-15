@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from 'next/cache';
 import prisma from '@/lib/prisma';
+import { deleteFiles } from '@/lib/storage';
 
 export async function createCollection(formData: FormData) {
     const name = formData.get('name') as string;
@@ -63,11 +64,22 @@ export async function deleteCollection(collectionId: string, userId: string) {
         if (!collection || collection.user_id !== userId) {
             return { success: false, message: 'Not found or unauthorized.' };
         }
+        // Fetch image paths before deletion so we can clean up S3
+        const cards = await prisma.card.findMany({
+            where: { collection_id: collectionId },
+            include: { images: true },
+        });
+        const imagePaths = cards.flatMap(c => c.images.map((img: any) => img.path)).filter(Boolean);
+
         await prisma.$transaction(async (tx) => {
+            await tx.cardImage.deleteMany({ where: { card: { collection_id: collectionId } } });
             await tx.card.deleteMany({ where: { collection_id: collectionId } });
             await tx.collection.delete({ where: { id: collectionId } });
             await tx.user.update({ where: { id: userId }, data: { collection_count: { decrement: 1 } } });
         });
+
+        if (imagePaths.length > 0) await deleteFiles(imagePaths).catch(() => {});
+
         revalidatePath('/my-collectoroom');
         return { success: true };
     } catch (error: any) {

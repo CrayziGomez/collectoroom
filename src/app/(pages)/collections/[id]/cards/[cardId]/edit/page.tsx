@@ -20,6 +20,7 @@ export default async function EditCardPage({ params }: { params: Promise<{ id: s
     title: card.title,
     description: card.description,
     status: card.status,
+    categoryId: card.category_id,
     images: card.images.map((i: any) => ({ url: i.url, path: i.path, hint: i.hint })),
     createdAt: card.created_at,
   };

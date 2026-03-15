@@ -1,7 +1,13 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'standalone',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+    trustHost: true,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -46,6 +52,13 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 'localhost',
         port: '9002',
+        pathname: '/**',
+      },
+      {
+        // Production MinIO (s3.collectoroom.com)
+        protocol: 'https',
+        hostname: 's3.collectoroom.com',
+        port: '',
         pathname: '/**',
       },
       {

@@ -53,7 +53,7 @@ export function Header() {
     handle = window.setInterval(fetchCounts, 15000);
 
     return () => { mounted = false; if (handle) clearInterval(handle); };
-  }, [user, isLoaded]);
+  }, [user?.id, isLoaded]);
   
   const totalUnread = unreadChatsCount + unreadNotificationsCount;
 

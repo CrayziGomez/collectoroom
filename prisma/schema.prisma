@@ -12,12 +12,13 @@ datasource db {
 model User {
   id             String     @id
   plan_id        String?    @map("plan_id")
+  username       String?    @unique
   card_count     Int        @default(0) @map("card_count")
   collection_count Int      @default(0) @map("collection_count")
   is_admin       Boolean    @default(false) @map("is_admin")
   following_count Int       @default(0) @map("following_count")
   followers_count Int       @default(0) @map("followers_count")
-  avatar         String?    
+  avatar         String?
   created_at     DateTime   @default(now()) @map("created_at")
   updated_at     DateTime   @default(now()) @map("updated_at")
 

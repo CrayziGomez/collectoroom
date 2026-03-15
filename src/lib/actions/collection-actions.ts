@@ -10,7 +10,7 @@ import { revalidatePath } from 'next/cache';
  * It includes a security check to ensure that only the owner of the collection can modify it.
  */
 export const toggleCollectionPrivacy = async (collectionId: string, newPrivacyState: boolean): Promise<{ success: boolean; error?: string }> => {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return { success: false, error: 'You must be logged in to perform this action.' };
 
     if (!collectionId || typeof newPrivacyState !== 'boolean') {
@@ -40,7 +40,7 @@ export const toggleCollectionPrivacy = async (collectionId: string, newPrivacySt
 };
 
 export const updateCollection = async (formData: FormData) => {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return { success: false, error: 'Not authenticated' };
 
     const id = formData.get('id') as string;

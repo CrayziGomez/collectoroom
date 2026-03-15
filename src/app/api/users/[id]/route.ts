@@ -14,7 +14,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (!dbUser && !clerkUser) return NextResponse.json(null, { status: 404 });
 
-    const username = clerkUser?.username || clerkUser?.firstName || clerkUser?.fullName || id;
+    const emailPrefix = clerkUser?.emailAddresses?.[0]?.emailAddress?.split('@')[0];
+    const username = dbUser?.username || clerkUser?.username || clerkUser?.firstName || clerkUser?.fullName || emailPrefix || id;
     const avatarUrl = dbUser?.avatar || clerkUser?.imageUrl || null;
     const email = clerkUser?.emailAddresses?.[0]?.emailAddress || null;
 
@@ -67,6 +68,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const updateData: any = {};
     if (typeof body.avatarUrl === 'string') updateData.avatar = body.avatarUrl;
     if (typeof body.isAdmin === 'boolean') updateData.is_admin = body.isAdmin;
+    if (typeof body.username === 'string' && body.username.trim()) updateData.username = body.username.trim();
 
     if (Object.keys(updateData).length > 0) {
       await prisma.user.updateMany({ where: { id }, data: updateData });

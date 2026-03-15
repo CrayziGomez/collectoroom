@@ -118,11 +118,19 @@ const AdminPageClient = ({
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
+  const [activeTab, setActiveTab] = useState('overview');
+
   // Data
   const [stats, setStats] = useState<AdminStats | undefined>(undefined);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [siteContent, setSiteContent] = useState<SiteContentData | null>(null);
+
+  // Site content form state (controlled)
+  const [scTitle, setScTitle] = useState('');
+  const [scSubtitle, setScSubtitle] = useState('');
+  const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
+  const [scSaving, setScSaving] = useState(false);
 
   // Loading
   const [usersLoading, setUsersLoading] = useState(false);
@@ -156,7 +164,11 @@ const AdminPageClient = ({
     });
 
     getSiteContentAction().then(res => {
-      if (res.success) setSiteContent(res.data);
+      if (res.success) {
+        setSiteContent(res.data);
+        setScTitle(res.data?.title || '');
+        setScSubtitle(res.data?.subtitle || '');
+      }
     });
   }, [user?.isAdmin]);
 
@@ -267,20 +279,32 @@ const AdminPageClient = ({
 
   // ─── Site content ─────────────────────────────────────────────────────────────
 
-  function handleUpdateSiteContent(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    if (siteContent?.hero_image_url) formData.set('heroImageUrl', siteContent.hero_image_url);
-    if (siteContent?.hero_image_path) formData.set('existingHeroImagePath', siteContent.hero_image_path);
-    startTransition(async () => {
-      const res = await updateSiteContentAction(formData);
-      if (res.success) {
-        if (res.data) setSiteContent(res.data);
+  async function handleUpdateSiteContent() {
+    if (scSaving) return;
+    setScSaving(true);
+    try {
+      const formData = new FormData();
+      formData.set('title', scTitle);
+      formData.set('subtitle', scSubtitle);
+      if (heroImageFile) formData.set('heroImage', heroImageFile);
+      if (siteContent?.hero_image_url) formData.set('heroImageUrl', siteContent.hero_image_url);
+      if (siteContent?.hero_image_path) formData.set('existingHeroImagePath', siteContent.hero_image_path);
+      const res = await fetch('/api/admin/site-content', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.success) {
+        setSiteContent(json.data);
+        setScTitle(json.data?.title || '');
+        setScSubtitle(json.data?.subtitle || '');
+        setHeroImageFile(null);
         toast({ title: 'Site content updated' });
       } else {
-        toast({ title: 'Error', description: res.message, variant: 'destructive' });
+        toast({ title: 'Error', description: json.error || 'Unknown error', variant: 'destructive' });
       }
-    });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setScSaving(false);
+    }
   }
 
   // ─── Loading / guard ──────────────────────────────────────────────────────────
@@ -305,10 +329,10 @@ const AdminPageClient = ({
         <p className="text-muted-foreground mt-1">Welcome back, {user.username}</p>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'users') loadUsers(); }}>
         <TabsList className="mb-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users" onClick={loadUsers}>Users</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="site-content">Site Content</TabsTrigger>
         </TabsList>
@@ -549,23 +573,23 @@ const AdminPageClient = ({
                   <Skeleton className="h-10 w-full" />
                 </div>
               ) : (
-                <form onSubmit={handleUpdateSiteContent} className="space-y-5 max-w-lg">
+                <div className="space-y-5 max-w-lg">
                   <div className="space-y-2">
                     <Label htmlFor="sc-title">Hero Title</Label>
                     <Input
                       id="sc-title"
-                      name="title"
-                      defaultValue={siteContent.title || ''}
                       placeholder="Welcome to CollectoRoom"
+                      value={scTitle}
+                      onChange={(e) => setScTitle(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="sc-subtitle">Hero Subtitle</Label>
                     <Input
                       id="sc-subtitle"
-                      name="subtitle"
-                      defaultValue={siteContent.subtitle || ''}
                       placeholder="Create, manage, and share your collections…"
+                      value={scSubtitle}
+                      onChange={(e) => setScSubtitle(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -575,13 +599,19 @@ const AdminPageClient = ({
                         Current: {siteContent.hero_image_url}
                       </p>
                     )}
-                    <Input id="sc-image" name="heroImage" type="file" accept="image/*" />
+                    <Input
+                      id="sc-image"
+                      name="heroImage"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setHeroImageFile(e.target.files?.[0] || null)}
+                    />
                   </div>
-                  <Button type="submit" disabled={isPending}>
-                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button type="button" onClick={handleUpdateSiteContent} disabled={scSaving}>
+                    {scSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save Changes
                   </Button>
-                </form>
+                </div>
               )}
             </CardContent>
           </Card>

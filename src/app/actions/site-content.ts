@@ -4,7 +4,6 @@
 import prisma from '@/lib/prisma';
 import { uploadSiteImage, deleteFile } from '@/lib/storage';
 import { revalidatePath } from 'next/cache';
-import { v4 as uuidv4 } from 'uuid';
 
 
 export async function getSiteContent() {
@@ -19,9 +18,9 @@ export async function getSiteContent() {
                 hero_image_path: '',
                 how_it_works_steps: [] as any,
             }});
-            return { success: true, data: defaultContent };
+            return { success: true, data: { ...defaultContent, heroImageUrl: defaultContent.hero_image_url ?? '', heroImagePath: defaultContent.hero_image_path ?? '' } };
         }
-        return { success: true, data: content };
+        return { success: true, data: { ...content, heroImageUrl: content.hero_image_url ?? '', heroImagePath: content.hero_image_path ?? '' } };
     } catch (error: any) {
         console.error('Error fetching site content:', error);
         return { success: false, message: error.message };
@@ -43,10 +42,9 @@ export async function updateSiteContent(formData: FormData) {
     let heroImageUrl = formData.get('heroImageUrl') as string | null;
     let heroImagePath = existingHeroImagePath;
 
-    // Use Prisma to update the single `site_content` row
-    const existing = await prisma.siteContent.findUnique({ where: { id: 'content' } });
-
     try {
+        console.log('[updateSiteContent] heroImageFile type:', typeof heroImageFile, 'size:', (heroImageFile as any)?.size, 'name:', (heroImageFile as any)?.name);
+
         // Handle hero image update
         if (heroImageFile && (heroImageFile as any).size > 0) {
             if (existingHeroImagePath) {
@@ -81,7 +79,7 @@ export async function updateSiteContent(formData: FormData) {
 
                 revalidatePath('/');
 
-                return { success: true, message: 'Content updated successfully.', imageUrl: heroImageUrl, data: upsert };
+                return { success: true, message: 'Content updated successfully.', imageUrl: heroImageUrl, data: { ...upsert, heroImageUrl: upsert.hero_image_url ?? '', heroImagePath: upsert.hero_image_path ?? '' } };
 
     } catch (error: any) {
         console.error("Error updating site content:", error);

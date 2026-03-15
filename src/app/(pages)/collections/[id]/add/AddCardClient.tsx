@@ -72,7 +72,7 @@ export default function AddCardClient({ initialCollection }: any) {
   const descriptionWordCount = description.split(/\s+/).filter(Boolean).length;
 
   const handleAddCard = async () => {
-    if (!isSignedIn || !user) return (window.location.href = '/');
+    if (!isSignedIn || !user) { router.push('/'); return; }
     if (!title || !status || imageFiles.length === 0) {
       toast({ title: 'Validation Error', description: 'Title, Status, and at least one image are required.', variant: 'destructive' });
       return;

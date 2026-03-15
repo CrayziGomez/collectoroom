@@ -1,6 +1,7 @@
 import GalleryClient from './GalleryClient';
 import prisma from '@/lib/prisma';
 import { clerkClient } from '@clerk/nextjs/server';
+import { resolveDisplayName } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,16 +14,15 @@ export default async function GalleryContent() {
     include: { user: true, category: true },
   });
 
-  // Batch-fetch Clerk usernames for all unique owners
+  // Batch-fetch display names: DB username first, then Clerk fallback
   const ownerIds = [...new Set(collections.map(c => c.user_id))];
-  const clerkUsers: Record<string, string> = {};
+  const clerkUsers: Record<string, any> = {};
   if (ownerIds.length > 0) {
     try {
       const client = await clerkClient();
       await Promise.all(
         ownerIds.map(async (id) => {
-          const u = await client.users.getUser(id).catch(() => null);
-          clerkUsers[id] = u?.username || u?.firstName || u?.fullName || id;
+          clerkUsers[id] = await client.users.getUser(id).catch(() => null);
         })
       );
     } catch {}
@@ -32,7 +32,7 @@ export default async function GalleryContent() {
   collections.forEach((c) => {
     owners[c.user_id] = {
       id: c.user_id,
-      username: clerkUsers[c.user_id] ?? c.user_id,
+      username: resolveDisplayName(c.user?.username, clerkUsers[c.user_id]),
       avatar: c.user?.avatar ?? '',
     };
   });
