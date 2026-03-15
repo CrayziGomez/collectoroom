@@ -4,7 +4,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: install dependencies + generate Prisma client ──────────────────
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 
 COPY package*.json ./
@@ -14,7 +14,7 @@ RUN npm ci
 RUN npx prisma generate
 
 # ── Stage 2: build the Next.js app ──────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -30,7 +30,7 @@ ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 RUN npm run build
 
 # ── Stage 3: minimal production runner ──────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -44,6 +44,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Prisma client binary + CLI (needed for `prisma migrate deploy` at startup)
+# Must be from the same Debian-based image as the runner — binaries are OS-specific
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
