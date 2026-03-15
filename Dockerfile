@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --frozen-lockfile
+RUN npm ci
 RUN npx prisma generate
 
 # ── Stage 2: build the Next.js app ──────────────────────────────────────────
