@@ -1,48 +1,35 @@
 
-'use server';
+"use server";
 
-import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import prisma from '@/lib/prisma';
+import { uploadSiteImage, deleteFile } from '@/lib/storage';
 import { revalidatePath } from 'next/cache';
-import { v4 as uuidv4 } from 'uuid';
 
 
 export async function getSiteContent() {
-    const contentRef = adminDb.collection('siteContent').doc('content');
     try {
-        let doc = await contentRef.get();
-
-        if (!doc.exists) {
-            console.log("Site content not found, creating default document.");
-            const defaultContent = {
-                title: "Welcome to Your Collection!",
-                subtitle: "This is a brief description of your collection. You can edit this in the admin dashboard.",
-                heroImageUrl: "", // Default image URL can be set here
-                heroImagePath: "",
-                howItWorksSteps: [],
-            };
-            await contentRef.set(defaultContent);
-            doc = await contentRef.get(); // Re-fetch the document after creation
+        const content = await prisma.siteContent.findUnique({ where: { id: 'content' } });
+        if (!content) {
+            const defaultContent = await prisma.siteContent.create({ data: {
+                id: 'content',
+                title: 'Welcome to Your Collection!',
+                subtitle: 'This is a brief description of your collection. You can edit this in the admin dashboard.',
+                hero_image_url: '',
+                hero_image_path: '',
+                how_it_works_steps: [] as any,
+            }});
+            return { success: true, data: { ...defaultContent, heroImageUrl: defaultContent.hero_image_url ?? '', heroImagePath: defaultContent.hero_image_path ?? '' } };
         }
-
-        return { success: true, data: doc.data() };
+        return { success: true, data: { ...content, heroImageUrl: content.hero_image_url ?? '', heroImagePath: content.hero_image_path ?? '' } };
     } catch (error: any) {
-        console.error("Error fetching site content:", error);
+        console.error('Error fetching site content:', error);
         return { success: false, message: error.message };
     }
 }
 
 
-async function uploadHeroImage(file: File): Promise<{ url: string, path: string }> {
-    const bucket = adminStorage.bucket();
-    const imageFileName = `${uuidv4()}-${file.name}`;
-    const imagePath = `site-content/hero/${imageFileName}`;
-    const fileRef = bucket.file(imagePath);
-
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    await fileRef.save(fileBuffer, { metadata: { contentType: file.type } });
-
-    const [signedUrl] = await fileRef.getSignedUrl({ action: 'read', expires: '01-01-2100' });
-    return { url: signedUrl, path: imagePath };
+async function uploadHeroImage(file: File) {
+    return uploadSiteImage(file, 'hero');
 }
 
 export async function updateSiteContent(formData: FormData) {
@@ -55,21 +42,19 @@ export async function updateSiteContent(formData: FormData) {
     let heroImageUrl = formData.get('heroImageUrl') as string | null;
     let heroImagePath = existingHeroImagePath;
 
-    const contentRef = adminDb.collection('siteContent').doc('content');
-
     try {
+        console.log('[updateSiteContent] heroImageFile type:', typeof heroImageFile, 'size:', (heroImageFile as any)?.size, 'name:', (heroImageFile as any)?.name);
+
         // Handle hero image update
-        if (heroImageFile && heroImageFile.size > 0) {
-            // If there's an old image, delete it from storage
+        if (heroImageFile && (heroImageFile as any).size > 0) {
             if (existingHeroImagePath) {
                 try {
-                    await adminStorage.bucket().file(existingHeroImagePath).delete({ ignoreNotFound: true });
-                } catch (storageError: any) {
-                    console.error(`Failed to delete old hero image, but continuing: ${storageError.message}`);
+                    await deleteFile(existingHeroImagePath);
+                } catch (e) {
+                    console.error('Failed to delete old hero image, continuing', e);
                 }
             }
-            // Upload the new image
-            const { url, path } = await uploadHeroImage(heroImageFile);
+            const { url, path } = await uploadHeroImage(heroImageFile as File);
             heroImageUrl = url;
             heroImagePath = path;
         }
@@ -77,19 +62,24 @@ export async function updateSiteContent(formData: FormData) {
         const updateData: { [key: string]: any } = {};
         if (title) updateData.title = title;
         if (subtitle) updateData.subtitle = subtitle;
-        if (heroImageUrl) updateData.heroImageUrl = heroImageUrl;
-        if (heroImagePath) updateData.heroImagePath = heroImagePath;
+        if (heroImageUrl) updateData.hero_image_url = heroImageUrl;
+        if (heroImagePath) updateData.hero_image_path = heroImagePath;
 
-        await contentRef.set(updateData, { merge: true });
+                const upsert = await prisma.siteContent.upsert({
+                    where: { id: 'content' },
+                    update: {
+                        ...updateData,
+                        updated_at: new Date(),
+                    },
+                    create: {
+                        id: 'content',
+                        ...updateData,
+                    }
+                });
 
-        revalidatePath('/'); // Revalidate the homepage to show changes
+                revalidatePath('/');
 
-        // Return the potentially new image URL so the client can update its state
-        return { 
-            success: true, 
-            message: "Content updated successfully.",
-            imageUrl: heroImageUrl
-        };
+                return { success: true, message: 'Content updated successfully.', imageUrl: heroImageUrl, data: { ...upsert, heroImageUrl: upsert.hero_image_url ?? '', heroImagePath: upsert.hero_image_path ?? '' } };
 
     } catch (error: any) {
         console.error("Error updating site content:", error);

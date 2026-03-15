@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown, Users } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Settings, Share2, Trash2, Loader2, Crown, Users, Layers } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -18,9 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { deleteCollection } from '@/app/actions/collection-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+// Collections are now fetched from the Prisma-backed API
 import type { Collection } from '@/lib/types';
 import { tierLimits } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -61,20 +61,41 @@ export default function MyCollectoRoomPage() {
     }
 
     setCollectionsLoading(true);
-    const q = query(collection(db, 'collections'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const collectionsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Collection);
-      setUserCollections(collectionsData);
-      setCollectionsLoading(false);
-    }, (error) => {
-        console.error("Error fetching collections:", error);
+    fetch('/api/collections/my')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch collections');
+        return res.json();
+      })
+      .then((data: Collection[]) => {
+        setUserCollections(data || []);
         setCollectionsLoading(false);
-    });
+      })
+      .catch((err) => {
+        console.error('Error fetching collections:', err);
+        setCollectionsLoading(false);
+      });
 
-    return () => unsubscribe();
+    return () => {
+      /* no-op cleanup for fetch */
+    };
   }, [user, authLoading, router]);
   
+  const handleDeleteCollection = async (collectionId: string, collectionName: string) => {
+    if (!user) return;
+    if (!window.confirm(`Delete "${collectionName}" and all its cards? This cannot be undone.`)) return;
+    try {
+      const result = await deleteCollection(collectionId, user.id);
+      if (result.success) {
+        setUserCollections(prev => prev.filter(c => c.id !== collectionId));
+        toast({ title: 'Collection Deleted', description: `"${collectionName}" has been removed.` });
+      } else {
+        toast({ title: 'Error', description: result.message || 'Could not delete collection.', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Could not delete collection.', variant: 'destructive' });
+    }
+  };
+
   const handleShare = (collectionId: string) => {
     const url = `${window.location.origin}/collections/${collectionId}`;
     navigator.clipboard.writeText(url);
@@ -124,6 +145,7 @@ export default function MyCollectoRoomPage() {
 
   const hasReachedCardLimit = totalCards >= cardLimit;
   const hasReachedCollectionLimit = userCollections.length >= collectionLimit;
+  const needsUsername = !user.username || user.username.startsWith('user_');
 
   const cardUsage = cardLimit === Infinity ? 0 : Math.min((totalCards / cardLimit) * 100, 100);
   const collectionUsage = collectionLimit === Infinity ? 0 : Math.min((userCollections.length / collectionLimit) * 100, 100);
@@ -198,7 +220,18 @@ export default function MyCollectoRoomPage() {
           )}
         </CardContent>
       </Card>
-      
+
+      {needsUsername && (
+        <Alert className="mb-6">
+          <Settings className="h-4 w-4" />
+          <AlertTitle>Set a username</AlertTitle>
+          <AlertDescription>
+            Your profile doesn't have a username yet — your user ID is showing on cards and collections.{' '}
+            <Link href="/my-collectoroom/settings" className="font-semibold text-primary underline">Set one now</Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold font-headline">My Collections</h2>
         <Button asChild disabled={hasReachedCollectionLimit}>
@@ -240,7 +273,7 @@ export default function MyCollectoRoomPage() {
                        <DropdownMenuItem onClick={() => handleShare(collection.id)}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCollection(collection.id, collection.name)}>
                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -248,14 +281,20 @@ export default function MyCollectoRoomPage() {
               </CardHeader>
               <CardContent className="p-0 flex-grow">
                  <Link href={`/collections/${collection.id}`}>
-                   <Image
-                      src={collection.coverImage}
-                      alt={`Cover image for ${collection.name}`}
-                      width={400}
-                      height={300}
-                      className="aspect-[4/3] object-cover w-full group-hover:opacity-90 transition-opacity"
-                      data-ai-hint={collection.coverImageHint}
-                    />
+                   {collection.coverImage ? (
+                     <Image
+                        src={collection.coverImage}
+                        alt={`Cover image for ${collection.name}`}
+                        width={400}
+                        height={300}
+                        className="aspect-[4/3] object-cover w-full group-hover:opacity-90 transition-opacity"
+                        data-ai-hint={collection.coverImageHint}
+                      />
+                   ) : (
+                     <div className="aspect-[4/3] w-full bg-muted flex items-center justify-center">
+                       <Layers className="h-12 w-12 text-muted-foreground/30" />
+                     </div>
+                   )}
                   </Link>
               </CardContent>
               <CardFooter className="p-4">

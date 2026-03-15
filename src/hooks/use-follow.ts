@@ -3,8 +3,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
 // The hook now accepts the server action as an argument.
@@ -26,14 +24,18 @@ export function useFollow(
                 setIsLoading(false);
                 return;
             }
-            
+
             setIsLoading(true);
             try {
-                const followingRef = doc(db, 'users', user.uid, 'following', targetUserId);
-                const docSnap = await getDoc(followingRef);
-                setIsFollowing(docSnap.exists());
+                const res = await fetch(`/api/follow?targetUserId=${encodeURIComponent(targetUserId)}`);
+                if (!res.ok) {
+                    setIsFollowing(false);
+                } else {
+                    const data = await res.json();
+                    setIsFollowing(Boolean(data.isFollowing));
+                }
             } catch (error) {
-                console.error("Error checking follow status:", error);
+                console.error('Error checking follow status:', error);
                 setIsFollowing(false);
             } finally {
                 setIsLoading(false);
@@ -58,27 +60,26 @@ export function useFollow(
         setIsFollowing(!originalFollowState);
 
         try {
-            // Use the passed-in server action
-            const result = await toggleFollowAction({ targetUserId, currentUserId: user.uid });
-
-            // Confirm the final state from the server
-            const confirmedState = result.newState === 'followed';
-            if (isFollowing !== confirmedState) {
-                setIsFollowing(confirmedState);
+            if (toggleFollowAction) {
+                const result = await toggleFollowAction({ targetUserId, currentUserId: user.uid });
+                const confirmedState = result.newState === 'followed';
+                if (isFollowing !== confirmedState) setIsFollowing(confirmedState);
+            } else {
+                const res = await fetch('/api/follow', { method: 'POST', body: JSON.stringify({ targetUserId }), headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (res.ok && data.success) setIsFollowing(Boolean(data.isFollowing));
+                else throw new Error(data.message || 'Failed to toggle follow');
             }
-            
+
             toast({
-                title: confirmedState ? "Followed!" : "Unfollowed",
-                description: `You are ${confirmedState ? 'now following' : 'no longer following'} this user.`,
+                title: isFollowing ? 'Unfollowed' : 'Followed!',
+                description: `You are ${isFollowing ? 'no longer following' : 'now following'} this user.`,
             });
-            
-            // Callback to refresh data on the parent component if needed
             onSuccess?.();
 
         } catch (error: any) {
-            console.error("Error toggling follow:", error);
-            // Revert UI on error
-            setIsFollowing(originalFollowState); 
+            console.error('Error toggling follow:', error);
+            setIsFollowing(originalFollowState);
             toast({ title: 'Error', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);

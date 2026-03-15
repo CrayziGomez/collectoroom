@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -14,24 +14,6 @@ import { PRICING_TIERS, HOW_IT_WORKS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CategoryIcon } from '@/components/CategoryIcon';
-
-// A fallback component to show while the main content is loading.
-function HeroLoadingSkeleton() {
-    return (
-        <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-12">
-            <div className="md:w-1/2 space-y-6 text-center md:text-left">
-                <Skeleton className="h-16 w-3/4 mx-auto md:mx-0" />
-                <Skeleton className="h-6 w-full max-w-lg mx-auto md:mx-0" />
-                <div className="flex justify-center md:justify-start gap-4">
-                    <Skeleton className="h-12 w-40" />
-                </div>
-            </div>
-            <div className="md:w-1/2 flex justify-center">
-                <Skeleton className="w-[500px] h-[350px] rounded-lg" />
-            </div>
-        </div>
-    );
-}
 
 // Main client component for the homepage
 export function HomePageClientContent({ initialContent, initialCategories, initialHowItWorksSteps, initialHeroContent }) {
@@ -69,30 +51,29 @@ export function HomePageClientContent({ initialContent, initialCategories, initi
         );
     };
     
-    // This is a sub-component to render the hero section.
-    const HeroSection = () => {
-      if (loading) {
-          return <HeroLoadingSkeleton />;
-      }
-      return (
+    return (
+    <div className="bg-background text-foreground">
+        {/* Hero Section — rendered immediately from server props, no auth gate */}
         <div className="text-center md:text-left">
             <div className="container mx-auto px-4 py-24">
                 <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-12">
                     <div className="md:w-1/2 space-y-6">
-                        <h1 
-                            className="text-4xl md:text-6xl font-bold font-headline leading-tight tracking-tighter" 
+                        <h1
+                            className="text-4xl md:text-6xl font-bold font-headline leading-tight tracking-tighter"
                             dangerouslySetInnerHTML={{ __html: content?.title || '' }}
                         />
                         <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto md:mx-0">
                             {content?.subtitle}
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center md:justify-start gap-4">
-                            <Button asChild size="lg" className="font-bold text-lg">
-                                <Link href={user ? "/my-collectoroom" : "/signup"}>
-                                    {user ? 'Go to My Collectoroom' : 'Get Started For Free'}
-                                    <ArrowRight className="ml-2 h-5 w-5" />
-                                </Link>
-                            </Button>
+                            {!loading && (
+                                <Button asChild size="lg" className="font-bold text-lg">
+                                    <Link href={user ? "/my-collectoroom" : "/signup"}>
+                                        {user ? 'Go to My Collectoroom' : 'Get Started For Free'}
+                                        <ArrowRight className="ml-2 h-5 w-5" />
+                                    </Link>
+                                </Button>
+                            )}
                         </div>
                     </div>
                     <div className="md:w-1/2 flex justify-center items-center">
@@ -102,15 +83,15 @@ export function HomePageClientContent({ initialContent, initialCategories, initi
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 transition={{ duration: 0.8, ease: "easeOut" }}
                             >
-                            <Image
-                                src={content.heroImageUrl}
-                                alt="Hero Image"
-                                width={550}
-                                height={400}
-                                className="rounded-xl shadow-2xl object-cover"
-                                priority
-                            />
-                             </motion.div>
+                                <Image
+                                    src={content.heroImageUrl}
+                                    alt="Hero Image"
+                                    width={550}
+                                    height={400}
+                                    className="rounded-xl shadow-2xl object-cover"
+                                    priority
+                                />
+                            </motion.div>
                         ) : (
                             <div className="w-[550px] h-[400px] bg-muted rounded-xl shadow-lg flex items-center justify-center">
                                 <p className="text-muted-foreground">Image coming soon</p>
@@ -120,15 +101,6 @@ export function HomePageClientContent({ initialContent, initialCategories, initi
                 </div>
             </div>
         </div>
-      );
-    };
-    
-    return (
-    <div className="bg-background text-foreground">
-        {/* Hero Section */}
-        <Suspense fallback={<HeroLoadingSkeleton />}>
-            <HeroSection />
-        </Suspense>
         
         {/* Categories Section */}
         <Section className="py-20">

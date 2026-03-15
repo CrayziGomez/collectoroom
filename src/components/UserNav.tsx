@@ -18,23 +18,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreditCard, LogOut, Settings, User as UserIcon, Shield, Bell } from 'lucide-react';
+import { useUser, useAuth as useClerkAuth } from '@clerk/nextjs';
 import { useAuth } from '@/contexts/auth-context';
-import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { app } from '@/lib/firebase';
 import { Skeleton } from './ui/skeleton';
 
 export function UserNav() {
-  const { user, loading } = useAuth();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerkAuth();
+  const { user: appUser } = useAuth();
   const router = useRouter();
-
   const handleLogout = async () => {
-    const auth = getAuth(app);
-    await signOut(auth);
+    await signOut();
     router.push('/');
   };
 
-  if (loading) {
+  if (!isLoaded) {
     return (
       <div className="flex items-center gap-4">
         <Skeleton className="h-8 w-8 rounded-full" />
@@ -51,18 +50,18 @@ export function UserNav() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatarUrl || ''} alt={`@${user.username}`} />
-            <AvatarFallback>{user.username?.charAt(0).toUpperCase()}</AvatarFallback>
+            <Avatar className="h-8 w-8">
+            <AvatarImage src={(user as any)?.imageUrl || ''} alt={`@${(user as any)?.username || ''}`} />
+            <AvatarFallback>{(user as any)?.username?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.username}</p>
+            <p className="text-sm font-medium leading-none">{(user as any)?.username}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              {(user as any)?.primaryEmailAddress?.emailAddress || ''}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -90,7 +89,7 @@ export function UserNav() {
                 <span>Settings</span>
              </Link>
           </DropdownMenuItem>
-           {user.isAdmin && (
+           {appUser?.isAdmin && (
             <DropdownMenuItem asChild>
                <Link href="/admin">
                 <Shield className="mr-2 h-4 w-4" />

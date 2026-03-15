@@ -1,29 +1,30 @@
 
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Define the routes that should be publicly accessible
 const isPublicRoute = createRouteMatcher([
   '/',
+  '/gallery(.*)',
+  '/pricing(.*)',
+  '/about(.*)',
+  '/contact(.*)',
+  '/terms(.*)',
   '/login(.*)',
   '/signup(.*)',
-  '/forgot-password(.*)',
-  '/about',
-  '/contact',
-  '/terms',
-  '/pricing',
-  '/gallery',
-  '/profile/(.*)',
-  '/collections/(.*)',
-  '/api/auth',
+  '/collections(.*)',
+  '/profile(.*)',
+  '/api/users(.*)',
+  '/api/webhooks(.*)',
 ]);
 
-export default clerkMiddleware((auth, req) => {
-  // Protect all routes that are not public
+export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
-    auth().protect();
+    await auth.protect();
   }
 });
 
 export const config = {
-  matcher: ['/((?!.*\..*|_next).*)', '/', '/(api|trpc)(.*)'],
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
 };

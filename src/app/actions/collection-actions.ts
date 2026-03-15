@@ -1,56 +1,88 @@
-'use server';
-import { FieldValue } from 'firebase-admin/firestore';
+"use server";
 import { revalidatePath } from 'next/cache';
-import { adminDb } from '@/lib/firebase-admin';
-import { getUser } from './user-actions'; // Import the user-actions
+import prisma from '@/lib/prisma';
+import { deleteFiles } from '@/lib/storage';
 
 export async function createCollection(formData: FormData) {
     const name = formData.get('name') as string;
     const userId = formData.get('userId') as string;
-    const category = formData.get('category') as string;
+    const categoryId = formData.get('category') as string;
+    const description = formData.get('description') as string || null;
+    const keywords = formData.get('keywords') as string || null;
+    const isPublic = formData.get('isPublic') !== 'false';
 
-    if (!name || !userId || !category) {
+    if (!name || !userId || !categoryId) {
         return { success: false, message: 'Missing required fields.' };
     }
 
     try {
-        // **FIXED: Add user plan limit check**
-        const user = await getUser(userId);
-        if (!user) {
-            throw new Error('User not found');
-        }
-
-        if (user.collectionCount >= user.plan.collectionLimit) {
-            return { 
-                success: false, 
-                message: `You\'ve reached your limit of ${user.plan.collectionLimit} collections. Please upgrade your plan.` 
-            };
-        }
-
-        const collectionRef = adminDb.collection('collections').doc();
-        const userRef = adminDb.collection('users').doc(userId);
-
-        // Use a transaction to ensure atomic update
-        await adminDb.runTransaction(async (transaction) => {
-            transaction.set(collectionRef, {
-                name,
-                userId,
-                category,
-                cardCount: 0,
-                coverImage: '', // Default cover image
-                createdAt: FieldValue.serverTimestamp(),
+        // Use a Prisma transaction to create collection and increment user's count
+        const created = await prisma.$transaction(async (tx) => {
+            const col = await tx.collection.create({
+                data: {
+                    name,
+                    user_id: userId,
+                    category_id: categoryId,
+                    description,
+                    keywords,
+                    is_public: isPublic,
+                    card_count: 0,
+                },
             });
 
-            // Atomically increment the user's collection count
-            transaction.update(userRef, { collectionCount: FieldValue.increment(1) });
+            await tx.user.update({
+                where: { id: userId },
+                data: { collection_count: { increment: 1 } },
+            });
+
+            return col;
         });
 
-        revalidatePath('/'); // Revalidate the home page to show the new collection
+        revalidatePath('/');
 
-        return { success: true, collectionId: collectionRef.id };
+        return { success: true, collectionId: created.id };
 
     } catch (error: any) {
         console.error('Error creating collection:', error);
         return { success: false, message: error.message || 'An unknown error occurred while creating the collection.' };
+    }
+}
+
+export async function toggleCollectionPrivacy(collectionId: string, isPublic: boolean) {
+    try {
+        await prisma.collection.update({ where: { id: collectionId }, data: { is_public: isPublic } });
+        revalidatePath(`/collections/${collectionId}`);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    }
+}
+
+export async function deleteCollection(collectionId: string, userId: string) {
+    try {
+        const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
+        if (!collection || collection.user_id !== userId) {
+            return { success: false, message: 'Not found or unauthorized.' };
+        }
+        // Fetch image paths before deletion so we can clean up S3
+        const cards = await prisma.card.findMany({
+            where: { collection_id: collectionId },
+            include: { images: true },
+        });
+        const imagePaths = cards.flatMap(c => c.images.map((img: any) => img.path)).filter(Boolean);
+
+        await prisma.$transaction(async (tx) => {
+            await tx.cardImage.deleteMany({ where: { card: { collection_id: collectionId } } });
+            await tx.card.deleteMany({ where: { collection_id: collectionId } });
+            await tx.collection.delete({ where: { id: collectionId } });
+            await tx.user.update({ where: { id: userId }, data: { collection_count: { decrement: 1 } } });
+        });
+
+        if (imagePaths.length > 0) await deleteFiles(imagePaths).catch(() => {});
+
+        revalidatePath('/my-collectoroom');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, message: error.message };
     }
 }

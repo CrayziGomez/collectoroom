@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { updateUsername } from '@/app/actions/user-actions';
 import { Loader2 } from 'lucide-react';
 import { recountUsage } from '@/app/actions/user-actions-dev'; // Import the recount action
 
@@ -23,18 +22,21 @@ export function SettingsPageClient() {
     const [recountMessage, setRecountMessage] = useState(''); // State for the recount message
 
     const handleUpdateUsername = async () => {
-        if (!user || !newUsername) return;
+        if (!user || !newUsername.trim()) return;
 
         setIsUpdating(true);
         try {
-            const result = await updateUsername(user.id, newUsername);
-            if (result.success) {
-                toast({ title: 'Success', description: 'Username updated successfully!' });
-                await user.reload(); // Reload user data to get the new username
-                router.push(`/profile/${newUsername}`);
-            } else {
-                throw new Error(result.message || 'An unknown error occurred.');
+            const res = await fetch(`/api/users/${user.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: newUsername.trim() }),
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.error || `Server error ${res.status}`);
             }
+            toast({ title: 'Success', description: 'Username updated successfully!' });
+            router.refresh();
         } catch (error: any) {
             toast({
                 title: 'Error',

@@ -1,18 +1,26 @@
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { AuthContextProvider } from '@/contexts/auth-context';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+// Using system font stack to avoid Turbopack Google font fetch issues in dev
 
 export const metadata: Metadata = {
   title: 'CollectoRoom - Your Digital Collection Space',
   description: 'Create, manage, and share your collections with the world. From stamps to supercars, showcase your passion.',
+  icons: {
+    icon: [
+      { url: '/images/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/images/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/images/apple-touch-icon.png',
+  },
+  manifest: '/images/site.webmanifest',
 };
 
 export default function RootLayout({
@@ -22,8 +30,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-body antialiased`}>
+      <body className="font-sans antialiased">
         <ClerkProvider>
+          <AuthContextProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -37,6 +46,7 @@ export default function RootLayout({
             </div>
             <Toaster />
           </ThemeProvider>
+          </AuthContextProvider>
         </ClerkProvider>
       </body>
     </html>

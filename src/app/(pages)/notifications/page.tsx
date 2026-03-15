@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, writeBatch, doc } from 'firebase/firestore';
 import type { Notification } from '@/lib/types';
 import { Loader2, BellOff } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,33 +25,27 @@ export default function NotificationsPage() {
             return;
         }
 
-        setLoading(true);
-        const notificationsQuery = query(
-            collection(db, 'notifications'),
-            where('recipientId', '==', user.uid),
-            orderBy('timestamp', 'desc')
-        );
+                setLoading(true);
+                let mounted = true;
 
-        const unsubscribe = onSnapshot(notificationsQuery, (querySnapshot) => {
-            const notificationsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Notification);
-            setNotifications(notificationsData);
-            setLoading(false);
+                const fetchNotifications = async () => {
+                    try {
+                        const res = await fetch('/api/notifications');
+                        if (!res.ok) throw new Error('Failed to load notifications');
+                        const data = await res.json();
+                        if (!mounted) return;
+                        setNotifications(data as Notification[]);
+                        setLoading(false);
+                    } catch (e) {
+                        console.error('Error fetching notifications:', e);
+                        setLoading(false);
+                    }
+                };
 
-            // Mark notifications as read
-            const unread = querySnapshot.docs.filter(doc => !doc.data().isRead);
-            if (unread.length > 0) {
-                const batch = writeBatch(db);
-                unread.forEach(doc => {
-                    batch.update(doc.ref, { isRead: true });
-                });
-                batch.commit().catch(console.error);
-            }
-        }, (error) => {
-            console.error("Error fetching notifications:", error);
-            setLoading(false);
-        });
+                fetchNotifications();
+                const handle = window.setInterval(fetchNotifications, 15000);
 
-        return () => unsubscribe();
+                return () => { mounted = false; clearInterval(handle); };
     }, [user, authLoading, router]);
 
     if (authLoading || loading) {

@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -7,36 +7,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
-import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { app } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSent, setIsSent] = useState(false);
-  const auth = getAuth(app);
   const { toast } = useToast();
 
   const handlePasswordReset = async () => {
     if (!email) {
       toast({
-        title: "Email Required",
-        description: "Please enter your email address.",
-        variant: "destructive",
+        title: 'Email Required',
+        description: 'Please enter your email address.',
+        variant: 'destructive',
       });
       return;
     }
     setIsSending(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || 'Failed to request password reset');
+      }
       setIsSent(true);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to send password reset email.",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to request password reset.',
+        variant: 'destructive',
       });
     } finally {
       setIsSending(false);

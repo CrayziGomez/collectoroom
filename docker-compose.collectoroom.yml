@@ -1,0 +1,143 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Collectoroom production stack
+#
+# Usage:
+#   docker compose -f docker-compose.collectoroom.yml --env-file .env.collectoroom.prod up -d
+#
+# All ports and credentials are configured via the env file.
+# See .env.collectoroom for the full list of required variables.
+#
+# ⚠️  Before deploying alongside other stacks on the same host:
+#   - Verify all port values in your env file are free: ss -tlnp | grep <port>
+#   - Volume names (collectoroom-db-data, collectoroom-minio-data) are scoped
+#     to this compose project and will not conflict with other stacks.
+#   - If running alongside the dev stack, use a distinct project name:
+#       docker compose -p collectoroom-prod -f docker-compose.collectoroom.yml ...
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  db-collectoroom:
+    container_name: db-collectoroom
+    image: postgres:15
+    restart: unless-stopped
+    networks: [collectoroom-net]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}         # Set in env file
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Set in env file — use a strong password
+      POSTGRES_DB: ${POSTGRES_DB}             # Set in env file
+    ports:
+      - "${POSTGRES_PORT}:5432"               # POSTGRES_PORT: choose a free host port (e.g. 5434)
+    volumes:
+      - collectoroom-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  s3-collectoroom:
+    container_name: s3-collectoroom
+    # Pinned release — do NOT change to :latest to avoid unexpected API changes.
+    image: minio/minio:RELEASE.2023-12-14T18-51-57Z
+    restart: unless-stopped
+    networks: [collectoroom-net]
+    # Console always runs on internal port 9001; API always on 9000
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}         # Set in env file
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD} # Set in env file — use a strong password
+    ports:
+      - "${MINIO_PORT}:9000"         # S3 API  — MINIO_PORT: choose a free host port (e.g. 9004)
+      - "${MINIO_CONSOLE_PORT}:9001" # Web UI  — MINIO_CONSOLE_PORT: choose a free host port (e.g. 9005)
+    volumes:
+      - collectoroom-minio-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    # One-shot init container: creates the S3 bucket and sets public-read access, then exits.
+    # Safe to re-run — --ignore-existing means it won't fail if the bucket already exists.
+    image: minio/mc:latest
+    networks: [collectoroom-net]
+    depends_on:
+      s3-collectoroom:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-collectoroom}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://s3-collectoroom:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb local/$$S3_BUCKET --ignore-existing;
+      mc anonymous set download local/$$S3_BUCKET;
+      echo 'MinIO bucket ready with public read access';
+      "
+
+  adminer-collectoroom:
+    container_name: adminer-collectoroom
+    image: adminer:latest
+    restart: unless-stopped
+    networks: [collectoroom-net]
+    ports:
+      - "${ADMINER_PORT}:8080"  # ADMINER_PORT: choose a free host port (e.g. 8082)
+                                # ⚠️  Do NOT expose this port publicly — internal/VPN access only
+    depends_on:
+      db-collectoroom:
+        condition: service_healthy
+
+  app-collectoroom:
+    container_name: app-collectoroom
+    # Pre-built image from GitHub Container Registry (pushed by CI on every merge to main).
+    # Server deployment: docker compose pull && docker compose up -d
+    # Local build (dev/testing): docker compose build app-collectoroom
+    image: ghcr.io/crayziggomez/collectoroom:latest
+    build:
+      context: .
+      args:
+        # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is baked into the client-side JS bundle at build time.
+        # Changing this value requires a full image rebuild: docker compose build app-collectoroom
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    restart: unless-stopped
+    networks: [collectoroom-net]
+    ports:
+      - "${APP_PORT:-3000}:3000"  # APP_PORT: the host port NPM (or HAProxy) will proxy to
+    environment:
+      # Database — uses internal Docker service name, not localhost
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-collectoroom:5432/${POSTGRES_DB}
+
+      # S3 storage — S3_ENDPOINT is the internal Docker address used for server-side uploads.
+      # S3_PUBLIC_URL is the externally accessible URL used in image src attributes (via NPM proxy).
+      S3_ENDPOINT: http://s3-collectoroom:9000
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}         # e.g. https://s3.collectoroom.com/collectoroom
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-collectoroom}
+
+      # Clerk auth — must be production keys (pk_live_ / sk_live_)
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+
+      # Admin bootstrap: the first request from this Clerk user ID will auto-promote them to admin in DB.
+      # Set to your Clerk user ID (found in Clerk dashboard → Users).
+      ADMIN_USER_ID: ${ADMIN_USER_ID}
+    depends_on:
+      db-collectoroom:
+        condition: service_healthy
+      s3-collectoroom:
+        condition: service_healthy
+
+networks:
+  collectoroom-net:
+    # Dedicated bridge network — fully isolated from all other Docker stacks on this host
+    driver: bridge
+
+volumes:
+  collectoroom-db-data:
+  collectoroom-minio-data:
